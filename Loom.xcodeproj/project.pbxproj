@@ -29,9 +29,23 @@
 		5A5626662F2952C500B7F4CF /* LoomUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LoomUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5AC4299E2F295989006F4FFB /* Exceptions for "Loom" folder in "Loom" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				ContentView.swift,
+				Item.swift,
+			);
+			target = 5A56264C2F2952C400B7F4CF /* Loom */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5A56264F2F2952C400B7F4CF /* Loom */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5AC4299E2F295989006F4FFB /* Exceptions for "Loom" folder in "Loom" target */,
+			);
 			path = Loom;
 			sourceTree = "<group>";
 		};
