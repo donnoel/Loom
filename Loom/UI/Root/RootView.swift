@@ -63,6 +63,7 @@ struct RootView: View {
         } detail: {
             if let session = vm.session(for: vm.selectedSessionID) {
                 SessionDetailView(session: session, store: store)
+                    .id(session.id)
             } else {
                 ContentUnavailableView("No Session Selected", systemImage: "text.bubble")
             }
@@ -148,30 +149,70 @@ private struct SessionDetailView: View {
 
             Divider()
 
-            if vm.messages.isEmpty {
-                Text("This session is ready.")
-                    .foregroundStyle(.secondary)
-            } else {
+            ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
-                        ForEach(vm.messages) { message in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(message.role.rawValue.capitalized)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                        if vm.messages.isEmpty {
+                            Text("This session is ready.")
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 8)
+                                .id("bottom")
+                        } else {
+                            ForEach(vm.messages) { message in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(message.role.rawValue.capitalized)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
 
-                                Text(message.content)
-                                    .textSelection(.enabled)
+                                    Text(message.content)
+                                        .textSelection(.enabled)
+                                }
+                                .padding(.vertical, 4)
+                                .id(message.id)
                             }
-                            .padding(.vertical, 4)
+
+                            Color.clear
+                                .frame(height: 1)
+                                .id("bottom")
                         }
                     }
+                    .padding(.vertical, 8)
+                }
+                .onChange(of: vm.messages.count) { _, _ in
+                    scrollToBottom(proxy)
+                }
+                .task {
+                    await vm.load()
+                    scrollToBottom(proxy)
                 }
             }
 
-            Spacer()
+            HStack(alignment: .bottom, spacing: 8) {
+                TextField("Message", text: $vm.draft)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit {
+                        Task { await vm.sendDraft() }
+                    }
+
+                Button {
+                    Task { await vm.sendDraft() }
+                } label: {
+                    Label("Send", systemImage: "paperplane.fill")
+                }
+                .disabled(vm.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+
+            Spacer(minLength: 0)
         }
         .padding(24)
-        .task { await vm.load() }
+    }
+
+    private func scrollToBottom(_ proxy: ScrollViewProxy) {
+        if let last = vm.messages.last {
+            proxy.scrollTo(last.id, anchor: .bottom)
+        } else {
+            proxy.scrollTo("bottom", anchor: .bottom)
+        }
     }
 }
