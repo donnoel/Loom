@@ -55,7 +55,9 @@ struct RootView: View {
                     .disabled(vm.selectedSessionID == nil)
 
                     Button {
-                        Task { await exportSelectedSession() }
+                        Task { @MainActor in
+                            await exportSelectedSession()
+                        }
                     } label: {
                         Label("Export Session", systemImage: "square.and.arrow.up")
                     }
@@ -91,7 +93,9 @@ struct RootView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .loomExportSessionRequested)) { _ in
-            Task { await exportSelectedSession() }
+            Task { @MainActor in
+                await exportSelectedSession()
+            }
         }
     }
 
@@ -160,7 +164,7 @@ struct RootView: View {
             let markdown = renderMarkdown(session: session, messages: messages)
 
             let defaultName = sanitizedFileName(session.metadata.title.isEmpty ? "Session" : session.metadata.title) + ".md"
-            guard let url = await presentSavePanel(defaultFileName: defaultName) else { return }
+            guard let url = presentSavePanel(defaultFileName: defaultName) else { return }
 
             guard let data = markdown.data(using: .utf8) else { return }
             try data.write(to: url, options: [.atomic])
@@ -205,24 +209,17 @@ struct RootView: View {
     }
 
     @MainActor
-    private func presentSavePanel(defaultFileName: String) async -> URL? {
+    private func presentSavePanel(defaultFileName: String) -> URL? {
         let panel = NSSavePanel()
         panel.canCreateDirectories = true
         panel.isExtensionHidden = false
         panel.nameFieldStringValue = defaultFileName
         panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
 
-        // Prefer sheet presentation when possible.
-        if let window = NSApp.keyWindow {
-            return await withCheckedContinuation { continuation in
-                panel.beginSheetModal(for: window) { result in
-                    continuation.resume(returning: result == .OK ? panel.url : nil)
-                }
-            }
-        } else {
-            let result = panel.runModal()
-            return result == .OK ? panel.url : nil
-        }
+        NSApp.activate(ignoringOtherApps: true)
+
+        let result = panel.runModal()
+        return result == .OK ? panel.url : nil
     }
 }
 
