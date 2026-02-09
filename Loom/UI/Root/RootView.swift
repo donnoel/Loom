@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct RootView: View {
     private let store: SessionStore
@@ -52,6 +53,13 @@ struct RootView: View {
                     }
                     .disabled(vm.selectedSessionID == nil)
 
+                    Button {
+                        Task { await exportSelectedSession() }
+                    } label: {
+                        Label("Export Session", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(vm.selectedSessionID == nil)
+
                     Button(role: .destructive) {
                         Task { await vm.deleteSelected() }
                     } label: {
@@ -80,6 +88,9 @@ struct RootView: View {
             if editingSessionID != nil, newValue == nil {
                 commitRenameIfNeeded()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .loomExportSessionRequested)) { _ in
+            Task { await exportSelectedSession() }
         }
     }
 
@@ -136,6 +147,81 @@ struct RootView: View {
         guard let idx = vm.sessions.firstIndex(where: { $0.id == sessionID }) else { return }
         vm.sessions[idx].metadata.updatedAt = Date()
         vm.sessions.sort { $0.metadata.updatedAt > $1.metadata.updatedAt }
+    }
+
+    private func exportSelectedSession() async {
+        guard let selected = vm.selectedSessionID,
+              let session = vm.sessions.first(where: { $0.id == selected })
+        else { return }
+
+        do {
+            let messages = try await store.loadMessages(sessionID: selected)
+            let markdown = renderMarkdown(session: session, messages: messages)
+
+            let defaultName = sanitizedFileName(session.metadata.title.isEmpty ? "Session" : session.metadata.title) + ".md"
+            guard let url = await presentSavePanel(defaultFileName: defaultName) else { return }
+
+            guard let data = markdown.data(using: .utf8) else { return }
+            try data.write(to: url, options: [.atomic])
+        } catch {
+            // For v1: fail quietly; later we can surface a banner.
+        }
+    }
+
+    private func renderMarkdown(session: Session, messages: [ChatMessage]) -> String {
+        var lines: [String] = []
+        lines.append("# \(session.metadata.title)")
+        lines.append("")
+        lines.append("Created: \(formatDate(session.metadata.createdAt))")
+        lines.append("Updated: \(formatDate(session.metadata.updatedAt))")
+        if !session.metadata.tags.isEmpty {
+            lines.append("Tags: \(session.metadata.tags.joined(separator: ", "))")
+        }
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+
+        for message in messages {
+            lines.append("**\(message.role.rawValue.capitalized)**")
+            lines.append(message.content)
+            lines.append("")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+
+    private func sanitizedFileName(_ input: String) -> String {
+        let invalid = CharacterSet(charactersIn: "/\\?%*|\"<>:")
+        let cleaned = input.components(separatedBy: invalid).joined(separator: "-")
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    @MainActor
+    private func presentSavePanel(defaultFileName: String) async -> URL? {
+        let panel = NSSavePanel()
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        panel.nameFieldStringValue = defaultFileName
+        panel.allowedContentTypes = [.markdown]
+
+        // Prefer sheet presentation when possible.
+        if let window = NSApp.keyWindow {
+            return await withCheckedContinuation { continuation in
+                panel.beginSheetModal(for: window) { result in
+                    continuation.resume(returning: result == .OK ? panel.url : nil)
+                }
+            }
+        } else {
+            let result = panel.runModal()
+            return result == .OK ? panel.url : nil
+        }
     }
 }
 
