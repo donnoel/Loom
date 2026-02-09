@@ -38,13 +38,23 @@ final class RootViewModel {
         guard let id = selectedSessionID else { return }
         do {
             try await store.deleteSession(id: id)
+            selectedSessionID = nil
             await load()
+            if selectedSessionID == nil {
+                selectedSessionID = sessions.first?.id
+            }
         } catch { }
     }
 
     func session(for id: Session.ID?) -> Session? {
         guard let id else { return nil }
         return sessions.first(where: { $0.id == id })
+    }
+    
+    func touchSession(id: Session.ID) {
+        guard let idx = sessions.firstIndex(where: { $0.id == id }) else { return }
+        sessions[idx].metadata.updatedAt = Date()
+        sessions.sort { $0.metadata.updatedAt > $1.metadata.updatedAt }
     }
     
     func renameSession(id: Session.ID, to newTitle: String) async {

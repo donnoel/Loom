@@ -62,7 +62,13 @@ struct RootView: View {
             }
         } detail: {
             if let session = vm.session(for: vm.selectedSessionID) {
-                SessionDetailView(session: session, store: store)
+                SessionDetailView(
+                    session: session,
+                    store: store,
+                    onActivity: {
+                        touchSessionRecency(sessionID: session.id)
+                    }
+                )
                     .id(session.id)
             } else {
                 ContentUnavailableView("No Session Selected", systemImage: "text.bubble")
@@ -125,20 +131,29 @@ struct RootView: View {
 
         Task { await vm.renameSession(id: id, to: title) }
     }
+    
+    private func touchSessionRecency(sessionID: Session.ID) {
+        guard let idx = vm.sessions.firstIndex(where: { $0.id == sessionID }) else { return }
+        vm.sessions[idx].metadata.updatedAt = Date()
+        vm.sessions.sort { $0.metadata.updatedAt > $1.metadata.updatedAt }
+    }
 }
 
 private struct SessionDetailView: View {
     let session: Session
     let store: SessionStore
+    let onActivity: () async -> Void
 
     @State private var vm: SessionMessagesViewModel
 
-    init(session: Session, store: SessionStore) {
+    init(session: Session, store: SessionStore, onActivity: @escaping () async -> Void) {
         self.session = session
         self.store = store
+        self.onActivity = onActivity
         _vm = State(initialValue: SessionMessagesViewModel(
             store: store,
-            sessionID: session.id
+            sessionID: session.id,
+            onActivity: onActivity
         ))
     }
 

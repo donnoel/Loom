@@ -1,7 +1,7 @@
 import Foundation
 
-nonisolated struct Session: Identifiable, Hashable, Codable {
-    nonisolated struct Metadata: Hashable, Codable {
+struct Session: Identifiable, Hashable, Codable, Sendable {
+    struct Metadata: Hashable, Codable, Sendable {
         var title: String
         var createdAt: Date
         var updatedAt: Date

@@ -110,9 +110,19 @@ actor SessionStore {
         data.append(0x0A) // newline
 
         let handle = try FileHandle(forWritingTo: url)
+        defer { try? handle.close() }
+
         try handle.seekToEnd()
         try handle.write(contentsOf: data)
-        try handle.close()
+
+        // Keep session ordering in sync with latest activity.
+        do {
+            var metadata = try loadMetadata(for: sessionID)
+            metadata.updatedAt = max(metadata.updatedAt, Date())
+            try writeMetadata(metadata, for: sessionID, touchUpdatedAt: false)
+        } catch {
+            log.error("Failed to update metadata after append: \(String(describing: error), privacy: .public)")
+        }
     }
 
     func loadMessages(sessionID: UUID) throws -> [ChatMessage] {
@@ -139,12 +149,20 @@ actor SessionStore {
         return messages
     }
 
-    private func writeMetadata(_ metadata: Session.Metadata, for id: UUID) throws {
+    private func writeMetadata(_ metadata: Session.Metadata, for id: UUID, touchUpdatedAt: Bool = true) throws {
         let metaURL = try LoomPaths.sessionMetadataURL(for: id)
         var copy = metadata
-        copy.updatedAt = Date()
+        if touchUpdatedAt {
+            copy.updatedAt = Date()
+        }
 
         let data = try encoder.encode(copy)
         try data.write(to: metaURL, options: [.atomic])
+    }
+
+    private func loadMetadata(for id: UUID) throws -> Session.Metadata {
+        let metaURL = try LoomPaths.sessionMetadataURL(for: id)
+        let data = try Data(contentsOf: metaURL)
+        return try decoder.decode(Session.Metadata.self, from: data)
     }
 }

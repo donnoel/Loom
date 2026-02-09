@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated enum LoomPaths {
+enum LoomPaths {
     static let appFolderName = "Loom"
     static let sessionsFolderName = "Sessions"
     static let metadataFileName = "metadata.json"
@@ -27,6 +27,7 @@ nonisolated enum LoomPaths {
     static func sessionMetadataURL(for id: UUID) throws -> URL {
         try sessionFolder(for: id).appendingPathComponent(metadataFileName, isDirectory: false)
     }
+
     static func sessionMessagesURL(for id: UUID) throws -> URL {
         try sessionFolder(for: id).appendingPathComponent(messagesFileName, isDirectory: false)
     }
