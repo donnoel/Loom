@@ -1,6 +1,6 @@
 import Foundation
 
-enum LoomPaths {
+nonisolated enum LoomPaths {
     static let appFolderName = "Loom"
     static let sessionsFolderName = "Sessions"
     static let metadataFileName = "metadata.json"

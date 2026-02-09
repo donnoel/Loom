@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import UniformTypeIdentifiers
 
 struct RootView: View {
     private let store: SessionStore
@@ -209,7 +210,7 @@ struct RootView: View {
         panel.canCreateDirectories = true
         panel.isExtensionHidden = false
         panel.nameFieldStringValue = defaultFileName
-        panel.allowedContentTypes = [.markdown]
+        panel.allowedContentTypes = [UTType(filenameExtension: "md") ?? .plainText]
 
         // Prefer sheet presentation when possible.
         if let window = NSApp.keyWindow {
