@@ -1,8 +1,10 @@
 import Foundation
 import OSLog
+import os.signpost
 
 actor SessionStore {
     private let log = Logger(subsystem: "com.loom.app", category: "SessionStore")
+    private let signposter = OSSignposter(subsystem: "com.loom.app", category: "SessionStore")
 
     private let encoder: JSONEncoder = {
         let e = JSONEncoder()
@@ -30,11 +32,17 @@ actor SessionStore {
     }()
 
     func bootstrap() throws {
+        let spID = signposter.makeSignpostID()
+        let state = signposter.beginInterval("bootstrap", id: spID)
+        defer { signposter.endInterval("bootstrap", state) }
         let root = try LoomPaths.sessionsRoot()
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     }
 
     func listSessions() throws -> [Session] {
+        let spID = signposter.makeSignpostID()
+        let state = signposter.beginInterval("listSessions", id: spID)
+        defer { signposter.endInterval("listSessions", state) }
         try bootstrap()
 
         let root = try LoomPaths.sessionsRoot()
@@ -47,20 +55,23 @@ actor SessionStore {
         var sessions: [Session] = []
 
         for url in urls {
-            let values = try url.resourceValues(forKeys: [.isDirectoryKey])
-            guard values.isDirectory == true else { continue }
+            autoreleasepool {
+                do {
+                    let values = try url.resourceValues(forKeys: [.isDirectoryKey])
+                    guard values.isDirectory == true else { return }
 
-            guard let id = UUID(uuidString: url.lastPathComponent) else { continue }
+                    guard let id = UUID(uuidString: url.lastPathComponent) else { return }
 
-            let metaURL = try LoomPaths.sessionMetadataURL(for: id)
-            guard FileManager.default.fileExists(atPath: metaURL.path) else { continue }
+                    let metaURL = try LoomPaths.sessionMetadataURL(for: id)
+                    guard FileManager.default.fileExists(atPath: metaURL.path) else { return }
 
-            do {
-                let data = try Data(contentsOf: metaURL)
-                let metadata = try decoder.decode(Session.Metadata.self, from: data)
-                sessions.append(Session(id: id, metadata: metadata))
-            } catch {
-                log.error("Failed to load session \(id.uuidString, privacy: .public): \(String(describing: error), privacy: .public)")
+                    let data = try Data(contentsOf: metaURL)
+                    let metadata = try decoder.decode(Session.Metadata.self, from: data)
+                    sessions.append(Session(id: id, metadata: metadata))
+                } catch {
+                    // Keep going on failure
+                    log.error("Failed to load session from \(url.lastPathComponent, privacy: .public): \(String(describing: error), privacy: .public)")
+                }
             }
         }
 
@@ -70,6 +81,9 @@ actor SessionStore {
     }
 
     func createSession(title: String) throws -> Session {
+        let spID = signposter.makeSignpostID()
+        let state = signposter.beginInterval("createSession", id: spID)
+        defer { signposter.endInterval("createSession", state) }
         try bootstrap()
 
         let session = Session(metadata: .init(title: title))
@@ -88,10 +102,16 @@ actor SessionStore {
     }
 
     func updateMetadata(_ metadata: Session.Metadata, for id: UUID) throws {
+        let spID = signposter.makeSignpostID()
+        let state = signposter.beginInterval("updateMetadata", id: spID)
+        defer { signposter.endInterval("updateMetadata", state) }
         try writeMetadata(metadata, for: id)
     }
 
     func deleteSession(id: UUID) throws {
+        let spID = signposter.makeSignpostID()
+        let state = signposter.beginInterval("deleteSession", id: spID)
+        defer { signposter.endInterval("deleteSession", state) }
         let folder = try LoomPaths.sessionFolder(for: id)
         if FileManager.default.fileExists(atPath: folder.path) {
             try FileManager.default.removeItem(at: folder)
@@ -100,6 +120,9 @@ actor SessionStore {
 
     // 3C: JSONL message storage (append-only)
     func appendMessage(_ message: ChatMessage, sessionID: UUID) throws {
+        let spID = signposter.makeSignpostID()
+        let state = signposter.beginInterval("appendMessage", id: spID)
+        defer { signposter.endInterval("appendMessage", state) }
         let url = try LoomPaths.sessionMessagesURL(for: sessionID)
 
         if !FileManager.default.fileExists(atPath: url.path) {
@@ -126,6 +149,9 @@ actor SessionStore {
     }
 
     func loadMessages(sessionID: UUID) throws -> [ChatMessage] {
+        let spID = signposter.makeSignpostID()
+        let state = signposter.beginInterval("loadMessages", id: spID)
+        defer { signposter.endInterval("loadMessages", state) }
         let url = try LoomPaths.sessionMessagesURL(for: sessionID)
         guard FileManager.default.fileExists(atPath: url.path) else { return [] }
 

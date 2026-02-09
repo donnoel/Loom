@@ -10,6 +10,13 @@ struct RootView: View {
     @State private var draftTitle: String = ""
     @FocusState private var focusedRenameID: Session.ID?
 
+    private static let exportDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
     init(store: SessionStore) {
         self.store = store
         _vm = State(initialValue: RootViewModel(store: store))
@@ -196,10 +203,7 @@ struct RootView: View {
     }
 
     private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
+        Self.exportDateFormatter.string(from: date)
     }
 
     private func sanitizedFileName(_ input: String) -> String {
