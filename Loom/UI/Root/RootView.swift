@@ -282,33 +282,41 @@ private struct SessionDetailView: View {
                     }
                     .padding(.vertical, 8)
                 }
-                .onChange(of: vm.messages.count) { _, _ in
-                    scrollToBottom(proxy)
-                }
                 .task {
                     await vm.load()
-                    scrollToBottom(proxy)
-                }
-            }
-
-            HStack(alignment: .bottom, spacing: 8) {
-                TextField("Message", text: $vm.draft)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit {
-                        Task { await vm.sendDraft() }
+                    DispatchQueue.main.async {
+                        scrollToBottom(proxy)
                     }
-
-                Button {
-                    Task { await vm.sendDraft() }
-                } label: {
-                    Label("Send", systemImage: "paperplane.fill")
                 }
-                .disabled(vm.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            }
 
-            Spacer(minLength: 0)
+                HStack(alignment: .bottom, spacing: 8) {
+                    TextField("Message", text: $vm.draft)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit {
+                            sendAndScroll(proxy)
+                        }
+
+                    Button {
+                        sendAndScroll(proxy)
+                    } label: {
+                        Label("Send", systemImage: "paperplane.fill")
+                    }
+                    .disabled(vm.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(24)
         }
-        .padding(24)
+    }
+
+    private func sendAndScroll(_ proxy: ScrollViewProxy) {
+        Task {
+            await vm.sendDraft()
+            DispatchQueue.main.async {
+                scrollToBottom(proxy)
+            }
+        }
     }
 
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
