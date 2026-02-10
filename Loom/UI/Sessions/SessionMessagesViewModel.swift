@@ -20,7 +20,7 @@ final class SessionMessagesViewModel {
     private let onActivity: (() async -> Void)?
     private let ollamaClient: OllamaClient
     private let chatClient: OllamaChatClient
-    private let streamUpdateInterval: Duration = .milliseconds(50)
+    private let streamUpdateInterval: Duration = .milliseconds(60)
 
     var messages: [ChatMessage] = []
     var draft: String = ""

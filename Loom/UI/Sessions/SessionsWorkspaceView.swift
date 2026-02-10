@@ -302,9 +302,14 @@ private struct SessionDetailView: View {
                                 .padding(.vertical, 8)
                                 .id("bottom")
                         } else {
-                            ForEach(vm.messages) { message in
-                                messageRow(for: message)
-                                    .id(message.id)
+                            ForEach(vm.messages, id: \.id) { message in
+                                MessageRowView(
+                                    message: message,
+                                    isThinking: vm.isGenerating
+                                        && vm.generatingMessageID == message.id
+                                        && message.content.isEmpty
+                                )
+                                .equatable()
                             }
 
                             Color.clear
@@ -316,11 +321,6 @@ private struct SessionDetailView: View {
                 }
                 .task {
                     await vm.load()
-                    DispatchQueue.main.async {
-                        scrollToBottom(proxy)
-                    }
-                }
-                .onChange(of: vm.messages.last?.id) { _, _ in
                     DispatchQueue.main.async {
                         scrollToBottom(proxy)
                     }
@@ -380,37 +380,50 @@ private struct SessionDetailView: View {
             proxy.scrollTo("bottom", anchor: .bottom)
         }
     }
+}
 
-    private func messageRow(for message: ChatMessage) -> some View {
+private struct MessageRowView: View, Equatable {
+    let message: ChatMessage
+    let isThinking: Bool
+
+    var body: some View {
         let isUser = message.role == .user
 
-        return VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
+        VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
             Text(message.role.rawValue.capitalized)
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            bubbleContent(for: message)
-                .loomBubble(role: message.role)
+            MessageBubbleChrome(role: message.role) {
+                if isThinking {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Thinking…")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text(message.content)
+                        .textSelection(.enabled)
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
         .padding(.vertical, 4)
     }
+}
 
-    @ViewBuilder
-    private func bubbleContent(for message: ChatMessage) -> some View {
-        if vm.isGenerating,
-           vm.generatingMessageID == message.id,
-           message.content.isEmpty {
-            HStack(spacing: 8) {
-                ProgressView()
-                    .controlSize(.small)
-                Text("Thinking…")
-                    .foregroundStyle(.secondary)
-            }
-        } else {
-            Text(message.content)
-                .textSelection(.enabled)
-        }
+private struct MessageBubbleChrome<Content: View>: View {
+    let role: ChatMessage.Role
+    let content: Content
+
+    init(role: ChatMessage.Role, @ViewBuilder content: () -> Content) {
+        self.role = role
+        self.content = content()
+    }
+
+    var body: some View {
+        content.loomBubble(role: role)
     }
 }
 

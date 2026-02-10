@@ -1,50 +1,50 @@
 import SwiftUI
 
 nonisolated enum LoomTheme {
-    static func backgroundGradient(_ scheme: ColorScheme) -> LinearGradient {
-        if scheme == .dark {
-            return LinearGradient(
-                colors: [
-                    Color.accentColor.opacity(0.32),
-                    Color(red: 0.34, green: 0.47, blue: 0.72).opacity(0.24),
-                    Color(red: 0.10, green: 0.13, blue: 0.20).opacity(0.20)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
+    private static let darkBackground = LinearGradient(
+        colors: [
+            Color.accentColor.opacity(0.32),
+            Color(red: 0.34, green: 0.47, blue: 0.72).opacity(0.24),
+            Color(red: 0.10, green: 0.13, blue: 0.20).opacity(0.20)
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
 
-        return LinearGradient(
-            colors: [
-                Color.accentColor.opacity(0.20),
-                Color(red: 0.62, green: 0.74, blue: 0.90).opacity(0.16),
-                Color(red: 0.94, green: 0.97, blue: 1.00).opacity(0.14)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+    private static let lightBackground = LinearGradient(
+        colors: [
+            Color.accentColor.opacity(0.20),
+            Color(red: 0.62, green: 0.74, blue: 0.90).opacity(0.16),
+            Color(red: 0.94, green: 0.97, blue: 1.00).opacity(0.14)
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    private static let darkAccent = LinearGradient(
+        colors: [
+            Color.accentColor.opacity(0.72),
+            Color(red: 0.42, green: 0.56, blue: 0.86).opacity(0.68)
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    private static let lightAccent = LinearGradient(
+        colors: [
+            Color.accentColor.opacity(0.62),
+            Color(red: 0.56, green: 0.69, blue: 0.90).opacity(0.58)
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    static func backgroundGradient(_ scheme: ColorScheme) -> LinearGradient {
+        scheme == .dark ? darkBackground : lightBackground
     }
 
     static func accentGradient(_ scheme: ColorScheme) -> LinearGradient {
-        if scheme == .dark {
-            return LinearGradient(
-                colors: [
-                    Color.accentColor.opacity(0.72),
-                    Color(red: 0.42, green: 0.56, blue: 0.86).opacity(0.68)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
-
-        return LinearGradient(
-            colors: [
-                Color.accentColor.opacity(0.62),
-                Color(red: 0.56, green: 0.69, blue: 0.90).opacity(0.58)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        scheme == .dark ? darkAccent : lightAccent
     }
 
     // Backward-compatible label form used in a few existing call sites.
