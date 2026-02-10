@@ -56,7 +56,15 @@ struct RootView: View {
     private var detailContent: some View {
         switch selectedSidebarItem ?? .sessions {
         case .sessions:
-            SessionsWorkspaceView(store: store)
+            SessionsWorkspaceView(
+                store: store,
+                browseModels: {
+                    selectedSidebarItem = .models
+                },
+                openOrInstallOllama: {
+                    statusViewModel.openOrInstallOllama()
+                }
+            )
         case .models:
             ModelsView(
                 onModelSelectionChanged: {

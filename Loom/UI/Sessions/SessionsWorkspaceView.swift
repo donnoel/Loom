@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 
 struct SessionsWorkspaceView: View {
     private let store: SessionStore
+    private let browseModels: () -> Void
+    private let openOrInstallOllama: () -> Void
     @State private var vm: RootViewModel
 
     @State private var editingSessionID: Session.ID?
@@ -17,8 +19,14 @@ struct SessionsWorkspaceView: View {
         return formatter
     }()
 
-    init(store: SessionStore) {
+    init(
+        store: SessionStore,
+        browseModels: @escaping () -> Void = {},
+        openOrInstallOllama: @escaping () -> Void = {}
+    ) {
         self.store = store
+        self.browseModels = browseModels
+        self.openOrInstallOllama = openOrInstallOllama
         _vm = State(initialValue: RootViewModel(store: store))
     }
 
@@ -83,6 +91,8 @@ struct SessionsWorkspaceView: View {
                 SessionDetailView(
                     session: session,
                     store: store,
+                    browseModels: browseModels,
+                    openOrInstallOllama: openOrInstallOllama,
                     onActivity: {
                         vm.touchSession(id: session.id)
                     }
@@ -222,13 +232,23 @@ struct SessionsWorkspaceView: View {
 private struct SessionDetailView: View {
     let session: Session
     let store: SessionStore
+    let browseModels: () -> Void
+    let openOrInstallOllama: () -> Void
     let onActivity: () async -> Void
 
     @State private var vm: SessionMessagesViewModel
 
-    init(session: Session, store: SessionStore, onActivity: @escaping () async -> Void) {
+    init(
+        session: Session,
+        store: SessionStore,
+        browseModels: @escaping () -> Void,
+        openOrInstallOllama: @escaping () -> Void,
+        onActivity: @escaping () async -> Void
+    ) {
         self.session = session
         self.store = store
+        self.browseModels = browseModels
+        self.openOrInstallOllama = openOrInstallOllama
         self.onActivity = onActivity
         _vm = State(initialValue: SessionMessagesViewModel(
             store: store,
@@ -243,6 +263,17 @@ private struct SessionDetailView: View {
                 .font(.largeTitle.bold())
 
             Divider()
+
+            if let banner = vm.banner {
+                SessionInlineBanner(banner: banner) { action in
+                    switch action {
+                    case .browseModels:
+                        browseModels()
+                    case .openOrInstallOllama:
+                        openOrInstallOllama()
+                    }
+                }
+            }
 
             ScrollViewReader { proxy in
                 ScrollView {
@@ -260,8 +291,19 @@ private struct SessionDetailView: View {
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
 
-                                    Text(message.content)
-                                        .textSelection(.enabled)
+                                    if vm.isGenerating,
+                                       vm.generatingMessageID == message.id,
+                                       message.content.isEmpty {
+                                        HStack(spacing: 8) {
+                                            ProgressView()
+                                                .controlSize(.small)
+                                            Text("Thinking…")
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    } else {
+                                        Text(message.content)
+                                            .textSelection(.enabled)
+                                    }
                                 }
                                 .padding(.vertical, 4)
                                 .id(message.id)
@@ -280,25 +322,43 @@ private struct SessionDetailView: View {
                         scrollToBottom(proxy)
                     }
                 }
+                .onChange(of: vm.messages.last?.content) { _, _ in
+                    DispatchQueue.main.async {
+                        scrollToBottom(proxy)
+                    }
+                }
 
                 HStack(alignment: .bottom, spacing: 8) {
                     TextField("Message", text: $vm.draft)
                         .textFieldStyle(.roundedBorder)
                         .onSubmit {
+                            guard !vm.isGenerating else { return }
                             sendAndScroll(proxy)
                         }
 
-                    Button {
-                        sendAndScroll(proxy)
-                    } label: {
-                        Label("Send", systemImage: "paperplane.fill")
+                    if vm.isGenerating {
+                        Button(role: .destructive) {
+                            vm.stopGenerating()
+                        } label: {
+                            Label("Stop", systemImage: "stop.fill")
+                        }
+                        .buttonStyle(.bordered)
+                    } else {
+                        Button {
+                            sendAndScroll(proxy)
+                        } label: {
+                            Label("Send", systemImage: "paperplane.fill")
+                        }
+                        .disabled(vm.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
-                    .disabled(vm.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
 
                 Spacer(minLength: 0)
             }
             .padding(24)
+        }
+        .onDisappear {
+            vm.stopGenerating()
         }
     }
 
@@ -317,5 +377,32 @@ private struct SessionDetailView: View {
         } else {
             proxy.scrollTo("bottom", anchor: .bottom)
         }
+    }
+}
+
+private struct SessionInlineBanner: View {
+    let banner: SessionMessagesViewModel.BannerState
+    let performAction: (SessionMessagesViewModel.BannerState.Action) -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: "info.circle.fill")
+                .foregroundStyle(.secondary)
+
+            Text(banner.text)
+                .foregroundStyle(.primary)
+
+            Spacer()
+
+            if let action = banner.action,
+               let actionTitle = banner.actionTitle {
+                Button(actionTitle) {
+                    performAction(action)
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(12)
+        .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
     }
 }

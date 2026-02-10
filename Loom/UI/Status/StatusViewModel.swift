@@ -100,8 +100,6 @@ final class StatusViewModel {
     }
 
     func openOrInstallOllama() {
-        guard snapshot.ollamaReachable == false else { return }
-
         if let appURL = Self.ollamaAppURL() {
             NSWorkspace.shared.open(appURL)
         } else {
