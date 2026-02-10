@@ -277,7 +277,8 @@ private struct SessionDetailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(session.metadata.title)
-                .font(.largeTitle.bold())
+                .font(LoomTheme.sessionHeaderFont())
+                .tracking(0.2)
 
             Divider()
 

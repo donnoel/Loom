@@ -57,6 +57,10 @@ nonisolated enum LoomTheme {
         accentGradient(scheme)
     }
 
+    static func sessionHeaderFont() -> Font {
+        .system(.largeTitle, design: .serif).weight(.semibold)
+    }
+
     static func bubblePalette(
         role: ChatMessage.Role,
         scheme: ColorScheme
