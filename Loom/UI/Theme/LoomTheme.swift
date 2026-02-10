@@ -1,12 +1,13 @@
 import SwiftUI
 
 nonisolated enum LoomTheme {
-    static func backgroundGradient(for colorScheme: ColorScheme) -> LinearGradient {
-        if colorScheme == .dark {
+    static func backgroundGradient(_ scheme: ColorScheme) -> LinearGradient {
+        if scheme == .dark {
             return LinearGradient(
                 colors: [
-                    Color(red: 0.12, green: 0.16, blue: 0.24),
-                    Color(red: 0.06, green: 0.09, blue: 0.14)
+                    Color.accentColor.opacity(0.32),
+                    Color(red: 0.34, green: 0.47, blue: 0.72).opacity(0.24),
+                    Color(red: 0.10, green: 0.13, blue: 0.20).opacity(0.20)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -15,20 +16,21 @@ nonisolated enum LoomTheme {
 
         return LinearGradient(
             colors: [
-                Color(red: 0.95, green: 0.97, blue: 1.0),
-                Color(red: 0.92, green: 0.95, blue: 0.99)
+                Color.accentColor.opacity(0.20),
+                Color(red: 0.62, green: 0.74, blue: 0.90).opacity(0.16),
+                Color(red: 0.94, green: 0.97, blue: 1.00).opacity(0.14)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
     }
 
-    static func accentGradient(for colorScheme: ColorScheme) -> LinearGradient {
-        if colorScheme == .dark {
+    static func accentGradient(_ scheme: ColorScheme) -> LinearGradient {
+        if scheme == .dark {
             return LinearGradient(
                 colors: [
-                    Color(red: 0.43, green: 0.64, blue: 0.92),
-                    Color(red: 0.37, green: 0.48, blue: 0.78)
+                    Color.accentColor.opacity(0.72),
+                    Color(red: 0.42, green: 0.56, blue: 0.86).opacity(0.68)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -37,41 +39,56 @@ nonisolated enum LoomTheme {
 
         return LinearGradient(
             colors: [
-                Color(red: 0.55, green: 0.71, blue: 0.92),
-                Color(red: 0.49, green: 0.60, blue: 0.86)
+                Color.accentColor.opacity(0.62),
+                Color(red: 0.56, green: 0.69, blue: 0.90).opacity(0.58)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
     }
 
-    static func cardBackground(in colorScheme: ColorScheme) -> some ShapeStyle {
-        AnyShapeStyle(colorScheme == .dark ? .regularMaterial : .thinMaterial)
+    // Backward-compatible label form used in a few existing call sites.
+    static func backgroundGradient(for scheme: ColorScheme) -> LinearGradient {
+        backgroundGradient(scheme)
     }
 
-    static func cardOverlayStroke() -> some ShapeStyle {
-        AnyShapeStyle(Color.primary.opacity(0.12))
+    // Backward-compatible label form used in a few existing call sites.
+    static func accentGradient(for scheme: ColorScheme) -> LinearGradient {
+        accentGradient(scheme)
     }
 
-    static func bubbleStyle(
+    static func bubblePalette(
         role: ChatMessage.Role,
-        colorScheme: ColorScheme
-    ) -> (alignment: HorizontalAlignment, bg: AnyShapeStyle, fg: Color) {
-        if role == .user {
-            let tint = accentGradient(for: colorScheme)
-            let opacity = colorScheme == .dark ? 0.32 : 0.24
+        scheme: ColorScheme
+    ) -> (alignment: Alignment, background: AnyShapeStyle, foreground: Color, strokeOpacity: Double, cornerRadius: CGFloat) {
+        switch role {
+        case .user:
             return (
                 alignment: .trailing,
-                bg: AnyShapeStyle(tint.opacity(opacity)),
-                fg: .primary
+                background: AnyShapeStyle(accentGradient(scheme).opacity(scheme == .dark ? 0.28 : 0.18)),
+                foreground: .primary,
+                strokeOpacity: scheme == .dark ? 0.20 : 0.14,
+                cornerRadius: 15
+            )
+
+        case .assistant:
+            return (
+                alignment: .leading,
+                background: AnyShapeStyle(scheme == .dark ? .thinMaterial : .ultraThinMaterial),
+                foreground: .primary,
+                strokeOpacity: scheme == .dark ? 0.18 : 0.13,
+                cornerRadius: 15
+            )
+
+        case .system, .tool:
+            return (
+                alignment: .leading,
+                background: AnyShapeStyle(Color.secondary.opacity(scheme == .dark ? 0.18 : 0.12)),
+                foreground: .secondary,
+                strokeOpacity: scheme == .dark ? 0.18 : 0.14,
+                cornerRadius: 12
             )
         }
-
-        return (
-            alignment: .leading,
-            bg: AnyShapeStyle(colorScheme == .dark ? .regularMaterial : .ultraThinMaterial),
-            fg: .primary
-        )
     }
 }
 
@@ -86,9 +103,12 @@ private struct LoomCardModifier: ViewModifier {
                 let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
                 shape
-                    .fill(LoomTheme.cardBackground(in: colorScheme))
+                    .fill(colorScheme == .dark ? .thinMaterial : .ultraThinMaterial)
                     .overlay {
-                        shape.strokeBorder(LoomTheme.cardOverlayStroke(), lineWidth: 0.8)
+                        shape.fill(LoomTheme.accentGradient(colorScheme).opacity(colorScheme == .dark ? 0.10 : 0.07))
+                    }
+                    .overlay {
+                        shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.12), lineWidth: 1)
                     }
             }
     }
@@ -100,21 +120,22 @@ private struct LoomBubbleModifier: ViewModifier {
     let role: ChatMessage.Role
 
     func body(content: Content) -> some View {
-        let style = LoomTheme.bubbleStyle(role: role, colorScheme: colorScheme)
+        let palette = LoomTheme.bubblePalette(role: role, scheme: colorScheme)
+        let isChipRole = role == .system || role == .tool
 
         content
-            .foregroundStyle(style.fg)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .foregroundStyle(palette.foreground)
+            .padding(.horizontal, isChipRole ? 10 : 12)
+            .padding(.vertical, isChipRole ? 6 : 8)
             .background {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(style.bg)
+                RoundedRectangle(cornerRadius: palette.cornerRadius, style: .continuous)
+                    .fill(palette.background)
                     .overlay {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(LoomTheme.cardOverlayStroke(), lineWidth: 0.7)
+                        RoundedRectangle(cornerRadius: palette.cornerRadius, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(palette.strokeOpacity), lineWidth: 1)
                     }
             }
-            .frame(maxWidth: 620, alignment: style.alignment == .trailing ? .trailing : .leading)
+            .frame(maxWidth: 620, alignment: palette.alignment)
     }
 }
 

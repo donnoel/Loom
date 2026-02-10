@@ -14,13 +14,13 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            Rectangle()
-                .fill(.ultraThinMaterial)
+            Color.clear
+                .background(.ultraThinMaterial)
                 .ignoresSafeArea()
 
             Rectangle()
-                .fill(LoomTheme.backgroundGradient(for: colorScheme))
-                .opacity(colorScheme == .dark ? 0.22 : 0.18)
+                .fill(LoomTheme.backgroundGradient(colorScheme))
+                .opacity(colorScheme == .dark ? 0.08 : 0.06)
                 .ignoresSafeArea()
 
             NavigationSplitView {
@@ -96,7 +96,24 @@ struct RootView: View {
     }
 
     private func sidebarRow(_ item: SidebarItem) -> some View {
-        Label(item.title, systemImage: item.systemImage)
+        let isSelected = selectedSidebarItem == item
+
+        return Label(item.title, systemImage: item.systemImage)
+            .padding(.vertical, 3)
+            .padding(.horizontal, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(LoomTheme.accentGradient(colorScheme).opacity(colorScheme == .dark ? 0.18 : 0.10))
+                }
+            }
+            .overlay {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.14), lineWidth: 1)
+                }
+            }
             .tag(item)
     }
 

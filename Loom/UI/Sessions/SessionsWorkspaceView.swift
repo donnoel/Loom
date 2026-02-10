@@ -6,6 +6,7 @@ struct SessionsWorkspaceView: View {
     private let store: SessionStore
     private let browseModels: () -> Void
     private let openOrInstallOllama: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
     @State private var vm: RootViewModel
 
     @State private var editingSessionID: Session.ID?
@@ -117,6 +118,8 @@ struct SessionsWorkspaceView: View {
 
     @ViewBuilder
     private func row(for session: Session) -> some View {
+        let isSelected = vm.selectedSessionID == session.id
+
         VStack(alignment: .leading, spacing: 2) {
             if editingSessionID == session.id {
                 TextField("", text: $draftTitle)
@@ -133,6 +136,20 @@ struct SessionsWorkspaceView: View {
             Text(session.metadata.updatedAt, style: .date)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 6)
+        .background {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(LoomTheme.accentGradient(colorScheme).opacity(colorScheme == .dark ? 0.18 : 0.10))
+            }
+        }
+        .overlay {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.14), lineWidth: 1)
+            }
         }
     }
 
@@ -330,9 +347,13 @@ private struct SessionDetailView: View {
                         } label: {
                             Label("Send", systemImage: "paperplane.fill")
                         }
+                        .buttonStyle(.bordered)
+                        .tint(.accentColor)
                         .disabled(vm.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
+                .padding(8)
+                .loomCard(cornerRadius: 14)
 
                 Spacer(minLength: 0)
             }
