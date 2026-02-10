@@ -59,10 +59,6 @@ struct RootView: View {
             SessionsWorkspaceView(store: store)
         case .models:
             ModelsView(
-                openOrInstallOllama: {
-                    statusViewModel.openOrInstallOllama()
-                },
-                ollamaActionTitle: statusViewModel.ollamaActionTitle,
                 onModelSelectionChanged: {
                     await statusViewModel.refresh()
                 }

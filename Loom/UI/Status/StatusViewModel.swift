@@ -65,9 +65,9 @@ final class StatusViewModel {
             lastRefreshAt = Date()
         }
 
-        ollamaAppInstalled = Self.ollamaAppURL() != nil
-
-        let isReachable = await client.ping()
+        let diagnosis = await client.diagnose()
+        ollamaAppInstalled = diagnosis.isInstalled
+        let isReachable = diagnosis.isRunning
 
         var models: [OllamaModel] = []
         if isReachable {
@@ -93,10 +93,15 @@ final class StatusViewModel {
     }
 
     var ollamaActionTitle: String {
-        ollamaAppInstalled ? "Open Ollama" : "Install Ollama…"
+        if snapshot.ollamaReachable {
+            return "Ollama is running"
+        }
+        return ollamaAppInstalled ? "Start Ollama" : "Install Ollama…"
     }
 
     func openOrInstallOllama() {
+        guard snapshot.ollamaReachable == false else { return }
+
         if let appURL = Self.ollamaAppURL() {
             NSWorkspace.shared.open(appURL)
         } else {
