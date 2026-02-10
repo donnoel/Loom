@@ -320,7 +320,7 @@ private struct SessionDetailView: View {
                         scrollToBottom(proxy)
                     }
                 }
-                .onChange(of: vm.messages.last?.content) { _, _ in
+                .onChange(of: vm.messages.last?.id) { _, _ in
                     DispatchQueue.main.async {
                         scrollToBottom(proxy)
                     }
