@@ -1,14 +1,14 @@
 import Foundation
 import OSLog
 
-nonisolated struct OllamaModel: Identifiable, Hashable, Sendable {
+struct OllamaModel: Identifiable, Hashable, Sendable {
     let tag: String
 
     var id: String { tag }
 }
 
 /// A plain-language diagnosis for guiding non-technical users.
-nonisolated struct OllamaDiagnosis: Hashable, Sendable {
+struct OllamaDiagnosis: Hashable, Sendable {
     enum NextStep: Hashable, Sendable {
         case ready
         case startOllama
@@ -205,14 +205,14 @@ actor OllamaClient {
     }
 }
 
-nonisolated private struct VersionResponse: Decodable {
+private struct VersionResponse: Decodable {
     let version: String
 }
 
-nonisolated private struct TagsResponse: Decodable {
+private struct TagsResponse: Decodable {
     let models: [TagsModel]
 }
 
-nonisolated private struct TagsModel: Decodable {
+private struct TagsModel: Decodable {
     let name: String
 }

@@ -1,7 +1,7 @@
 import Foundation
 
-nonisolated struct ChatMessage: Identifiable, Hashable, Codable, Sendable {
-    nonisolated enum Role: String, Codable, Sendable {
+struct ChatMessage: Identifiable, Hashable, Codable, Sendable {
+    enum Role: String, Codable, Sendable {
         case system
         case user
         case assistant

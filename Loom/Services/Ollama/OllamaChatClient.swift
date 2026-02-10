@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated struct OllamaChatStreamEvent: Equatable, Sendable {
+struct OllamaChatStreamEvent: Equatable, Sendable {
     let delta: String
     let done: Bool
     let error: String?
@@ -157,8 +157,8 @@ actor OllamaChatClient {
     }
 }
 
-nonisolated private struct ChatRequest: Encodable {
-    nonisolated struct Message: Encodable {
+private struct ChatRequest: Encodable {
+    struct Message: Encodable {
         let role: String
         let content: String
     }
@@ -168,8 +168,8 @@ nonisolated private struct ChatRequest: Encodable {
     let stream: Bool
 }
 
-nonisolated private struct ChatStreamChunk: Decodable {
-    nonisolated struct Message: Decodable {
+private struct ChatStreamChunk: Decodable {
+    struct Message: Decodable {
         let content: String?
     }
 
@@ -178,6 +178,6 @@ nonisolated private struct ChatStreamChunk: Decodable {
     let error: String?
 }
 
-nonisolated private struct ChatErrorBody: Decodable {
+private struct ChatErrorBody: Decodable {
     let error: String
 }
