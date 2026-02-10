@@ -138,7 +138,7 @@ final class ModelsViewModel {
     }
 }
 
-extension OllamaDiagnosis {
+nonisolated extension OllamaDiagnosis {
     static let unavailable = OllamaDiagnosis(
         isInstalled: false,
         isRunning: false,

@@ -4,10 +4,16 @@ import Observation
 @MainActor
 @Observable
 final class RootViewModel {
+    struct SidebarBannerState: Equatable {
+        let text: String
+        let actionTitle: String
+    }
+
     private let store: SessionStore
 
     var sessions: [Session] = []
     var selectedSessionID: Session.ID?
+    var sidebarBanner: SidebarBannerState?
 
     init(store: SessionStore) {
         self.store = store
@@ -17,12 +23,16 @@ final class RootViewModel {
         do {
             let items = try await store.listSessions()
             sessions = items
+            sidebarBanner = nil
             if selectedSessionID == nil {
                 selectedSessionID = sessions.first?.id
             }
         } catch {
-            // For v1: keep it simple. Later we’ll add a non-intrusive banner.
             sessions = []
+            sidebarBanner = SidebarBannerState(
+                text: "Loom couldn’t load sessions. Try again.",
+                actionTitle: "Reload"
+            )
         }
     }
 

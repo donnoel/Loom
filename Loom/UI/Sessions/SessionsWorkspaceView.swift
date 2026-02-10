@@ -51,6 +51,18 @@ struct SessionsWorkspaceView: View {
                         }
                 }
             }
+            .safeAreaInset(edge: .top) {
+                if let banner = vm.sidebarBanner {
+                    SessionsSidebarBanner(
+                        text: banner.text,
+                        actionTitle: banner.actionTitle
+                    ) {
+                        Task { await vm.load() }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.top, 8)
+                }
+            }
             .navigationTitle("Sessions")
             .toolbar {
                 ToolbarItemGroup {
@@ -243,6 +255,39 @@ struct SessionsWorkspaceView: View {
 
         let result = panel.runModal()
         return result == .OK ? panel.url : nil
+    }
+}
+
+private struct SessionsSidebarBanner: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    let text: String
+    let actionTitle: String
+    let action: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "info.circle.fill")
+                .foregroundStyle(.secondary)
+
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+
+            Spacer()
+
+            Button(actionTitle, action: action)
+                .buttonStyle(.bordered)
+        }
+        .padding(10)
+        .loomCard(cornerRadius: 10)
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(LoomTheme.accentGradient(for: colorScheme).opacity(colorScheme == .dark ? 0.55 : 0.45))
+                .frame(width: 3)
+                .padding(.vertical, 6)
+                .padding(.leading, 6)
+        }
     }
 }
 

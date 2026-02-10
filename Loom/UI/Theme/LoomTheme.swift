@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum LoomTheme {
+nonisolated enum LoomTheme {
     private static let darkBackground = LinearGradient(
         colors: [
             Color.accentColor.opacity(0.32),

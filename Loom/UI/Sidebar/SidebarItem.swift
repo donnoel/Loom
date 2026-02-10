@@ -1,6 +1,6 @@
 import Foundation
 
-enum SidebarItem: String, Hashable, Identifiable, Sendable {
+nonisolated enum SidebarItem: String, Hashable, Identifiable, Sendable {
     case sessions
     case models
     case status

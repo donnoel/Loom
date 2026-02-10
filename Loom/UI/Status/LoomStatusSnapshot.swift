@@ -1,6 +1,6 @@
 import Foundation
 
-enum LoomReadiness: String, Sendable {
+nonisolated enum LoomReadiness: String, Sendable {
     case ready
     case needsSetup
     case notReady
@@ -14,13 +14,13 @@ enum LoomReadiness: String, Sendable {
     }
 }
 
-enum LoomIssue: Hashable, Sendable {
+nonisolated enum LoomIssue: Hashable, Sendable {
     case ollamaNotRunning
     case noModelsInstalled
     case noModelSelected
 }
 
-struct LoomStatusSnapshot: Sendable, Equatable {
+nonisolated struct LoomStatusSnapshot: Sendable, Equatable {
     var ollamaReachable: Bool
     var installedModelCount: Int
     var activeModelTag: String?
@@ -57,12 +57,12 @@ struct LoomStatusSnapshot: Sendable, Equatable {
     )
 }
 
-enum LoomPreferenceKeys {
+nonisolated enum LoomPreferenceKeys {
     static let activeModelTag = "activeModelTag"
 }
 
-extension String {
-    nonisolated var nonEmptyTrimmed: String? {
+nonisolated extension String {
+    var nonEmptyTrimmed: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
