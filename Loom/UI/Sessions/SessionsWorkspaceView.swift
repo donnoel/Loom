@@ -286,27 +286,8 @@ private struct SessionDetailView: View {
                                 .id("bottom")
                         } else {
                             ForEach(vm.messages) { message in
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(message.role.rawValue.capitalized)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-
-                                    if vm.isGenerating,
-                                       vm.generatingMessageID == message.id,
-                                       message.content.isEmpty {
-                                        HStack(spacing: 8) {
-                                            ProgressView()
-                                                .controlSize(.small)
-                                            Text("Thinking…")
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    } else {
-                                        Text(message.content)
-                                            .textSelection(.enabled)
-                                    }
-                                }
-                                .padding(.vertical, 4)
-                                .id(message.id)
+                                messageRow(for: message)
+                                    .id(message.id)
                             }
 
                             Color.clear
@@ -378,9 +359,43 @@ private struct SessionDetailView: View {
             proxy.scrollTo("bottom", anchor: .bottom)
         }
     }
+
+    private func messageRow(for message: ChatMessage) -> some View {
+        let isUser = message.role == .user
+
+        return VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
+            Text(message.role.rawValue.capitalized)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            bubbleContent(for: message)
+                .loomBubble(role: message.role)
+        }
+        .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func bubbleContent(for message: ChatMessage) -> some View {
+        if vm.isGenerating,
+           vm.generatingMessageID == message.id,
+           message.content.isEmpty {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Thinking…")
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            Text(message.content)
+                .textSelection(.enabled)
+        }
+    }
 }
 
 private struct SessionInlineBanner: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     let banner: SessionMessagesViewModel.BannerState
     let performAction: (SessionMessagesViewModel.BannerState.Action) -> Void
 
@@ -403,6 +418,13 @@ private struct SessionInlineBanner: View {
             }
         }
         .padding(12)
-        .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
+        .loomCard(cornerRadius: 10)
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(LoomTheme.accentGradient(for: colorScheme).opacity(colorScheme == .dark ? 0.55 : 0.45))
+                .frame(width: 3)
+                .padding(.vertical, 6)
+                .padding(.leading, 6)
+        }
     }
 }

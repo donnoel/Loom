@@ -3,6 +3,7 @@ import SwiftUI
 struct RootView: View {
     private let store: SessionStore
 
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedSidebarItem: SidebarItem? = .sessions
     @State private var statusViewModel = StatusViewModel()
     @State private var isShowingStatusPopover: Bool = false
@@ -12,15 +13,26 @@ struct RootView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            sidebar
-        } detail: {
-            detailContent
-        }
-        .navigationSplitViewStyle(.balanced)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                statusPillButton
+        ZStack {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .ignoresSafeArea()
+
+            Rectangle()
+                .fill(LoomTheme.backgroundGradient(for: colorScheme))
+                .opacity(colorScheme == .dark ? 0.22 : 0.18)
+                .ignoresSafeArea()
+
+            NavigationSplitView {
+                sidebar
+            } detail: {
+                detailContent
+            }
+            .navigationSplitViewStyle(.balanced)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    statusPillButton
+                }
             }
         }
         .task {

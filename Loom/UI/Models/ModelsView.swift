@@ -86,7 +86,7 @@ struct ModelsView: View {
             }
         }
         .padding(16)
-        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
+        .loomCard(cornerRadius: 12)
     }
 
     @ViewBuilder
@@ -143,7 +143,7 @@ struct ModelsView: View {
             .disabled(model.tag == viewModel.activeModelTag)
         }
         .padding(12)
-        .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 10))
+        .loomCard(cornerRadius: 10)
     }
 
     private var privacyFooter: some View {

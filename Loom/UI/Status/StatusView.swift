@@ -126,7 +126,7 @@ struct LoomStatusLinesView: View {
             line("Offline", snapshot.offlineAvailable ? "Available" : "Not available")
         }
         .padding(12)
-        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
+        .loomCard(cornerRadius: 10)
     }
 
     @ViewBuilder
