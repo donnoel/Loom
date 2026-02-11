@@ -45,7 +45,7 @@ final class SessionMessagesViewModel {
 
     func load() async {
         do {
-            messages = try await store.loadMessages(sessionID: sessionID)
+            messages = try await store.loadRecentMessages(sessionID: sessionID, limit: 200)
         } catch {
             messages = []
         }
@@ -128,7 +128,7 @@ final class SessionMessagesViewModel {
                     let pending = await buffer.drain()
                     guard !pending.isEmpty else { continue }
 
-                    self.applyDelta(pending, to: placeholderID)
+                    await MainActor.run { self.applyDelta(pending, to: placeholderID) }
                 }
             }
 
@@ -149,15 +149,15 @@ final class SessionMessagesViewModel {
 
             let tail = await buffer.drain()
             if !tail.isEmpty {
-                self.applyDelta(tail, to: placeholderID)
+                await MainActor.run { self.applyDelta(tail, to: placeholderID) }
             }
 
             if let streamError, !(streamError is CancellationError) {
-                self.handleStreamFailure(streamError)
+                await MainActor.run { self.handleStreamFailure(streamError) }
             }
 
             await self.persistAssistantMessage(id: placeholderID, forcePersist: didFinishStream)
-            self.finishStreaming(placeholderID: placeholderID)
+            await MainActor.run { self.finishStreaming(placeholderID: placeholderID) }
         }
     }
 

@@ -158,7 +158,80 @@ actor SessionStore {
         let data = try Data(contentsOf: url)
         guard !data.isEmpty else { return [] }
 
-        // Split by newline, decode each JSON object
+        return decodeMessages(from: data)
+    }
+
+    func loadRecentMessages(sessionID: UUID, limit: Int = 200) throws -> [ChatMessage] {
+        let spID = signposter.makeSignpostID()
+        let state = signposter.beginInterval("loadRecentMessages", id: spID)
+        defer { signposter.endInterval("loadRecentMessages", state) }
+
+        guard limit > 0 else { return [] }
+
+        let url = try LoomPaths.sessionMessagesURL(for: sessionID)
+        guard FileManager.default.fileExists(atPath: url.path) else { return [] }
+
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+
+        let endOffset = try handle.seekToEnd()
+        guard endOffset > 0 else { return [] }
+        guard endOffset <= UInt64(Int64.max) else {
+            log.error("messages.jsonl too large to tail-read safely (offset=\(endOffset, privacy: .public))")
+            return []
+        }
+
+        let endOffsetI64 = Int64(endOffset)
+
+        // Read from the end in chunks until we have enough newline boundaries.
+        let chunkSize: Int64 = 64 * 1024
+        var cursor: Int64 = endOffsetI64
+        var buffer = Data()
+        var newlineCount = 0
+
+        while cursor > 0 && newlineCount <= limit {
+            let readSize = min(chunkSize, cursor)
+            cursor -= readSize
+            try handle.seek(toOffset: UInt64(cursor))
+            let chunk = try handle.read(upToCount: Int(readSize)) ?? Data()
+
+            if chunk.isEmpty { break }
+
+            // Prepend chunk to buffer (we're reading backwards).
+            buffer.insert(contentsOf: chunk, at: 0)
+
+            // Count newlines in the accumulated buffer. This is O(n) per loop, but loops are few (chunked).
+            newlineCount = buffer.reduce(into: 0) { acc, byte in
+                if byte == 0x0A { acc += 1 }
+            }
+
+            // If the file is small, avoid looping too much.
+            if cursor == 0 { break }
+        }
+
+        // Split and decode only the last `limit` lines.
+        let lines = buffer.split(separator: 0x0A)
+        if lines.isEmpty { return [] }
+
+        let slice = lines.suffix(limit)
+        var messages: [ChatMessage] = []
+        messages.reserveCapacity(slice.count)
+
+        for line in slice {
+            do {
+                let msg = try messageDecoder.decode(ChatMessage.self, from: Data(line))
+                messages.append(msg)
+            } catch {
+                log.error("Failed to decode message line (recent): \(String(describing: error), privacy: .public)")
+            }
+        }
+
+        return messages
+    }
+
+    private func decodeMessages(from data: Data) -> [ChatMessage] {
+        guard !data.isEmpty else { return [] }
+
         let lines = data.split(separator: 0x0A)
         var messages: [ChatMessage] = []
         messages.reserveCapacity(lines.count)
