@@ -321,9 +321,18 @@ private struct SessionDetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(session.metadata.title)
-                .font(LoomTheme.sessionHeaderFont())
-                .tracking(0.2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(session.metadata.title)
+                    .font(LoomTheme.sessionHeaderFont())
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
+                    .padding(.bottom, 4)
+
+                Text("Updated \(session.metadata.updatedAt.formatted(date: .abbreviated, time: .omitted))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             Divider()
 

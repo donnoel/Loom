@@ -58,7 +58,7 @@ nonisolated enum LoomTheme {
     }
 
     static func sessionHeaderFont() -> Font {
-        .system(.largeTitle, design: .serif).weight(.semibold)
+        .system(.title, design: .default).weight(.semibold)
     }
 
     static func bubblePalette(
