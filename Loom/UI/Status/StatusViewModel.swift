@@ -7,7 +7,7 @@ import OSLog
 @Observable
 final class StatusViewModel {
     private let log = Logger(subsystem: "com.loom.app", category: "StatusViewModel")
-    private let client: OllamaClient
+    private let client: any OllamaStatusProviding
     private var refreshTask: Task<Void, Never>?
     private var activationObserver: NSObjectProtocol?
 
@@ -23,7 +23,7 @@ final class StatusViewModel {
     var lastRefreshAt: Date?
     var ollamaAppInstalled: Bool = false
 
-    init(client: OllamaClient = OllamaClient()) {
+    init(client: any OllamaStatusProviding = OllamaClient()) {
         self.client = client
     }
 

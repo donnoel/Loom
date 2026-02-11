@@ -5,8 +5,15 @@ nonisolated enum LoomPaths {
     static let sessionsFolderName = "Sessions"
     static let metadataFileName = "metadata.json"
     static let messagesFileName = "messages.jsonl"
+    private static let overrideRootEnvironmentKey = "LOOM_APP_SUPPORT_ROOT"
 
     static func applicationSupportRoot() throws -> URL {
+        if let override = ProcessInfo.processInfo.environment[overrideRootEnvironmentKey]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !override.isEmpty {
+            return URL(fileURLWithPath: NSString(string: override).expandingTildeInPath, isDirectory: true)
+        }
+
         let base = try FileManager.default.url(
             for: .applicationSupportDirectory,
             in: .userDomainMask,

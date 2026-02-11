@@ -22,6 +22,7 @@ struct ModelsView: View {
             }
             .padding(24)
         }
+        .accessibilityIdentifier("screen.models")
         .navigationTitle("Models")
         .task {
             viewModel.startMonitoring()

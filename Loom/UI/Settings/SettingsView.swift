@@ -54,6 +54,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .accessibilityIdentifier("screen.settings")
         .formStyle(.grouped)
         .navigationTitle("Settings")
         .confirmationDialog(

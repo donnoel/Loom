@@ -19,8 +19,8 @@ final class SessionMessagesViewModel {
     private let store: SessionStore
     private let sessionID: UUID
     private let onActivity: (() async -> Void)?
-    private let ollamaClient: OllamaClient
-    private let chatClient: OllamaChatClient
+    private let ollamaClient: any OllamaStatusProviding
+    private let chatClient: any OllamaChatStreaming
     private let streamUpdateInterval: Duration = .milliseconds(60)
 
     var messages: [ChatMessage] = []
@@ -47,6 +47,20 @@ final class SessionMessagesViewModel {
         self.onActivity = onActivity
         self.ollamaClient = ollamaClient
         self.chatClient = chatClient ?? OllamaChatClient(ollamaClient: ollamaClient)
+    }
+
+    init(
+        store: SessionStore,
+        sessionID: UUID,
+        onActivity: (() async -> Void)? = nil,
+        ollamaClient: any OllamaStatusProviding,
+        chatClient: any OllamaChatStreaming
+    ) {
+        self.store = store
+        self.sessionID = sessionID
+        self.onActivity = onActivity
+        self.ollamaClient = ollamaClient
+        self.chatClient = chatClient
     }
 
     func load() async {

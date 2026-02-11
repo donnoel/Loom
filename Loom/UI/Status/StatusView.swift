@@ -33,6 +33,7 @@ struct StatusView: View {
             }
             .padding(24)
         }
+        .accessibilityIdentifier("screen.status")
         .navigationTitle("Status")
     }
 

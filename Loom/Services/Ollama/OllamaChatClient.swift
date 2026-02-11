@@ -6,7 +6,15 @@ nonisolated struct OllamaChatStreamEvent: Equatable, Sendable {
     let error: String?
 }
 
-actor OllamaChatClient {
+protocol OllamaChatStreaming: Actor {
+    func streamChat(
+        model: String,
+        messages: [ChatMessage],
+        onDelta: @Sendable (String) async -> Void
+    ) async throws
+}
+
+actor OllamaChatClient: OllamaChatStreaming {
     enum StreamError: LocalizedError, Sendable {
         case ollamaUnavailable
         case invalidRequest

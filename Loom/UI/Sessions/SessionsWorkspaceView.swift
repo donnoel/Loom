@@ -58,6 +58,8 @@ struct SessionsWorkspaceView: View {
                         }
                 }
             }
+            .accessibilityIdentifier("sessions.list")
+            .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 420)
             .searchable(text: $vm.searchQuery, placement: .automatic)
             .safeAreaInset(edge: .top) {
                 if let banner = vm.sidebarBanner {
@@ -79,6 +81,7 @@ struct SessionsWorkspaceView: View {
                     } label: {
                         Label("New Session", systemImage: "plus")
                     }
+                    .accessibilityIdentifier("sessions.toolbar.new")
 
                     Button {
                         if let selected = vm.selectedSessionID,
@@ -88,6 +91,7 @@ struct SessionsWorkspaceView: View {
                     } label: {
                         Label("Rename", systemImage: "pencil")
                     }
+                    .accessibilityIdentifier("sessions.toolbar.rename")
                     .disabled(vm.selectedSessionID == nil)
 
                     Button {
@@ -104,6 +108,7 @@ struct SessionsWorkspaceView: View {
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
+                    .accessibilityIdentifier("sessions.toolbar.delete")
                     .disabled(vm.selectedSessionID == nil)
                 }
             }
@@ -123,6 +128,7 @@ struct SessionsWorkspaceView: View {
                 ContentUnavailableView("No Session Selected", systemImage: "text.bubble")
             }
         }
+        .navigationSplitViewStyle(.prominentDetail)
         .task { await vm.load() }
         .onChange(of: focusedRenameID) { _, newValue in
             if editingSessionID != nil, newValue == nil {
@@ -177,6 +183,7 @@ struct SessionsWorkspaceView: View {
                 TextField("", text: $draftTitle)
                     .textFieldStyle(.plain)
                     .font(.headline)
+                    .accessibilityIdentifier("sessions.renameField")
                     .focused($focusedRenameID, equals: session.id)
                     .onSubmit { commitRenameIfNeeded() }
                     .onExitCommand { cancelRename() }
@@ -484,6 +491,7 @@ private struct SessionDetailView: View {
                 HStack(alignment: .bottom, spacing: 8) {
                     TextField("Message", text: $vm.draft)
                         .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("session.detail.messageField")
                         .onSubmit {
                             guard !vm.isGenerating else { return }
                             sendAndScroll(proxy)
@@ -495,6 +503,7 @@ private struct SessionDetailView: View {
                         } label: {
                             Label("Stop", systemImage: "stop.fill")
                         }
+                        .accessibilityIdentifier("session.detail.stopButton")
                         .buttonStyle(.bordered)
                     } else {
                         Button {
@@ -502,6 +511,7 @@ private struct SessionDetailView: View {
                         } label: {
                             Label("Send", systemImage: "paperplane.fill")
                         }
+                        .accessibilityIdentifier("session.detail.sendButton")
                         .buttonStyle(.bordered)
                         .tint(.accentColor)
                         .disabled(vm.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)

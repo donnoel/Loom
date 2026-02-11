@@ -12,7 +12,7 @@ final class ModelsViewModel {
     }
 
     private let log = Logger(subsystem: "com.loom.app", category: "ModelsViewModel")
-    private let client: OllamaClient
+    private let client: any OllamaStatusProviding
     private var activationObserver: NSObjectProtocol?
 
     private nonisolated static func isAutoCheckEnabled() -> Bool {
@@ -27,7 +27,7 @@ final class ModelsViewModel {
     var isRefreshing: Bool = false
     var lastRefreshAt: Date?
 
-    init(client: OllamaClient = OllamaClient()) {
+    init(client: any OllamaStatusProviding = OllamaClient()) {
         self.client = client
     }
 

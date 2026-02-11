@@ -32,7 +32,12 @@ nonisolated struct OllamaDiagnosis: Hashable, Sendable {
     let nextStep: NextStep
 }
 
-actor OllamaClient {
+protocol OllamaStatusProviding: Actor {
+    func diagnose() async -> OllamaDiagnosis
+    func listModels() async throws -> [OllamaModel]
+}
+
+actor OllamaClient: OllamaStatusProviding {
     private let log = Logger(subsystem: "com.loom.app", category: "OllamaClient")
 
     /// Try multiple localhost variants to be resilient across environments.

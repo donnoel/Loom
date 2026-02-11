@@ -28,7 +28,7 @@ struct RootView: View {
             } detail: {
                 detailContent
             }
-            .navigationSplitViewStyle(.balanced)
+            .navigationSplitViewStyle(.prominentDetail)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     statusPillButton
@@ -61,6 +61,7 @@ struct RootView: View {
                 sidebarRow(.settings)
             }
         }
+        .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 280)
         .navigationTitle("Loom")
     }
 
@@ -102,6 +103,7 @@ struct RootView: View {
             .padding(.vertical, 3)
             .padding(.horizontal, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("sidebar.\(item.id)")
             .background {
                 if isSelected {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
