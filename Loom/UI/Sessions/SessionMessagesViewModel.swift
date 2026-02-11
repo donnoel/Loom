@@ -29,6 +29,7 @@ final class SessionMessagesViewModel {
     var generationTask: Task<Void, Never>?
     var generatingMessageID: UUID?
     var banner: BannerState?
+    private(set) var isShowingFullHistory: Bool = false
     private var lastStreamModel: String?
     private var lastStreamContext: [ChatMessage]?
     private var lastStreamPlaceholderID: UUID?
@@ -51,8 +52,19 @@ final class SessionMessagesViewModel {
     func load() async {
         do {
             messages = try await store.loadRecentMessages(sessionID: sessionID, limit: 200)
+            isShowingFullHistory = false
         } catch {
             messages = []
+            isShowingFullHistory = false
+        }
+    }
+
+    func loadFullHistory() async {
+        do {
+            messages = try await store.loadMessages(sessionID: sessionID)
+            isShowingFullHistory = true
+        } catch {
+            // Keep current tail-loaded messages if full history fails.
         }
     }
 
@@ -125,8 +137,7 @@ final class SessionMessagesViewModel {
 
     func retryLastReply() async {
         guard !isGenerating else { return }
-        guard lastStreamFailed,
-              let model = lastStreamModel,
+        guard let model = lastStreamModel,
               let context = lastStreamContext else {
             return
         }

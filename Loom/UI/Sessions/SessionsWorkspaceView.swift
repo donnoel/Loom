@@ -376,6 +376,7 @@ private struct SessionDetailView: View {
     let onActivity: () async -> Void
 
     @State private var vm: SessionMessagesViewModel
+    @State private var didInitialScroll: Bool = false
 
     init(
         session: Session,
@@ -429,6 +430,15 @@ private struct SessionDetailView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {
+                        if !vm.isShowingFullHistory && vm.messages.count >= 200 {
+                            Button("Load Earlier") {
+                                loadEarlierAndPreservePosition(proxy)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .padding(.bottom, 4)
+                        }
+
                         if vm.messages.isEmpty {
                             Text("This session is ready.")
                                 .foregroundStyle(.secondary)
@@ -441,7 +451,10 @@ private struct SessionDetailView: View {
                                     message: message,
                                     isThinking: vm.isGenerating
                                         && vm.generatingMessageID == message.id
-                                        && message.content.isEmpty
+                                        && message.content.isEmpty,
+                                    onRegenerate: message.role == .assistant ? {
+                                        Task { await vm.retryLastReply() }
+                                    } : nil
                                 )
                                 .equatable()
                             }
@@ -455,8 +468,11 @@ private struct SessionDetailView: View {
                 }
                 .task {
                     await vm.load()
-                    DispatchQueue.main.async {
-                        scrollToBottom(proxy)
+                    if !didInitialScroll {
+                        didInitialScroll = true
+                        DispatchQueue.main.async {
+                            scrollToBottom(proxy)
+                        }
                     }
                 }
 
@@ -507,6 +523,20 @@ private struct SessionDetailView: View {
         }
     }
 
+    private func loadEarlierAndPreservePosition(_ proxy: ScrollViewProxy) {
+        let anchorID = vm.messages.first?.id
+
+        Task {
+            await vm.loadFullHistory()
+
+            DispatchQueue.main.async {
+                if let anchorID {
+                    proxy.scrollTo(anchorID, anchor: .top)
+                }
+            }
+        }
+    }
+
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
         if let last = vm.messages.last {
             proxy.scrollTo(last.id, anchor: .bottom)
@@ -519,6 +549,11 @@ private struct SessionDetailView: View {
 private struct MessageRowView: View, Equatable {
     let message: ChatMessage
     let isThinking: Bool
+    let onRegenerate: (() -> Void)?
+
+    static func == (lhs: MessageRowView, rhs: MessageRowView) -> Bool {
+        lhs.message == rhs.message && lhs.isThinking == rhs.isThinking
+    }
 
     var body: some View {
         let isUser = message.role == .user
@@ -537,7 +572,11 @@ private struct MessageRowView: View, Equatable {
                             .foregroundStyle(.secondary)
                     }
                 } else {
-                    MessageContentView(content: message.content)
+                    MessageContentView(
+                        content: message.content,
+                        role: message.role,
+                        onRegenerate: onRegenerate
+                    )
                 }
             }
         }
@@ -548,6 +587,8 @@ private struct MessageRowView: View, Equatable {
 
 private struct MessageContentView: View {
     let content: String
+    let role: ChatMessage.Role
+    let onRegenerate: (() -> Void)?
 
     var body: some View {
         Group {
@@ -565,6 +606,12 @@ private struct MessageContentView: View {
             Button("Copy") {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(content, forType: .string)
+            }
+
+            if role == .assistant,
+               let onRegenerate {
+                Divider()
+                Button("Regenerate", action: onRegenerate)
             }
         }
     }
