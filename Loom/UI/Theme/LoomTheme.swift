@@ -129,8 +129,12 @@ private struct LoomBubbleModifier: ViewModifier {
 
         content
             .foregroundStyle(palette.foreground)
+            .font(isChipRole ? .callout : .body)
+            .lineSpacing(isChipRole ? 1 : 2)
+            .multilineTextAlignment(.leading)
+            .contentShape(RoundedRectangle(cornerRadius: palette.cornerRadius, style: .continuous))
             .padding(.horizontal, isChipRole ? 10 : 12)
-            .padding(.vertical, isChipRole ? 6 : 8)
+            .padding(.vertical, isChipRole ? 6 : 10)
             .background {
                 RoundedRectangle(cornerRadius: palette.cornerRadius, style: .continuous)
                     .fill(palette.background)
@@ -139,7 +143,7 @@ private struct LoomBubbleModifier: ViewModifier {
                             .strokeBorder(Color.primary.opacity(palette.strokeOpacity), lineWidth: 1)
                     }
             }
-            .frame(maxWidth: 620, alignment: palette.alignment)
+            .frame(maxWidth: 680, alignment: palette.alignment)
     }
 }
 

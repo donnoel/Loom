@@ -449,13 +449,36 @@ private struct MessageRowView: View, Equatable {
                             .foregroundStyle(.secondary)
                     }
                 } else {
-                    Text(message.content)
-                        .textSelection(.enabled)
+                    MessageContentView(content: message.content)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
         .padding(.vertical, 4)
+    }
+}
+
+private struct MessageContentView: View {
+    let content: String
+
+    var body: some View {
+        Group {
+            if let attributed = try? AttributedString(
+                markdown: content,
+                options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .full)
+            ) {
+                Text(attributed)
+            } else {
+                Text(content)
+            }
+        }
+        .textSelection(.enabled)
+        .contextMenu {
+            Button("Copy") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(content, forType: .string)
+            }
+        }
     }
 }
 

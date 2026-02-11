@@ -125,7 +125,7 @@ struct RootView: View {
                 Image(systemName: statusViewModel.snapshot.readiness.symbolName)
                     .font(.caption.bold())
                     .foregroundStyle(statusViewModel.snapshot.readiness.tintColor)
-                Text("Loom Ready")
+                Text("Loom")
                     .font(.subheadline.weight(.semibold))
                 Text(statusViewModel.snapshot.readiness.label)
                     .font(.caption.weight(.semibold))
