@@ -59,6 +59,8 @@ nonisolated struct LoomStatusSnapshot: Sendable, Equatable {
 
 nonisolated enum LoomPreferenceKeys {
     static let activeModelTag = "activeModelTag"
+    static let statusAutoRefreshEnabled = "statusAutoRefreshEnabled"
+    static let modelsAutoCheckEnabled = "modelsAutoCheckEnabled"
 }
 
 nonisolated extension String {

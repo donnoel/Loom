@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 
 @MainActor
 @Observable
@@ -10,6 +11,7 @@ final class RootViewModel {
     }
 
     private let store: SessionStore
+    private let log = Logger(subsystem: "com.loom.app", category: "RootViewModel")
 
     var sessions: [Session] = []
     var selectedSessionID: Session.ID?
@@ -41,7 +43,13 @@ final class RootViewModel {
             let created = try await store.createSession(title: "New Session")
             await load()
             selectedSessionID = created.id
-        } catch { }
+        } catch {
+            log.error("Failed to create session: \(String(describing: error), privacy: .public)")
+            sidebarBanner = SidebarBannerState(
+                text: "Loom couldn’t create a session. Try again.",
+                actionTitle: "Reload"
+            )
+        }
     }
 
     func deleteSelected() async {
@@ -53,7 +61,13 @@ final class RootViewModel {
             if selectedSessionID == nil {
                 selectedSessionID = sessions.first?.id
             }
-        } catch { }
+        } catch {
+            log.error("Failed to delete session \(id.uuidString, privacy: .public): \(String(describing: error), privacy: .public)")
+            sidebarBanner = SidebarBannerState(
+                text: "Loom couldn’t delete this session. Try again.",
+                actionTitle: "Reload"
+            )
+        }
     }
 
     func session(for id: Session.ID?) -> Session? {
@@ -82,7 +96,11 @@ final class RootViewModel {
             await load()
             selectedSessionID = keepSelected
         } catch {
-            // For v1: ignore quietly. Later we can add a non-intrusive banner.
+            log.error("Failed to rename session \(id.uuidString, privacy: .public): \(String(describing: error), privacy: .public)")
+            sidebarBanner = SidebarBannerState(
+                text: "Loom couldn’t rename this session. Try again.",
+                actionTitle: "Reload"
+            )
         }
     }
 }

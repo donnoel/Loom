@@ -15,6 +15,13 @@ final class ModelsViewModel {
     private let client: OllamaClient
     private var activationObserver: NSObjectProtocol?
 
+    private nonisolated static func isAutoCheckEnabled() -> Bool {
+        if let stored = UserDefaults.standard.object(forKey: LoomPreferenceKeys.modelsAutoCheckEnabled) as? Bool {
+            return stored
+        }
+        return true
+    }
+
     var diagnosis: OllamaDiagnosis = .unavailable
     var models: [OllamaModel] = []
     var isRefreshing: Bool = false
@@ -49,6 +56,7 @@ final class ModelsViewModel {
                 queue: .main
             ) { [weak self] _ in
                 guard let self else { return }
+                guard Self.isAutoCheckEnabled() else { return }
                 Task { await self.refresh() }
             }
         }

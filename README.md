@@ -46,6 +46,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Stop** to cancel streaming while keeping partial text
 - **Export Session** from toolbar or `⌘⇧E`
 - **Status / Models** from sidebar for setup and diagnostics
+- **Automation toggles** in Settings let you disable background status/model checks and use manual Refresh instead
 
 ---
 

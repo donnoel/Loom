@@ -11,6 +11,13 @@ final class StatusViewModel {
     private var refreshTask: Task<Void, Never>?
     private var activationObserver: NSObjectProtocol?
 
+    private nonisolated static func isAutoRefreshEnabled() -> Bool {
+        if let stored = UserDefaults.standard.object(forKey: LoomPreferenceKeys.statusAutoRefreshEnabled) as? Bool {
+            return stored
+        }
+        return true
+    }
+
     var snapshot: LoomStatusSnapshot = .unavailable
     var isRefreshing: Bool = false
     var lastRefreshAt: Date?
@@ -28,6 +35,7 @@ final class StatusViewModel {
                 queue: .main
             ) { [weak self] _ in
                 guard let self else { return }
+                guard Self.isAutoRefreshEnabled() else { return }
                 Task { await self.refresh() }
             }
         }
@@ -38,6 +46,7 @@ final class StatusViewModel {
 
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(20))
+                    guard Self.isAutoRefreshEnabled() else { continue }
                     await self.refresh()
                 }
             }

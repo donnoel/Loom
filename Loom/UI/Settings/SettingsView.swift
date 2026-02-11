@@ -1,10 +1,10 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @AppStorage("statusAutoRefreshEnabled")
+    @AppStorage(LoomPreferenceKeys.statusAutoRefreshEnabled)
     private var statusAutoRefreshEnabled: Bool = true
 
-    @AppStorage("modelsAutoCheckEnabled")
+    @AppStorage(LoomPreferenceKeys.modelsAutoCheckEnabled)
     private var modelsAutoCheckEnabled: Bool = true
 
     var body: some View {
