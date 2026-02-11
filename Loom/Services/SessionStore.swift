@@ -118,6 +118,24 @@ actor SessionStore {
         }
     }
 
+    func deleteAllSessions() throws {
+        let spID = signposter.makeSignpostID()
+        let state = signposter.beginInterval("deleteAllSessions", id: spID)
+        defer { signposter.endInterval("deleteAllSessions", state) }
+        try bootstrap()
+
+        let root = try LoomPaths.sessionsRoot()
+        let urls = try FileManager.default.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )
+
+        for url in urls {
+            try FileManager.default.removeItem(at: url)
+        }
+    }
+
     // 3C: JSONL message storage (append-only)
     func appendMessage(_ message: ChatMessage, sessionID: UUID) throws {
         let spID = signposter.makeSignpostID()

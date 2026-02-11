@@ -91,7 +91,7 @@ struct RootView: View {
                 }
             )
         case .settings:
-            SettingsView()
+            SettingsView(store: store)
         }
     }
 

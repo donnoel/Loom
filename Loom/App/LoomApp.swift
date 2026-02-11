@@ -21,4 +21,5 @@ struct LoomApp: App {
 
 extension Notification.Name {
     static let loomExportSessionRequested = Notification.Name("loom.exportSessionRequested")
+    static let loomSessionsDidChange = Notification.Name("loom.sessionsDidChange")
 }

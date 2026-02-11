@@ -134,6 +134,9 @@ struct SessionsWorkspaceView: View {
                 await exportSelectedSession()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .loomSessionsDidChange)) { _ in
+            Task { await vm.load() }
+        }
         .sheet(isPresented: $isShowingTagsEditor, onDismiss: resetTagsEditorState) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Edit Tags")
