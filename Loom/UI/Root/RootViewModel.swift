@@ -16,6 +16,22 @@ final class RootViewModel {
     var sessions: [Session] = []
     var selectedSessionID: Session.ID?
     var sidebarBanner: SidebarBannerState?
+    var searchQuery: String = ""
+
+    var filteredSessions: [Session] {
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return sessions }
+
+        return sessions.filter { session in
+            if session.metadata.title.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil {
+                return true
+            }
+
+            return session.metadata.tags.contains(where: { tag in
+                tag.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+            })
+        }
+    }
 
     init(store: SessionStore) {
         self.store = store
@@ -24,10 +40,13 @@ final class RootViewModel {
     func load() async {
         do {
             let items = try await store.listSessions()
-            sessions = items
+            sessions = sortSessions(items)
             sidebarBanner = nil
             if selectedSessionID == nil {
                 selectedSessionID = sessions.first?.id
+            } else if let selectedSessionID,
+                      !sessions.contains(where: { $0.id == selectedSessionID }) {
+                self.selectedSessionID = sessions.first?.id
             }
         } catch {
             sessions = []
@@ -78,7 +97,7 @@ final class RootViewModel {
     func touchSession(id: Session.ID) {
         guard let idx = sessions.firstIndex(where: { $0.id == id }) else { return }
         sessions[idx].metadata.updatedAt = Date()
-        sessions.sort { $0.metadata.updatedAt > $1.metadata.updatedAt }
+        sessions = sortSessions(sessions)
     }
     
     func renameSession(id: Session.ID, to newTitle: String) async {
@@ -101,6 +120,52 @@ final class RootViewModel {
                 text: "Loom couldn’t rename this session. Try again.",
                 actionTitle: "Reload"
             )
+        }
+    }
+
+    func togglePinned(id: Session.ID) async {
+        guard var session = sessions.first(where: { $0.id == id }) else { return }
+        session.metadata.isPinned.toggle()
+
+        do {
+            try await store.updateMetadata(session.metadata, for: id)
+            let keepSelected = selectedSessionID
+            await load()
+            selectedSessionID = keepSelected
+        } catch {
+            log.error("Failed to update pinned state for session \(id.uuidString, privacy: .public): \(String(describing: error), privacy: .public)")
+            sidebarBanner = SidebarBannerState(
+                text: "Loom couldn’t update this session. Try again.",
+                actionTitle: "Reload"
+            )
+        }
+    }
+
+    func updateTags(id: Session.ID, tags: [String]) async {
+        guard var session = sessions.first(where: { $0.id == id }) else { return }
+        guard session.metadata.tags != tags else { return }
+        session.metadata.tags = tags
+
+        do {
+            try await store.updateMetadata(session.metadata, for: id)
+            let keepSelected = selectedSessionID
+            await load()
+            selectedSessionID = keepSelected
+        } catch {
+            log.error("Failed to update tags for session \(id.uuidString, privacy: .public): \(String(describing: error), privacy: .public)")
+            sidebarBanner = SidebarBannerState(
+                text: "Loom couldn’t update session tags. Try again.",
+                actionTitle: "Reload"
+            )
+        }
+    }
+
+    private func sortSessions(_ input: [Session]) -> [Session] {
+        input.sorted { lhs, rhs in
+            if lhs.metadata.isPinned != rhs.metadata.isPinned {
+                return lhs.metadata.isPinned && !rhs.metadata.isPinned
+            }
+            return lhs.metadata.updatedAt > rhs.metadata.updatedAt
         }
     }
 }

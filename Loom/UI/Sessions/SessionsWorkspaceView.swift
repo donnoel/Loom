@@ -12,6 +12,9 @@ struct SessionsWorkspaceView: View {
     @State private var editingSessionID: Session.ID?
     @State private var draftTitle: String = ""
     @FocusState private var focusedRenameID: Session.ID?
+    @State private var isShowingTagsEditor = false
+    @State private var tagsDraft = ""
+    @State private var tagsEditingSessionID: Session.ID?
 
     private static let exportDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -34,11 +37,15 @@ struct SessionsWorkspaceView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $vm.selectedSessionID) {
-                ForEach(vm.sessions) { session in
+                ForEach(vm.filteredSessions) { session in
                     row(for: session)
                         .tag(session.id)
                         .contextMenu {
                             Button("Rename") { beginRename(session) }
+                            Button(session.metadata.isPinned ? "Unpin" : "Pin") {
+                                Task { await vm.togglePinned(id: session.id) }
+                            }
+                            Button("Edit Tags…") { beginTagsEdit(session) }
                             Divider()
                             Button(role: .destructive) {
                                 Task {
@@ -51,6 +58,7 @@ struct SessionsWorkspaceView: View {
                         }
                 }
             }
+            .searchable(text: $vm.searchQuery, placement: .automatic)
             .safeAreaInset(edge: .top) {
                 if let banner = vm.sidebarBanner {
                     SessionsSidebarBanner(
@@ -126,6 +134,35 @@ struct SessionsWorkspaceView: View {
                 await exportSelectedSession()
             }
         }
+        .sheet(isPresented: $isShowingTagsEditor, onDismiss: resetTagsEditorState) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Edit Tags")
+                    .font(.headline)
+
+                Text("Use commas to separate tags.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                TextField("design, roadmap, notes", text: $tagsDraft, axis: .vertical)
+                    .lineLimit(2...4)
+                    .textFieldStyle(.roundedBorder)
+
+                HStack {
+                    Spacer()
+
+                    Button("Cancel", role: .cancel) {
+                        resetTagsEditorState()
+                    }
+
+                    Button("Save") {
+                        saveTagsEdit()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .padding(20)
+            .frame(minWidth: 420)
+        }
     }
 
     @ViewBuilder
@@ -190,6 +227,46 @@ struct SessionsWorkspaceView: View {
         focusedRenameID = nil
 
         Task { await vm.renameSession(id: id, to: title) }
+    }
+
+    private func beginTagsEdit(_ session: Session) {
+        tagsEditingSessionID = session.id
+        tagsDraft = session.metadata.tags.joined(separator: ", ")
+        isShowingTagsEditor = true
+    }
+
+    private func resetTagsEditorState() {
+        isShowingTagsEditor = false
+        tagsEditingSessionID = nil
+        tagsDraft = ""
+    }
+
+    private func saveTagsEdit() {
+        guard let id = tagsEditingSessionID else {
+            resetTagsEditorState()
+            return
+        }
+
+        let tags = parseTags(from: tagsDraft)
+        resetTagsEditorState()
+
+        Task { await vm.updateTags(id: id, tags: tags) }
+    }
+
+    private func parseTags(from text: String) -> [String] {
+        var seen: Set<String> = []
+        var ordered: [String] = []
+
+        for item in text.split(separator: ",", omittingEmptySubsequences: false) {
+            let trimmed = item.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+
+            let key = trimmed.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            guard seen.insert(key).inserted else { continue }
+            ordered.append(trimmed)
+        }
+
+        return ordered
     }
 
     private func exportSelectedSession() async {
