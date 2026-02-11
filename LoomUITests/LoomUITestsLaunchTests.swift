@@ -5,6 +5,7 @@
 //  Created by Don Noel on 1/27/26.
 //
 
+import Foundation
 import XCTest
 
 final class LoomUITestsLaunchTests: XCTestCase {
@@ -19,11 +20,15 @@ final class LoomUITestsLaunchTests: XCTestCase {
 
     @MainActor
     func testLaunch() throws {
-        let app = XCUIApplication()
-        app.launch()
+        let testRootURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("LoomUITestsLaunch-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: testRootURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: testRootURL) }
 
-        // Insert steps here to perform after app launch but before taking a screenshot,
-        // such as logging into a test account or navigating somewhere in the app
+        let app = XCUIApplication()
+        app.launchEnvironment["LOOM_APP_SUPPORT_ROOT"] = testRootURL.path
+        app.launchEnvironment["LOOM_UI_TEST_RESET_DEFAULTS"] = "1"
+        app.launch()
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "Launch Screen"

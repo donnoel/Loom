@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 
 final class LoomUITests: XCTestCase {
@@ -5,13 +6,6 @@ final class LoomUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-    }
-
-    override func tearDownWithError() throws {
-        if let testRootURL {
-            try? FileManager.default.removeItem(at: testRootURL)
-        }
-        testRootURL = nil
     }
 
     override func tearDownWithError() throws {
