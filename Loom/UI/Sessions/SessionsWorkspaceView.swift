@@ -420,6 +420,8 @@ private struct SessionDetailView: View {
                         browseModels()
                     case .openOrInstallOllama:
                         openOrInstallOllama()
+                    case .retryLastReply:
+                        Task { await vm.retryLastReply() }
                     }
                 }
             }

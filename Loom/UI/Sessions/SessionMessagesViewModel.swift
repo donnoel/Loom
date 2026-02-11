@@ -8,6 +8,7 @@ final class SessionMessagesViewModel {
         enum Action: Equatable {
             case browseModels
             case openOrInstallOllama
+            case retryLastReply
         }
 
         let text: String
@@ -28,6 +29,10 @@ final class SessionMessagesViewModel {
     var generationTask: Task<Void, Never>?
     var generatingMessageID: UUID?
     var banner: BannerState?
+    private var lastStreamModel: String?
+    private var lastStreamContext: [ChatMessage]?
+    private var lastStreamPlaceholderID: UUID?
+    private var lastStreamFailed: Bool = false
 
     init(
         store: SessionStore,
@@ -101,15 +106,59 @@ final class SessionMessagesViewModel {
         isGenerating = true
         generatingMessageID = assistantPlaceholder.id
 
+        let context = contextMessages(excluding: assistantPlaceholder.id, limit: 20)
+        lastStreamModel = activeModel
+        lastStreamContext = context
+        lastStreamPlaceholderID = assistantPlaceholder.id
+        lastStreamFailed = false
+
         startStreamingReply(
             model: activeModel,
             placeholderID: assistantPlaceholder.id,
-            context: contextMessages(excluding: assistantPlaceholder.id, limit: 20)
+            context: context
         )
     }
 
     func stopGenerating() {
         generationTask?.cancel()
+    }
+
+    func retryLastReply() async {
+        guard !isGenerating else { return }
+        guard lastStreamFailed,
+              let model = lastStreamModel,
+              let context = lastStreamContext else {
+            return
+        }
+
+        let diagnosis = await ollamaClient.diagnose()
+        guard diagnosis.isRunning else {
+            banner = BannerState(
+                text: "Loom can’t reach Ollama. Start it to continue.",
+                actionTitle: diagnosis.isInstalled ? "Start Ollama" : "Install Ollama…",
+                action: .openOrInstallOllama
+            )
+            return
+        }
+
+        if let failedPlaceholderID = lastStreamPlaceholderID,
+           let failedIndex = messages.firstIndex(where: { $0.id == failedPlaceholderID }) {
+            messages.remove(at: failedIndex)
+        }
+
+        let freshPlaceholder = ChatMessage(role: .assistant, content: "")
+        messages.append(freshPlaceholder)
+        generatingMessageID = freshPlaceholder.id
+        isGenerating = true
+        banner = nil
+        lastStreamPlaceholderID = freshPlaceholder.id
+        lastStreamFailed = false
+
+        startStreamingReply(
+            model: model,
+            placeholderID: freshPlaceholder.id,
+            context: context
+        )
     }
 
     private func startStreamingReply(model: String, placeholderID: UUID, context: [ChatMessage]) {
@@ -190,10 +239,11 @@ final class SessionMessagesViewModel {
             return
         }
 
+        lastStreamFailed = true
         banner = BannerState(
             text: "Connection lost. Try again.",
-            actionTitle: nil,
-            action: nil
+            actionTitle: "Retry",
+            action: .retryLastReply
         )
     }
 
