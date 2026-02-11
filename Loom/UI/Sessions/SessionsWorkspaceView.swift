@@ -402,10 +402,11 @@ private struct SessionDetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(spacing: 2) {
                 Text(session.metadata.title)
                     .font(LoomTheme.sessionHeaderFont())
                     .lineLimit(2)
+                    .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
                     .padding(.bottom, 4)
@@ -414,6 +415,7 @@ private struct SessionDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            .frame(maxWidth: .infinity, alignment: .center)
 
             Divider()
 

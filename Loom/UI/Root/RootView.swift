@@ -133,14 +133,6 @@ struct RootView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(
-                Capsule()
-                    .fill(statusViewModel.snapshot.readiness.tintColor.opacity(0.12))
-            )
-            .overlay(
-                Capsule()
-                    .stroke(statusViewModel.snapshot.readiness.tintColor.opacity(0.4), lineWidth: 1)
-            )
         }
         .buttonStyle(.plain)
         .popover(isPresented: $isShowingStatusPopover, arrowEdge: .bottom) {
