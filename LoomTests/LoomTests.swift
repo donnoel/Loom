@@ -184,3 +184,37 @@ struct StringTrimmingTests {
         #expect("  hello  ".nonEmptyTrimmed == "hello")
     }
 }
+
+struct ChatDisplayFormatterTests {
+    @Test
+    func formatAddsParagraphBreaksForShortPlainText() {
+        let input = "Loom helps you chat locally. It keeps your data on this Mac. You can choose a model and start quickly."
+        let formatted = ChatDisplayFormatter.format(input)
+
+        #expect(formatted.contains("\n\n"))
+        #expect(formatted.contains("Loom helps you chat locally."))
+        #expect(formatted.contains("You can choose a model and start quickly."))
+    }
+
+    @Test
+    func formatNormalizesInlineNumberedLists() {
+        let input = "To get started, follow these steps. 1) Open Models. 2) Choose llama3. 3) Send a message."
+        let formatted = ChatDisplayFormatter.format(input)
+
+        #expect(formatted.contains("\n1. Open Models."))
+        #expect(formatted.contains("\n2. Choose llama3."))
+        #expect(formatted.contains("\n3. Send a message."))
+    }
+
+    @Test
+    func formatRepairsSentenceSpacingWithoutBreakingTechnicalTokens() {
+        let input = "First sentence.Second sentence references v1.2.3 and example.com."
+        let formatted = ChatDisplayFormatter.format(input)
+
+        #expect(formatted.contains("First sentence. Second sentence"))
+        #expect(formatted.contains("v1.2.3"))
+        #expect(formatted.contains("example.com"))
+        #expect(!formatted.contains("example. com"))
+        #expect(!formatted.contains("v1. 2. 3"))
+    }
+}

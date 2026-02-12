@@ -651,7 +651,7 @@ private struct MessageContentView: View {
     }
 }
 
-private nonisolated enum ChatDisplayFormatter {
+nonisolated enum ChatDisplayFormatter {
     private static let marker = "\u{241E}"
 
     static func format(_ raw: String) -> String {
@@ -662,14 +662,21 @@ private nonisolated enum ChatDisplayFormatter {
         let trimmed = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return raw }
 
-        // Repair common "no-space after punctuation" and heading/list label joins.
-        var working = regexReplace("([.!?])([^\\s.!?])", in: trimmed, with: "$1 $2")
-        working = regexReplace("([a-z])([A-Z][A-Za-z]+ [A-Z][A-Za-z]+:)", in: working, with: "$1\n\n$2")
+        // Repair common "no-space after punctuation" without touching URLs/versions.
+        var working = repairSentenceSpacing(in: trimmed)
+        // Normalize list markers and split inline lists onto their own lines.
+        working = normalizeListMarkers(in: working)
+        // Repair heading/list label joins.
+        working = regexReplace(
+            "([a-z0-9])\\s+([A-Z][A-Za-z]+(?: [A-Z][A-Za-z]+){0,4}:)",
+            in: working,
+            with: "$1\n\n$2"
+        )
 
         guard shouldAutoFormat(working) else { return working }
 
         let sentenceChunks = splitIntoSentences(working)
-        guard sentenceChunks.count >= 3 else { return working }
+        guard sentenceChunks.count >= 2 else { return working }
 
         var outputBlocks: [String] = []
         var paragraphBuffer: [String] = []
@@ -694,7 +701,8 @@ private nonisolated enum ChatDisplayFormatter {
             }
 
             paragraphBuffer.append(sentence)
-            if paragraphBuffer.count >= 2 {
+            let bufferLength = paragraphBuffer.joined(separator: " ").count
+            if paragraphBuffer.count >= 2 || bufferLength >= 280 {
                 flushParagraph()
             }
         }
@@ -705,7 +713,7 @@ private nonisolated enum ChatDisplayFormatter {
     }
 
     private static func shouldAutoFormat(_ text: String) -> Bool {
-        guard text.count >= 220 else { return false }
+        guard text.count >= 80 else { return false }
         guard !text.contains("```") else { return false }
         guard !text.contains("\n\n") else { return false }
         guard !containsMarkdownStructure(text) else { return false }
@@ -713,7 +721,23 @@ private nonisolated enum ChatDisplayFormatter {
     }
 
     private static func containsMarkdownStructure(_ text: String) -> Bool {
-        text.contains("- ") || text.contains("* ") || text.contains("# ")
+        text.range(of: "(?m)^\\s*[-*]\\s+", options: .regularExpression) != nil
+            || text.range(of: "(?m)^\\s*\\d+[\\.)]\\s+", options: .regularExpression) != nil
+            || text.range(of: "(?m)^\\s*#+\\s+", options: .regularExpression) != nil
+    }
+
+    private static func repairSentenceSpacing(in text: String) -> String {
+        var working = regexReplace("([A-Za-z][.!?])([A-Z])", in: text, with: "$1 $2")
+        working = regexReplace("([A-Za-z][.!?][\"”’])([A-Z])", in: working, with: "$1 $2")
+        return working
+    }
+
+    private static func normalizeListMarkers(in text: String) -> String {
+        var working = regexReplace("([.!?])\\s+(\\d+[\\.)]\\s+)", in: text, with: "$1\n$2")
+        working = regexReplace("([.!?])\\s+([•*\\-]\\s+)", in: working, with: "$1\n$2")
+        working = regexReplace("(?m)^\\s*[•*]\\s+", in: working, with: "- ")
+        working = regexReplace("(?m)^\\s*(\\d+)\\)\\s+", in: working, with: "$1. ")
+        return working
     }
 
     private static func splitIntoSentences(_ text: String) -> [String] {
