@@ -9,13 +9,17 @@ private enum StubFailure: Error, Sendable {
 private actor StubOllamaClient: OllamaStatusProviding {
     var diagnosis: OllamaDiagnosis
     var modelsResult: Result<[OllamaModel], StubFailure>
+    var deleteResult: Result<Void, StubFailure>
+    private var deletedModelNames: [String] = []
 
     init(
         diagnosis: OllamaDiagnosis,
-        modelsResult: Result<[OllamaModel], StubFailure> = .success([])
+        modelsResult: Result<[OllamaModel], StubFailure> = .success([]),
+        deleteResult: Result<Void, StubFailure> = .success(())
     ) {
         self.diagnosis = diagnosis
         self.modelsResult = modelsResult
+        self.deleteResult = deleteResult
     }
 
     func diagnose() async -> OllamaDiagnosis {
@@ -24,6 +28,15 @@ private actor StubOllamaClient: OllamaStatusProviding {
 
     func listModels() async throws -> [OllamaModel] {
         try modelsResult.get()
+    }
+
+    func deleteModel(name: String) async throws {
+        deletedModelNames.append(name)
+        try deleteResult.get()
+    }
+
+    func readDeletedModelNames() -> [String] {
+        deletedModelNames
     }
 }
 
@@ -201,6 +214,51 @@ struct StatusViewModelCoverageTests {
 
         #expect(vm.models.isEmpty)
         #expect(vm.lastRefreshAt != nil)
+    }
+
+    @Test
+    @MainActor
+    func requestDeleteBlocksDeletingActiveModel() async {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            modelsResult: .success([OllamaModel(tag: "llama3"), OllamaModel(tag: "phi4")])
+        )
+        let vm = ModelsViewModel(client: client)
+        await vm.refresh()
+
+        vm.requestDelete(modelTag: "llama3")
+
+        #expect(vm.selectedModelToDelete == nil)
+        #expect(vm.deleteAlertMessage == "This model is currently active. Choose another model before deleting.")
+        #expect(await client.readDeletedModelNames().isEmpty)
+    }
+
+    @Test
+    @MainActor
+    func confirmDeleteRemovesNonActiveModel() async {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            modelsResult: .success([OllamaModel(tag: "llama3"), OllamaModel(tag: "phi4")]),
+            deleteResult: .success(())
+        )
+        let vm = ModelsViewModel(client: client)
+        await vm.refresh()
+        vm.requestDelete(modelTag: "phi4")
+
+        let didDelete = await vm.confirmDelete()
+
+        #expect(didDelete)
+        #expect(vm.selectedModelToDelete == nil)
+        #expect(vm.deleteAlertMessage == nil)
+        #expect(await client.readDeletedModelNames() == ["phi4"])
     }
 }
 

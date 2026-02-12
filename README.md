@@ -33,6 +33,8 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | ⏹️ **Stop Generation** | Cancel generation any time and keep the partial assistant response. |
 | 🧠 **Helpful Setup Gating** | Clear in-context guidance if no active model is selected or Ollama is unavailable. |
 | 🧩 **Model Picker** | View installed Ollama models, choose an active model, and keep that selection across launches until you change it. |
+| 🧹 **Model Cleanup** | Delete installed models directly from Loom (with confirmation and active-model safety checks). |
+| 💽 **Disk Awareness** | Models and Status screens show local free-space info and warn when free space is below 10%. |
 | 🩺 **Readiness Status** | Dedicated Status view + toolbar pill showing ready/setup/not-ready state. |
 | 📤 **Markdown Export** | Export any session to Markdown (`⌘⇧E` command + toolbar action). |
 | 🔒 **Privacy-First by Default** | Chats and model usage stay local to your Mac. |

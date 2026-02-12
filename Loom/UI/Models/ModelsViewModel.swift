@@ -14,6 +14,7 @@ final class ModelsViewModel {
     private let log = Logger(subsystem: "com.loom.app", category: "ModelsViewModel")
     private let client: any OllamaStatusProviding
     private var activationObserver: NSObjectProtocol?
+    private let activeModelDeleteBlockedMessage = "This model is currently active. Choose another model before deleting."
 
     private nonisolated static func isAutoCheckEnabled() -> Bool {
         if let stored = UserDefaults.standard.object(forKey: LoomPreferenceKeys.modelsAutoCheckEnabled) as? Bool {
@@ -24,8 +25,12 @@ final class ModelsViewModel {
 
     var diagnosis: OllamaDiagnosis = .unavailable
     var models: [OllamaModel] = []
+    var diskSpaceSnapshot: DiskSpaceSnapshot?
     var isRefreshing: Bool = false
     var lastRefreshAt: Date?
+    var selectedModelToDelete: String?
+    var deleteAlertMessage: String?
+    var isDeletingModel: Bool = false
 
     init(client: any OllamaStatusProviding = OllamaClient()) {
         self.client = client
@@ -46,6 +51,18 @@ final class ModelsViewModel {
 
     var isRunning: Bool { diagnosis.isRunning }
     var isInstalled: Bool { diagnosis.isInstalled }
+    var lowDiskSpaceWarningText: String? {
+        guard let diskSpaceSnapshot, diskSpaceSnapshot.isLowSpace else { return nil }
+        return DiskSpaceSnapshot.lowSpaceWarningMessage
+    }
+
+    var diskFreeSpaceText: String {
+        guard let diskSpaceSnapshot else {
+            return "Free space: unavailable"
+        }
+
+        return "Free space: \(DiskSpaceSnapshot.formattedBytes(diskSpaceSnapshot.availableBytes)) of \(DiskSpaceSnapshot.formattedBytes(diskSpaceSnapshot.totalBytes)) (\(diskSpaceSnapshot.availablePercentDisplay))"
+    }
 
     func startMonitoring() {
         if activationObserver == nil {
@@ -77,6 +94,7 @@ final class ModelsViewModel {
             lastRefreshAt = Date()
         }
 
+        diskSpaceSnapshot = DiskSpaceSnapshot.current()
         diagnosis = await client.diagnose()
 
         guard diagnosis.isRunning else {
@@ -91,11 +109,55 @@ final class ModelsViewModel {
             log.error("Failed to load models: \(String(describing: error), privacy: .public)")
             models = []
         }
-
     }
 
     func setActiveModel(tag: String) {
         activeModelTag = tag
+    }
+
+    func requestDelete(modelTag: String) {
+        guard let tag = modelTag.nonEmptyTrimmed else { return }
+
+        guard activeModelTag != tag else {
+            selectedModelToDelete = nil
+            deleteAlertMessage = activeModelDeleteBlockedMessage
+            return
+        }
+
+        selectedModelToDelete = tag
+    }
+
+    func cancelDeleteRequest() {
+        selectedModelToDelete = nil
+    }
+
+    func dismissDeleteAlert() {
+        deleteAlertMessage = nil
+    }
+
+    func confirmDelete() async -> Bool {
+        guard !isDeletingModel else { return false }
+        guard let modelTag = selectedModelToDelete?.nonEmptyTrimmed else { return false }
+
+        guard activeModelTag != modelTag else {
+            selectedModelToDelete = nil
+            deleteAlertMessage = activeModelDeleteBlockedMessage
+            return false
+        }
+
+        isDeletingModel = true
+        selectedModelToDelete = nil
+        defer { isDeletingModel = false }
+
+        do {
+            try await client.deleteModel(name: modelTag)
+            await refresh()
+            return true
+        } catch {
+            log.error("Failed to delete model \(modelTag, privacy: .public): \(String(describing: error), privacy: .public)")
+            deleteAlertMessage = deleteFailureMessage(for: error, modelTag: modelTag)
+            return false
+        }
     }
 
     func openOrInstallOllama() -> OpenOllamaResult {
@@ -117,6 +179,19 @@ final class ModelsViewModel {
     }
 
     private static let downloadURL = URL(string: "https://ollama.com/download")!
+
+    private func deleteFailureMessage(for error: Error, modelTag: String) -> String {
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .cannotConnectToHost, .notConnectedToInternet, .networkConnectionLost, .timedOut:
+                return "Loom can’t reach Ollama. Start it to continue."
+            default:
+                break
+            }
+        }
+
+        return "Loom couldn’t delete '\(modelTag)'. Try again."
+    }
 
     private static func ollamaAppURL() -> URL? {
         let bundleIdentifiers = [

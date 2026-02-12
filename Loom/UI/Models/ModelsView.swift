@@ -17,6 +17,10 @@ struct ModelsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 topStatusCard
+                diskSpaceCard
+                if let warning = viewModel.lowDiskSpaceWarningText {
+                    lowDiskWarningBanner(warning)
+                }
                 modelsSection
                 privacyFooter
             }
@@ -34,6 +38,37 @@ struct ModelsView: View {
         }
         .sheet(isPresented: $isShowingServeHelp) {
             serveHelpSheet
+        }
+        .confirmationDialog(
+            "Delete model?",
+            isPresented: isShowingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            if viewModel.selectedModelToDelete != nil {
+                Button("Delete", role: .destructive) {
+                    Task {
+                        let didDelete = await viewModel.confirmDelete()
+                        if didDelete {
+                            await onModelSelectionChanged()
+                        }
+                    }
+                }
+            }
+
+            Button("Cancel", role: .cancel) {
+                viewModel.cancelDeleteRequest()
+            }
+        } message: {
+            if let modelTag = viewModel.selectedModelToDelete {
+                Text("This will remove '\(modelTag)' from your Mac and free up disk space.")
+            }
+        }
+        .alert("Can't Delete Model", isPresented: isShowingDeleteAlert) {
+            Button("OK", role: .cancel) {
+                viewModel.dismissDeleteAlert()
+            }
+        } message: {
+            Text(viewModel.deleteAlertMessage ?? "")
         }
     }
 
@@ -90,6 +125,31 @@ struct ModelsView: View {
         .loomCard(cornerRadius: 12)
     }
 
+    private var diskSpaceCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Disk")
+                .font(.headline)
+            Text(viewModel.diskFreeSpaceText)
+                .foregroundStyle(.secondary)
+                .font(.subheadline)
+        }
+        .padding(14)
+        .loomCard(cornerRadius: 12)
+    }
+
+    private func lowDiskWarningBanner(_ message: String) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+            Spacer()
+        }
+        .padding(12)
+        .loomCard(cornerRadius: 10)
+    }
+
     @ViewBuilder
     private var modelsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -142,9 +202,24 @@ struct ModelsView: View {
             }
             .buttonStyle(.bordered)
             .disabled(model.tag == viewModel.activeModelTag)
+
+            Button {
+                viewModel.requestDelete(modelTag: model.tag)
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .help("Delete model")
+            .disabled(viewModel.isDeletingModel)
         }
         .padding(12)
         .loomCard(cornerRadius: 10)
+        .contextMenu {
+            Button("Delete…", role: .destructive) {
+                viewModel.requestDelete(modelTag: model.tag)
+            }
+        }
     }
 
     private var privacyFooter: some View {
@@ -205,5 +280,27 @@ struct ModelsView: View {
         case .showServeHelp:
             isShowingServeHelp = true
         }
+    }
+
+    private var isShowingDeleteConfirmation: Binding<Bool> {
+        Binding(
+            get: { viewModel.selectedModelToDelete != nil },
+            set: { isPresented in
+                if !isPresented {
+                    viewModel.cancelDeleteRequest()
+                }
+            }
+        )
+    }
+
+    private var isShowingDeleteAlert: Binding<Bool> {
+        Binding(
+            get: { viewModel.deleteAlertMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    viewModel.dismissDeleteAlert()
+                }
+            }
+        )
     }
 }
