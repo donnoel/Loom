@@ -578,7 +578,7 @@ private struct MessageRowView: View, Equatable {
         let isUser = message.role == .user
 
         VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
-            Text(message.role.rawValue.capitalized)
+            Text(roleLabel)
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -601,6 +601,19 @@ private struct MessageRowView: View, Equatable {
         }
         .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
         .padding(.vertical, 4)
+    }
+
+    private var roleLabel: String {
+        switch message.role {
+        case .assistant:
+            return "Loom"
+        case .user:
+            return "You"
+        case .system:
+            return "System"
+        case .tool:
+            return "Tool"
+        }
     }
 }
 
