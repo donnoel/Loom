@@ -47,6 +47,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Create Session** with the `+` toolbar button
 - **Rename/Delete** from toolbar or session context menu
 - **Type + Send** in the message field to start a local model response
+- **Auto-Correct + Spell Check** in the message field (uses your macOS Keyboard settings)
 - **Stop** to cancel streaming while keeping partial text
 - **Export Session** from toolbar or `⌘⇧E`
 - **Status / Models** from sidebar for setup and diagnostics
