@@ -35,6 +35,7 @@ nonisolated struct OllamaDiagnosis: Hashable, Sendable {
 protocol OllamaStatusProviding: Actor {
     func diagnose() async -> OllamaDiagnosis
     func listModels() async throws -> [OllamaModel]
+    func deleteModel(name: String) async throws
 }
 
 actor OllamaClient: OllamaStatusProviding {
@@ -112,6 +113,25 @@ actor OllamaClient: OllamaStatusProviding {
         let response = try await fetchTags(baseURL: baseURL)
         let models = response.models.map { OllamaModel(tag: $0.name) }
         return models.sorted { $0.tag.localizedStandardCompare($1.tag) == .orderedAscending }
+    }
+
+    func deleteModel(name: String) async throws {
+        guard let modelName = name.nonEmptyTrimmed else {
+            throw URLError(.badURL)
+        }
+
+        let baseURL = try await resolveReachableBaseURL()
+        var request = URLRequest(url: baseURL.appendingPathComponent("api/delete"))
+        request.httpMethod = "DELETE"
+        request.timeoutInterval = timeout
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(DeleteModelRequest(name: modelName))
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
     }
 
     // MARK: - Reachability
@@ -214,5 +234,9 @@ nonisolated private struct TagsResponse: Decodable {
 }
 
 nonisolated private struct TagsModel: Decodable {
+    let name: String
+}
+
+nonisolated private struct DeleteModelRequest: Encodable {
     let name: String
 }
