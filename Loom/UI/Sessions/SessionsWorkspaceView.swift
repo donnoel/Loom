@@ -59,7 +59,7 @@ struct SessionsWorkspaceView: View {
                 }
             }
             .accessibilityIdentifier("sessions.list")
-            .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 420)
+            .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
             .searchable(text: $vm.searchQuery, placement: .automatic)
             .safeAreaInset(edge: .top) {
                 if let banner = vm.sidebarBanner {
@@ -132,7 +132,7 @@ struct SessionsWorkspaceView: View {
                     .accessibilityIdentifier("sessions.noSelection")
             }
         }
-        .navigationSplitViewStyle(.prominentDetail)
+        .navigationSplitViewStyle(.balanced)
         .task { await vm.load() }
         .onChange(of: focusedRenameID) { _, newValue in
             if editingSessionID != nil, newValue == nil {
@@ -524,7 +524,8 @@ private struct SessionDetailView: View {
 
                 Spacer(minLength: 0)
             }
-            .padding(24)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 18)
         }
         .onDisappear {
             vm.stopGenerating()
