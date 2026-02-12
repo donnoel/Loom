@@ -12,6 +12,7 @@ private actor StubOllamaClient: OllamaStatusProviding {
     var deleteResult: Result<Void, StubFailure>
     var pullResult: Result<Void, StubFailure>
     var deleteThrownError: (any Error)?
+    var pullThrownError: (any Error)?
     var pullProgressEvents: [PullProgress]
     var pullWaitsForCancellation: Bool
     var pullCompletionDelay: Duration?
@@ -24,6 +25,7 @@ private actor StubOllamaClient: OllamaStatusProviding {
         deleteResult: Result<Void, StubFailure> = .success(()),
         pullResult: Result<Void, StubFailure> = .success(()),
         deleteThrownError: (any Error)? = nil,
+        pullThrownError: (any Error)? = nil,
         pullProgressEvents: [PullProgress] = [PullProgress(status: "Pulling manifest", completed: nil, total: nil)],
         pullWaitsForCancellation: Bool = false,
         pullCompletionDelay: Duration? = nil
@@ -33,6 +35,7 @@ private actor StubOllamaClient: OllamaStatusProviding {
         self.deleteResult = deleteResult
         self.pullResult = pullResult
         self.deleteThrownError = deleteThrownError
+        self.pullThrownError = pullThrownError
         self.pullProgressEvents = pullProgressEvents
         self.pullWaitsForCancellation = pullWaitsForCancellation
         self.pullCompletionDelay = pullCompletionDelay
@@ -70,6 +73,10 @@ private actor StubOllamaClient: OllamaStatusProviding {
 
         if let pullCompletionDelay {
             try? await Task.sleep(for: pullCompletionDelay)
+        }
+
+        if let pullThrownError {
+            throw pullThrownError
         }
 
         try pullResult.get()
@@ -214,6 +221,32 @@ struct StatusViewModelCoverageTests {
 
     @Test
     @MainActor
+    func ollamaActionTitleShowsInstallWhenNotInstalled() async {
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: false, isRunning: false)
+        )
+        let vm = StatusViewModel(client: client)
+
+        await vm.refresh()
+
+        #expect(vm.ollamaActionTitle == "Install Ollama…")
+    }
+
+    @Test
+    @MainActor
+    func ollamaActionTitleShowsStartWhenInstalledButStopped() async {
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: false)
+        )
+        let vm = StatusViewModel(client: client)
+
+        await vm.refresh()
+
+        #expect(vm.ollamaActionTitle == "Start Ollama")
+    }
+
+    @Test
+    @MainActor
     func refreshWhenOllamaIsNotRunningClearsModels() async {
         let client = StubOllamaClient(
             diagnosis: makeDiagnosis(isInstalled: true, isRunning: false),
@@ -345,6 +378,64 @@ struct StatusViewModelCoverageTests {
 
     @Test
     @MainActor
+    func activeModelTagSetterTrimsAndClearsValue() async {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        let vm = ModelsViewModel(client: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)))
+        vm.activeModelTag = "  llama3.2:3b  "
+        #expect(vm.activeModelTag == "llama3.2:3b")
+
+        vm.activeModelTag = "   "
+        #expect(vm.activeModelTag == nil)
+    }
+
+    @Test
+    @MainActor
+    func beginInstallOnLowDiskRequiresConfirmationBeforePull() async {
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            pullWaitsForCancellation: true
+        )
+        let vm = ModelsViewModel(client: client)
+        vm.diskSpaceSnapshot = DiskSpaceSnapshot(totalBytes: 100, availableBytes: 5)
+
+        vm.beginInstall(tag: "phi4:latest")
+
+        #expect(vm.pendingLowSpaceInstallTag == "phi4:latest")
+        #expect(vm.installingTag == nil)
+        #expect(await client.readPulledModelNames().isEmpty)
+    }
+
+    @Test
+    @MainActor
+    func continueInstallAfterLowSpaceConfirmationStartsInstall() async {
+        let tag = "phi4:latest"
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            pullWaitsForCancellation: true
+        )
+        let vm = ModelsViewModel(client: client)
+        vm.diskSpaceSnapshot = DiskSpaceSnapshot(totalBytes: 100, availableBytes: 5)
+
+        vm.beginInstall(tag: tag)
+        vm.continueInstallAfterLowSpaceConfirmation()
+
+        await waitUntil { vm.installingTag == tag }
+        let clock = ContinuousClock()
+        let deadline = clock.now + .seconds(2)
+        while await client.readPulledModelNames() != [tag], clock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(vm.pendingLowSpaceInstallTag == nil)
+        #expect(await client.readPulledModelNames() == [tag])
+
+        vm.cancelInstall()
+        await waitUntil { vm.installingTag == nil }
+    }
+
+    @Test
+    @MainActor
     func beginInstallTracksProgressAndClearsWhenDone() async {
         let tag = "phi4:latest"
         let client = StubOllamaClient(
@@ -394,6 +485,45 @@ struct StatusViewModelCoverageTests {
         #expect(vm.pullProgress(for: tag) == nil)
         #expect(vm.installErrorMessage == nil)
         #expect(await client.readPulledModelNames() == [tag])
+    }
+
+    @Test
+    @MainActor
+    func beginInstallSurfacesPullErrorMessage() async {
+        let tag = "qwen2.5:7b"
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            pullThrownError: PullModelError.httpStatus(500, "download failed")
+        )
+        let vm = ModelsViewModel(client: client)
+
+        vm.beginInstall(tag: tag)
+
+        await waitUntil { vm.installingTag == nil }
+
+        #expect(vm.installErrorMessage == "download failed")
+    }
+
+    @Test
+    @MainActor
+    func confirmDeleteShowsNetworkMessageWhenOllamaUnreachable() async {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            modelsResult: .success([OllamaModel(tag: "llama3"), OllamaModel(tag: "phi4")]),
+            deleteThrownError: URLError(.cannotConnectToHost)
+        )
+        let vm = ModelsViewModel(client: client)
+        await vm.refresh()
+        vm.requestDelete(modelTag: "phi4")
+
+        let didDelete = await vm.confirmDelete()
+
+        #expect(!didDelete)
+        #expect(vm.deleteAlertMessage == "Loom can’t reach Ollama. Start it to continue.")
     }
 }
 

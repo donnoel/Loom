@@ -171,6 +171,32 @@ struct LoomStatusSnapshotTests {
         #expect(snapshot.readiness == .ready)
         #expect(snapshot.issues.isEmpty)
     }
+
+    @Test
+    func lowDiskWarningShownWhenBelowTenPercent() {
+        let snapshot = LoomStatusSnapshot(
+            ollamaReachable: true,
+            installedModelCount: 1,
+            activeModelTag: "llama3.2",
+            offlineAvailable: true,
+            diskSpace: DiskSpaceSnapshot(totalBytes: 100, availableBytes: 9)
+        )
+
+        #expect(snapshot.lowDiskSpaceWarning == DiskSpaceSnapshot.lowSpaceWarningMessage)
+    }
+
+    @Test
+    func lowDiskWarningHiddenWhenDiskIsHealthy() {
+        let snapshot = LoomStatusSnapshot(
+            ollamaReachable: true,
+            installedModelCount: 1,
+            activeModelTag: "llama3.2",
+            offlineAvailable: true,
+            diskSpace: DiskSpaceSnapshot(totalBytes: 100, availableBytes: 20)
+        )
+
+        #expect(snapshot.lowDiskSpaceWarning == nil)
+    }
 }
 
 struct StringTrimmingTests {
