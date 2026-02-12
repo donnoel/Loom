@@ -46,7 +46,6 @@ final class ModelsViewModel {
 
     var isRunning: Bool { diagnosis.isRunning }
     var isInstalled: Bool { diagnosis.isInstalled }
-    var installedModelCount: Int { models.count }
 
     func startMonitoring() {
         if activationObserver == nil {

@@ -33,7 +33,6 @@ final class SessionMessagesViewModel {
     private var lastStreamModel: String?
     private var lastStreamContext: [ChatMessage]?
     private var lastStreamPlaceholderID: UUID?
-    private var lastStreamFailed: Bool = false
 
     init(
         store: SessionStore,
@@ -136,7 +135,6 @@ final class SessionMessagesViewModel {
         lastStreamModel = activeModel
         lastStreamContext = context
         lastStreamPlaceholderID = assistantPlaceholder.id
-        lastStreamFailed = false
 
         startStreamingReply(
             model: activeModel,
@@ -177,7 +175,6 @@ final class SessionMessagesViewModel {
         isGenerating = true
         banner = nil
         lastStreamPlaceholderID = freshPlaceholder.id
-        lastStreamFailed = false
 
         startStreamingReply(
             model: model,
@@ -264,7 +261,6 @@ final class SessionMessagesViewModel {
             return
         }
 
-        lastStreamFailed = true
         banner = BannerState(
             text: "Connection lost. Try again.",
             actionTitle: "Retry",

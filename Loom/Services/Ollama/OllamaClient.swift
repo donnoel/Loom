@@ -53,11 +53,6 @@ actor OllamaClient: OllamaStatusProviding {
     /// Cache the last known good base URL to avoid re-probing on every call.
     private var cachedReachableBaseURL: URL?
 
-    /// Quick “is Ollama reachable right now?” check.
-    func ping() async -> Bool {
-        (await diagnose()).isRunning
-    }
-
     /// Returns a diagnosis that is suitable for a “brain-dead helpful” UI.
     func diagnose() async -> OllamaDiagnosis {
         let installed = Self.detectInstalled()
