@@ -19,6 +19,18 @@ nonisolated struct DiskSpaceSnapshot: Equatable, Sendable {
         "\(Int((availablePercent * 100).rounded()))%"
     }
 
+    static func currentForOllamaModels(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        homeDirectory: URL = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+    ) -> DiskSpaceSnapshot? {
+        for url in preferredProbeURLs(environment: environment, homeDirectory: homeDirectory) {
+            if let snapshot = current(for: url) {
+                return snapshot
+            }
+        }
+        return nil
+    }
+
     static func current(for url: URL = URL(fileURLWithPath: "/")) -> DiskSpaceSnapshot? {
         let keys: Set<URLResourceKey> = [
             .volumeTotalCapacityKey,
@@ -52,5 +64,42 @@ nonisolated struct DiskSpaceSnapshot: Equatable, Sendable {
         formatter.countStyle = .file
         formatter.allowsNonnumericFormatting = false
         return formatter.string(fromByteCount: bytes)
+    }
+
+    static func preferredProbeURLs(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        homeDirectory: URL = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+    ) -> [URL] {
+        var candidates: [URL] = []
+
+        if let configuredPath = trimmedNonEmpty(environment["OLLAMA_MODELS"]) {
+            candidates.append(URL(fileURLWithPath: expandTilde(in: configuredPath), isDirectory: true))
+        }
+
+        candidates.append(homeDirectory.appendingPathComponent(".ollama/models", isDirectory: true))
+        candidates.append(homeDirectory)
+        candidates.append(URL(fileURLWithPath: "/", isDirectory: true))
+
+        var seenPaths: Set<String> = []
+        var deduped: [URL] = []
+
+        for candidate in candidates {
+            let standardizedPath = candidate.standardizedFileURL.path
+            if seenPaths.insert(standardizedPath).inserted {
+                deduped.append(candidate)
+            }
+        }
+
+        return deduped
+    }
+
+    private static func trimmedNonEmpty(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func expandTilde(in path: String) -> String {
+        NSString(string: path).expandingTildeInPath
     }
 }

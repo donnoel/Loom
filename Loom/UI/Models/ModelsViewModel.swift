@@ -109,7 +109,7 @@ final class ModelsViewModel {
             lastRefreshAt = Date()
         }
 
-        diskSpaceSnapshot = DiskSpaceSnapshot.current()
+        diskSpaceSnapshot = DiskSpaceSnapshot.currentForOllamaModels()
         diagnosis = await client.diagnose()
 
         guard diagnosis.isRunning else {
