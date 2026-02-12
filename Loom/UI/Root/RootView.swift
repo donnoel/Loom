@@ -78,12 +78,16 @@ struct RootView: View {
                     statusViewModel.openOrInstallOllama()
                 }
             )
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("root.detail.sessions")
         case .models:
             ModelsView(
                 onModelSelectionChanged: {
                     await statusViewModel.refresh()
                 }
             )
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("root.detail.models")
         case .status:
             StatusView(
                 viewModel: statusViewModel,
@@ -91,8 +95,12 @@ struct RootView: View {
                     selectedSidebarItem = .models
                 }
             )
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("root.detail.status")
         case .settings:
             SettingsView(store: store)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("root.detail.settings")
         }
     }
 

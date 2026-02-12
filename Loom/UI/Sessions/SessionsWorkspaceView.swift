@@ -124,8 +124,12 @@ struct SessionsWorkspaceView: View {
                     }
                 )
                 .id(session.id)
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("sessions.detail")
             } else {
                 ContentUnavailableView("No Session Selected", systemImage: "text.bubble")
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("sessions.noSelection")
             }
         }
         .navigationSplitViewStyle(.prominentDetail)
