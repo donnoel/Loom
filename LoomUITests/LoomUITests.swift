@@ -32,7 +32,7 @@ final class LoomUITests: XCTestCase {
         tapSidebarItem(identifier: "sidebar.settings", title: "Settings", app: app)
         XCTAssertTrue(element("root.detail.settings", app: app).waitForExistence(timeout: Self.mediumTimeout))
 
-        tapSidebarItem(identifier: "sidebar.sessions", title: "Sessions", app: app)
+        clickButton("sessions.toolbar.new", app: app)
         XCTAssertTrue(button("sessions.toolbar.new", app: app).waitForExistence(timeout: Self.shortTimeout))
         XCTAssertTrue(element("root.detail.sessions", app: app).waitForExistence(timeout: Self.shortTimeout))
     }
@@ -40,8 +40,6 @@ final class LoomUITests: XCTestCase {
     @MainActor
     func testCreateRenameAndDeleteSessionFromToolbar() throws {
         let app = launchApp()
-        tapSidebarItem(identifier: "sidebar.sessions", title: "Sessions", app: app)
-        XCTAssertTrue(element("root.detail.sessions", app: app).waitForExistence(timeout: Self.shortTimeout))
 
         XCTAssertTrue(createSessionAndWaitForDetail(app: app))
 
@@ -75,9 +73,6 @@ final class LoomUITests: XCTestCase {
     @MainActor
     func testSendWithoutModelShowsSetupGuidance() throws {
         let app = launchApp()
-        tapSidebarItem(identifier: "sidebar.sessions", title: "Sessions", app: app)
-        XCTAssertTrue(element("root.detail.sessions", app: app).waitForExistence(timeout: Self.shortTimeout))
-
         XCTAssertTrue(createSessionAndWaitForDetail(app: app))
 
         let messageField = element("session.detail.messageField", app: app)
@@ -149,18 +144,13 @@ final class LoomUITests: XCTestCase {
 
     @MainActor
     private func ensureSidebarVisible(app: XCUIApplication) {
-        let sessionsSidebarItem = app.descendants(matching: .any)
-            .matching(identifier: "sidebar.sessions")
-            .firstMatch
         let modelsSidebarItemByTitle = app.outlines.staticTexts["Models"].firstMatch
-        if sessionsSidebarItem.waitForExistence(timeout: 1)
-            || modelsSidebarItemByTitle.waitForExistence(timeout: 1) {
+        if modelsSidebarItemByTitle.waitForExistence(timeout: 1) {
             return
         }
 
         app.typeKey("s", modifierFlags: [.command, .option])
-        _ = sessionsSidebarItem.waitForExistence(timeout: Self.shortTimeout)
-            || modelsSidebarItemByTitle.waitForExistence(timeout: Self.shortTimeout)
+        _ = modelsSidebarItemByTitle.waitForExistence(timeout: Self.shortTimeout)
     }
 
     @MainActor

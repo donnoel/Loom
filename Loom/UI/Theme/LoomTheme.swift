@@ -69,18 +69,18 @@ nonisolated enum LoomTheme {
         case .user:
             return (
                 alignment: .trailing,
-                background: AnyShapeStyle(accentGradient(scheme).opacity(scheme == .dark ? 0.28 : 0.18)),
-                foreground: .primary,
-                strokeOpacity: scheme == .dark ? 0.20 : 0.14,
+                background: AnyShapeStyle(accentGradient(scheme).opacity(scheme == .dark ? 0.86 : 0.78)),
+                foreground: .white,
+                strokeOpacity: scheme == .dark ? 0.38 : 0.30,
                 cornerRadius: 15
             )
 
         case .assistant:
             return (
                 alignment: .leading,
-                background: AnyShapeStyle(scheme == .dark ? .thinMaterial : .ultraThinMaterial),
+                background: AnyShapeStyle(Color.primary.opacity(scheme == .dark ? 0.18 : 0.10)),
                 foreground: .primary,
-                strokeOpacity: scheme == .dark ? 0.18 : 0.13,
+                strokeOpacity: scheme == .dark ? 0.30 : 0.22,
                 cornerRadius: 15
             )
 

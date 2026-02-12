@@ -382,7 +382,7 @@ private struct SessionsSidebarBanner: View {
     }
 }
 
-private struct SessionDetailView: View {
+struct SessionDetailView: View {
     let session: Session
     let store: SessionStore
     let browseModels: () -> Void
@@ -640,6 +640,7 @@ private struct MessageRowView: View, Equatable {
     let message: ChatMessage
     let isThinking: Bool
     let onRegenerate: (() -> Void)?
+    @Environment(\.colorScheme) private var colorScheme
 
     static func == (lhs: MessageRowView, rhs: MessageRowView) -> Bool {
         lhs.message == rhs.message && lhs.isThinking == rhs.isThinking
@@ -651,7 +652,8 @@ private struct MessageRowView: View, Equatable {
         VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
             Text(roleLabel)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .fontWeight(isUser ? .semibold : .regular)
+                .foregroundStyle(roleLabelColor)
 
             MessageBubbleChrome(role: message.role) {
                 if isThinking {
@@ -684,6 +686,15 @@ private struct MessageRowView: View, Equatable {
             return "System"
         case .tool:
             return "Tool"
+        }
+    }
+
+    private var roleLabelColor: Color {
+        switch message.role {
+        case .user:
+            return colorScheme == .dark ? .white.opacity(0.90) : .accentColor
+        case .assistant, .system, .tool:
+            return .secondary
         }
     }
 }
