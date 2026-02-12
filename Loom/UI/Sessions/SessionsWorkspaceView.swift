@@ -639,7 +639,7 @@ private struct MessageContentView: View {
         .contextMenu {
             Button("Copy") {
                 NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(content, forType: .string)
+                NSPasteboard.general.setString(displayContent, forType: .string)
             }
 
             if role == .assistant,
@@ -661,19 +661,18 @@ nonisolated enum ChatDisplayFormatter {
 
         let trimmed = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return raw }
+        let hadMarkdownStructure = containsMarkdownStructure(trimmed)
 
         // Repair common "no-space after punctuation" without touching URLs/versions.
         var working = repairSentenceSpacing(in: trimmed)
+        // Repair collapsed heading words like "isConsidered Fundamental:".
+        working = repairCollapsedHeadingWords(in: working)
+        // Add section boundaries around heading-like labels.
+        working = normalizeSectionBoundaries(in: working)
         // Normalize list markers and split inline lists onto their own lines.
         working = normalizeListMarkers(in: working)
-        // Repair heading/list label joins.
-        working = regexReplace(
-            "([a-z0-9])\\s+([A-Z][A-Za-z]+(?: [A-Z][A-Za-z]+){0,4}:)",
-            in: working,
-            with: "$1\n\n$2"
-        )
 
-        guard shouldAutoFormat(working) else { return working }
+        guard shouldAutoFormat(working, hadMarkdownStructure: hadMarkdownStructure) else { return working }
 
         let sentenceChunks = splitIntoSentences(working)
         guard sentenceChunks.count >= 2 else { return working }
@@ -712,11 +711,12 @@ nonisolated enum ChatDisplayFormatter {
         return formatted.isEmpty ? working : formatted
     }
 
-    private static func shouldAutoFormat(_ text: String) -> Bool {
+    private static func shouldAutoFormat(_ text: String, hadMarkdownStructure: Bool) -> Bool {
         guard text.count >= 80 else { return false }
         guard !text.contains("```") else { return false }
         guard !text.contains("\n\n") else { return false }
         guard !containsMarkdownStructure(text) else { return false }
+        guard !hadMarkdownStructure else { return false }
         return true
     }
 
@@ -732,11 +732,37 @@ nonisolated enum ChatDisplayFormatter {
         return working
     }
 
+    private static func repairCollapsedHeadingWords(in text: String) -> String {
+        var working = regexReplace(
+            "([a-z]{2,})([A-Z][a-z]{2,})(\\s+[A-Z][A-Za-z]{2,}:)",
+            in: text,
+            with: "$1 $2$3"
+        )
+        working = regexReplace("([a-z]{2,})([A-Z][a-z]{2,}:)", in: working, with: "$1 $2")
+        return working
+    }
+
+    private static func normalizeSectionBoundaries(in text: String) -> String {
+        var working = regexReplace(
+            "([.!?])\\s*(?=[A-Z][A-Za-z]{2,}(?: [A-Z][A-Za-z]{2,}){0,4}:)",
+            in: text,
+            with: "$1\n\n"
+        )
+        working = regexReplace(
+            "([A-Za-z][A-Za-z ]{2,40}:)\\s*(?=[A-Z])",
+            in: working,
+            with: "$1\n\n"
+        )
+        return working
+    }
+
     private static func normalizeListMarkers(in text: String) -> String {
-        var working = regexReplace("([.!?])\\s+(\\d+[\\.)]\\s+)", in: text, with: "$1\n$2")
-        working = regexReplace("([.!?])\\s+([•*\\-]\\s+)", in: working, with: "$1\n$2")
+        var working = regexReplace("([.!?:;])\\s*(\\d+\\)\\s*)", in: text, with: "$1\n$2")
+        working = regexReplace("([.!?:;])\\s+(\\d+\\.\\s+)", in: working, with: "$1\n$2")
+        working = regexReplace("([.!?:;])\\s*([•*\\-]\\s+)", in: working, with: "$1\n$2")
         working = regexReplace("(?m)^\\s*[•*]\\s+", in: working, with: "- ")
-        working = regexReplace("(?m)^\\s*(\\d+)\\)\\s+", in: working, with: "$1. ")
+        working = regexReplace("(?m)^\\s*(\\d+)\\)\\s*", in: working, with: "$1. ")
+        working = regexReplace("(?m)^\\s*(\\d+)\\.\\s*", in: working, with: "$1. ")
         return working
     }
 

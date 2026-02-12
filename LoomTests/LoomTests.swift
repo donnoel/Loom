@@ -217,4 +217,22 @@ struct ChatDisplayFormatterTests {
         #expect(!formatted.contains("example. com"))
         #expect(!formatted.contains("v1. 2. 3"))
     }
+
+    @Test
+    func formatImprovesDenseSectionedOutput() {
+        let input = """
+        Determining which scientific discipline is the most fundamental can be a matter of perspective and often depends on how one defines "fundamental." Each discipline plays a crucial role and contributes to our understanding of the world in unique ways. However, some might argue that physics holds a foundational position due to its focus on the basic laws governing matter, energy, space, and time.Why Physics isConsidered Fundamental:Basic Laws: Physics seeks to understand the fundamental forces that govern the behavior of all matter in the universe.Building Blocks: Many other sciences rely on physics principles.OtherSciences:Chemistry: While chemistry is incredibly important, it builds upon the principles of physics.Conclusion:While all scientific disciplines are essential, physics often stands out as the most fundamental.
+        """
+
+        let formatted = ChatDisplayFormatter.format(input)
+
+        #expect(formatted.contains("Why Physics is Considered Fundamental:"))
+        #expect(formatted.contains("Basic Laws:"))
+        #expect(formatted.contains("Building Blocks:"))
+        #expect(formatted.contains("Other Sciences:"))
+        #expect(formatted.contains("\n\nChemistry:"))
+        #expect(formatted.contains("Conclusion:\n\nWhile all scientific disciplines are essential"))
+        #expect(!formatted.contains("isConsidered"))
+        #expect(!formatted.contains("OtherSciences"))
+    }
 }
