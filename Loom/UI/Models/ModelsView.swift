@@ -6,6 +6,7 @@ struct ModelsView: View {
 
     @State private var viewModel: ModelsViewModel
     @State private var isShowingServeHelp: Bool = false
+    @State private var isShowingAddModelSheet: Bool = false
     @State private var didCopyCommand: Bool = false
 
     init(onModelSelectionChanged: @escaping () async -> Void) {
@@ -21,6 +22,7 @@ struct ModelsView: View {
                 if let warning = viewModel.lowDiskSpaceWarningText {
                     lowDiskWarningBanner(warning)
                 }
+                addModelCard
                 modelsSection
                 privacyFooter
             }
@@ -38,6 +40,10 @@ struct ModelsView: View {
         }
         .sheet(isPresented: $isShowingServeHelp) {
             serveHelpSheet
+        }
+        .sheet(isPresented: $isShowingAddModelSheet) {
+            AddModelSheet(viewModel: viewModel)
+                .frame(minWidth: 680, minHeight: 540)
         }
         .confirmationDialog(
             "Delete model?",
@@ -150,18 +156,57 @@ struct ModelsView: View {
         .loomCard(cornerRadius: 10)
     }
 
+    private var addModelCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Add a model")
+                .font(.headline)
+
+            Text("Browse recommended models with friendly descriptions and install them in Loom.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                Button("Add Model…") {
+                    isShowingAddModelSheet = true
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!viewModel.isRunning)
+
+                if !viewModel.isRunning {
+                    Text("Start Ollama to install models.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(14)
+        .loomCard(cornerRadius: 12)
+    }
+
     @ViewBuilder
     private var modelsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Installed models")
-                .font(.headline)
+            HStack(alignment: .firstTextBaseline) {
+                Text("Installed models")
+                    .font(.headline)
+
+                Spacer()
+
+                Button("Add Model…") {
+                    isShowingAddModelSheet = true
+                }
+                .buttonStyle(.bordered)
+                .disabled(!viewModel.isRunning)
+            }
 
             if viewModel.isRunning && viewModel.models.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("No models installed yet.")
                         .foregroundStyle(.secondary)
-                    Link("Browse model library", destination: URL(string: "https://ollama.com/library")!)
-                        .font(.subheadline)
+                    Button("Add Model…") {
+                        isShowingAddModelSheet = true
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
                 .padding(.vertical, 8)
             } else if !viewModel.models.isEmpty {
@@ -180,10 +225,18 @@ struct ModelsView: View {
 
     private func modelRow(_ model: OllamaModel) -> some View {
         HStack(spacing: 12) {
-            Text(model.tag)
-                .font(.body)
-                .lineLimit(1)
-                .truncationMode(.middle)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(model.tag)
+                    .font(.body)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                if let sizeText = viewModel.installedSizeText(tag: model.tag) {
+                    Text("Size: \(sizeText)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
 
             Spacer(minLength: 12)
 

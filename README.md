@@ -33,6 +33,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | ⏹️ **Stop Generation** | Cancel generation any time and keep the partial assistant response. |
 | 🧠 **Helpful Setup Gating** | Clear in-context guidance if no active model is selected or Ollama is unavailable. |
 | 🧩 **Model Picker** | View installed Ollama models, choose an active model, and keep that selection across launches until you change it. |
+| 📥 **In-App Model Install** | Use **Add Model…** to browse a curated catalog, review friendly model summaries, and install with live progress + cancel support. |
 | 🧹 **Model Cleanup** | Delete installed models directly from Loom (with confirmation and active-model safety checks). |
 | 💽 **Disk Awareness** | Models and Status screens show local free-space info and warn when free space is below 10%. |
 | 🩺 **Readiness Status** | Dedicated Status view + toolbar pill showing ready/setup/not-ready state. |
@@ -49,6 +50,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Stop** to cancel streaming while keeping partial text
 - **Export Session** from toolbar or `⌘⇧E`
 - **Status / Models** from sidebar for setup and diagnostics
+- **Add Model…** from Models to install curated models without leaving Loom
 - **Automation toggles** in Settings let you disable background status/model checks and use manual Refresh instead
 
 ---
@@ -68,6 +70,7 @@ Connectivity + model discovery:
 - Caches the last reachable base URL
 - Provides plain-language diagnosis for setup UX
 - Lists installed models from Ollama API
+- Pulls and deletes models via Ollama HTTP endpoints with install-progress streaming
 
 ### **OllamaChatClient (actor)**
 Streaming chat transport:

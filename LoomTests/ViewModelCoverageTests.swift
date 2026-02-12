@@ -11,18 +11,28 @@ private actor StubOllamaClient: OllamaStatusProviding {
     var modelsResult: Result<[OllamaModel], StubFailure>
     var deleteResult: Result<Void, StubFailure>
     var pullResult: Result<Void, StubFailure>
+    var pullProgressEvents: [PullProgress]
+    var pullWaitsForCancellation: Bool
+    var pullCompletionDelay: Duration?
     private var deletedModelNames: [String] = []
+    private var pulledModelNames: [String] = []
 
     init(
         diagnosis: OllamaDiagnosis,
         modelsResult: Result<[OllamaModel], StubFailure> = .success([]),
         deleteResult: Result<Void, StubFailure> = .success(()),
-        pullResult: Result<Void, StubFailure> = .success(())
+        pullResult: Result<Void, StubFailure> = .success(()),
+        pullProgressEvents: [PullProgress] = [PullProgress(status: "Pulling manifest", completed: nil, total: nil)],
+        pullWaitsForCancellation: Bool = false,
+        pullCompletionDelay: Duration? = nil
     ) {
         self.diagnosis = diagnosis
         self.modelsResult = modelsResult
         self.deleteResult = deleteResult
         self.pullResult = pullResult
+        self.pullProgressEvents = pullProgressEvents
+        self.pullWaitsForCancellation = pullWaitsForCancellation
+        self.pullCompletionDelay = pullCompletionDelay
     }
 
     func diagnose() async -> OllamaDiagnosis {
@@ -39,12 +49,32 @@ private actor StubOllamaClient: OllamaStatusProviding {
     }
 
     func pullModel(name: String, onProgress: @Sendable (PullProgress) -> Void) async throws {
-        onProgress(PullProgress(status: "Pulling manifest", completed: nil, total: nil))
+        pulledModelNames.append(name)
+
+        for progress in pullProgressEvents {
+            onProgress(progress)
+        }
+
+        if pullWaitsForCancellation {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(20))
+            }
+            throw CancellationError()
+        }
+
+        if let pullCompletionDelay {
+            try? await Task.sleep(for: pullCompletionDelay)
+        }
+
         try pullResult.get()
     }
 
     func readDeletedModelNames() -> [String] {
         deletedModelNames
+    }
+
+    func readPulledModelNames() -> [String] {
+        pulledModelNames
     }
 }
 
@@ -267,6 +297,75 @@ struct StatusViewModelCoverageTests {
         #expect(vm.selectedModelToDelete == nil)
         #expect(vm.deleteAlertMessage == nil)
         #expect(await client.readDeletedModelNames() == ["phi4"])
+    }
+
+    @Test
+    @MainActor
+    func beginInstallDoesNothingForAlreadyInstalledModel() async {
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            modelsResult: .success([OllamaModel(tag: "qwen2.5:7b")])
+        )
+        let vm = ModelsViewModel(client: client)
+        await vm.refresh()
+
+        vm.beginInstall(tag: "qwen2.5:7b")
+
+        #expect(vm.installingTag == nil)
+        #expect(await client.readPulledModelNames().isEmpty)
+    }
+
+    @Test
+    @MainActor
+    func beginInstallTracksProgressAndClearsWhenDone() async {
+        let tag = "phi4:latest"
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            pullResult: .success(()),
+            pullProgressEvents: [
+                PullProgress(status: "Downloading", completed: 50, total: 100)
+            ],
+            pullCompletionDelay: .milliseconds(250)
+        )
+        let vm = ModelsViewModel(client: client)
+
+        vm.beginInstall(tag: tag)
+        #expect(vm.installingTag == tag)
+
+        await waitUntil {
+            vm.pullProgress(for: tag)?.status == "Downloading"
+        }
+
+        #expect(vm.pullProgress(for: tag)?.fraction == 0.5)
+        #expect(await client.readPulledModelNames() == [tag])
+
+        await waitUntil {
+            vm.installingTag == nil
+        }
+
+        #expect(vm.pullProgress(for: tag) == nil)
+    }
+
+    @Test
+    @MainActor
+    func cancelInstallClearsInstallState() async {
+        let tag = "mistral:7b"
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            pullWaitsForCancellation: true
+        )
+        let vm = ModelsViewModel(client: client)
+
+        vm.beginInstall(tag: tag)
+        await waitUntil { vm.installingTag == tag }
+
+        vm.cancelInstall()
+
+        await waitUntil { vm.installingTag == nil }
+
+        #expect(vm.pullProgress(for: tag) == nil)
+        #expect(vm.installErrorMessage == nil)
+        #expect(await client.readPulledModelNames() == [tag])
     }
 }
 
