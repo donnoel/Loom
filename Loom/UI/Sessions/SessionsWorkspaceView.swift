@@ -623,14 +623,16 @@ private struct MessageContentView: View {
     let onRegenerate: (() -> Void)?
 
     var body: some View {
+        let displayContent = ChatDisplayFormatter.format(content)
+
         Group {
             if let attributed = try? AttributedString(
-                markdown: content,
+                markdown: displayContent,
                 options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .full)
             ) {
                 Text(attributed)
             } else {
-                Text(content)
+                Text(displayContent)
             }
         }
         .textSelection(.enabled)
@@ -646,6 +648,124 @@ private struct MessageContentView: View {
                 Button("Regenerate", action: onRegenerate)
             }
         }
+    }
+}
+
+private nonisolated enum ChatDisplayFormatter {
+    private static let marker = "\u{241E}"
+
+    static func format(_ raw: String) -> String {
+        let normalized = raw
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+
+        let trimmed = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return raw }
+
+        // Repair common "no-space after punctuation" and heading/list label joins.
+        var working = regexReplace("([.!?])([^\\s.!?])", in: trimmed, with: "$1 $2")
+        working = regexReplace("([a-z])([A-Z][A-Za-z]+ [A-Z][A-Za-z]+:)", in: working, with: "$1\n\n$2")
+
+        guard shouldAutoFormat(working) else { return working }
+
+        let sentenceChunks = splitIntoSentences(working)
+        guard sentenceChunks.count >= 3 else { return working }
+
+        var outputBlocks: [String] = []
+        var paragraphBuffer: [String] = []
+
+        func flushParagraph() {
+            guard !paragraphBuffer.isEmpty else { return }
+            outputBlocks.append(paragraphBuffer.joined(separator: " "))
+            paragraphBuffer.removeAll(keepingCapacity: true)
+        }
+
+        for sentence in sentenceChunks {
+            if isHeading(sentence) {
+                flushParagraph()
+                outputBlocks.append("**\(sentence)**")
+                continue
+            }
+
+            if let bullet = bulletLine(sentence) {
+                flushParagraph()
+                outputBlocks.append(bullet)
+                continue
+            }
+
+            paragraphBuffer.append(sentence)
+            if paragraphBuffer.count >= 2 {
+                flushParagraph()
+            }
+        }
+
+        flushParagraph()
+        let formatted = outputBlocks.joined(separator: "\n\n")
+        return formatted.isEmpty ? working : formatted
+    }
+
+    private static func shouldAutoFormat(_ text: String) -> Bool {
+        guard text.count >= 220 else { return false }
+        guard !text.contains("```") else { return false }
+        guard !text.contains("\n\n") else { return false }
+        guard !containsMarkdownStructure(text) else { return false }
+        return true
+    }
+
+    private static func containsMarkdownStructure(_ text: String) -> Bool {
+        text.contains("- ") || text.contains("* ") || text.contains("# ")
+    }
+
+    private static func splitIntoSentences(_ text: String) -> [String] {
+        let withMarkers = regexReplace("(?<=[.!?])\\s+(?=[A-Z0-9])", in: text, with: marker)
+        return withMarkers
+            .components(separatedBy: marker)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private static func isHeading(_ sentence: String) -> Bool {
+        guard sentence.count <= 70 else { return false }
+        guard !sentence.contains(":") else { return false }
+        guard sentence.rangeOfCharacter(from: CharacterSet(charactersIn: ",;")) == nil else { return false }
+        guard let last = sentence.last, !".!?".contains(last) else { return false }
+
+        let words = sentence.split(separator: " ")
+        guard (2...8).contains(words.count) else { return false }
+
+        for word in words {
+            let cleaned = word.trimmingCharacters(in: .punctuationCharacters)
+            let lower = cleaned.lowercased()
+            if ["a", "an", "and", "in", "of", "on", "or", "the", "to", "with"].contains(lower) {
+                continue
+            }
+            guard let scalar = cleaned.unicodeScalars.first, CharacterSet.uppercaseLetters.contains(scalar) else {
+                return false
+            }
+        }
+        return true
+    }
+
+    private static func bulletLine(_ sentence: String) -> String? {
+        guard let colon = sentence.firstIndex(of: ":") else { return nil }
+        let prefix = sentence[..<colon].trimmingCharacters(in: .whitespacesAndNewlines)
+        let suffix = sentence[sentence.index(after: colon)...].trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !suffix.isEmpty else { return nil }
+
+        let words = prefix.split(separator: " ")
+        guard (1...6).contains(words.count) else { return nil }
+        guard let firstScalar = prefix.unicodeScalars.first, CharacterSet.uppercaseLetters.contains(firstScalar) else {
+            return nil
+        }
+
+        return "- **\(prefix):** \(suffix)"
+    }
+
+    private static func regexReplace(_ pattern: String, in text: String, with template: String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: template)
     }
 }
 
