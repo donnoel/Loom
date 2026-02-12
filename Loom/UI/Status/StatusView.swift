@@ -125,6 +125,14 @@ struct LoomStatusLinesView: View {
             )
             line("Active model", snapshot.activeModelTag ?? "Not selected")
             line("Offline", snapshot.offlineAvailable ? "Available" : "Not available")
+            line("Disk", diskSummaryText)
+
+            if let warning = snapshot.lowDiskSpaceWarning {
+                Text(warning)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(12)
         .loomCard(cornerRadius: 10)
@@ -139,6 +147,11 @@ struct LoomStatusLinesView: View {
             Text(value)
         }
         .font(.subheadline)
+    }
+
+    private var diskSummaryText: String {
+        guard let disk = snapshot.diskSpace else { return "Unavailable" }
+        return "\(DiskSpaceSnapshot.formattedBytes(disk.availableBytes)) free (\(disk.availablePercentDisplay))"
     }
 }
 

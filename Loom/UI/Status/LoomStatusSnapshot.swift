@@ -25,6 +25,26 @@ nonisolated struct LoomStatusSnapshot: Sendable, Equatable {
     var installedModelCount: Int
     var activeModelTag: String?
     var offlineAvailable: Bool
+    var diskSpace: DiskSpaceSnapshot?
+
+    init(
+        ollamaReachable: Bool,
+        installedModelCount: Int,
+        activeModelTag: String?,
+        offlineAvailable: Bool,
+        diskSpace: DiskSpaceSnapshot? = nil
+    ) {
+        self.ollamaReachable = ollamaReachable
+        self.installedModelCount = installedModelCount
+        self.activeModelTag = activeModelTag
+        self.offlineAvailable = offlineAvailable
+        self.diskSpace = diskSpace
+    }
+
+    var lowDiskSpaceWarning: String? {
+        guard let diskSpace, diskSpace.isLowSpace else { return nil }
+        return DiskSpaceSnapshot.lowSpaceWarningMessage
+    }
 
     var issues: [LoomIssue] {
         if !ollamaReachable {
@@ -53,7 +73,8 @@ nonisolated struct LoomStatusSnapshot: Sendable, Equatable {
         ollamaReachable: false,
         installedModelCount: 0,
         activeModelTag: nil,
-        offlineAvailable: false
+        offlineAvailable: false,
+        diskSpace: nil
     )
 }
 

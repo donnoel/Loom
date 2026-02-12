@@ -77,6 +77,7 @@ final class StatusViewModel {
         let diagnosis = await client.diagnose()
         ollamaAppInstalled = diagnosis.isInstalled
         let isReachable = diagnosis.isRunning
+        let diskSpace = DiskSpaceSnapshot.current()
 
         var models: [OllamaModel] = []
         if isReachable {
@@ -94,7 +95,8 @@ final class StatusViewModel {
             ollamaReachable: isReachable,
             installedModelCount: models.count,
             activeModelTag: activeModelTag,
-            offlineAvailable: isReachable && !models.isEmpty && activeModelTag != nil
+            offlineAvailable: isReachable && !models.isEmpty && activeModelTag != nil,
+            diskSpace: diskSpace
         )
     }
 
