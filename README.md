@@ -1,5 +1,5 @@
 # 🧵 **Loom**
-### *A calm, offline-first local LLM workspace for macOS.*
+### *An offline-first local LLM workspace for macOS.*
 
 <p align="center">
   <img src="https://img.shields.io/badge/SwiftUI-MVVM-orange?logo=swift">
