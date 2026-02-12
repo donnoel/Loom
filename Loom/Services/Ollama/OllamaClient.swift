@@ -3,8 +3,45 @@ import OSLog
 
 nonisolated struct OllamaModel: Identifiable, Hashable, Sendable {
     let tag: String
+    let sizeBytes: Int64?
+
+    init(tag: String, sizeBytes: Int64? = nil) {
+        self.tag = tag
+        self.sizeBytes = sizeBytes
+    }
 
     var id: String { tag }
+}
+
+nonisolated struct PullProgress: Equatable, Sendable {
+    let status: String
+    let completed: Int64?
+    let total: Int64?
+
+    var fraction: Double? {
+        guard let total, total > 0, let completed else { return nil }
+        return Double(completed) / Double(total)
+    }
+}
+
+nonisolated enum PullModelError: LocalizedError, Sendable {
+    case invalidRequest
+    case badResponse
+    case httpStatus(Int, String?)
+    case serverError(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidRequest:
+            return "Loom couldn’t prepare this model install request."
+        case .badResponse:
+            return "Loom got an unexpected response while installing."
+        case .httpStatus(_, let snippet):
+            return snippet?.nonEmptyTrimmed ?? "Loom couldn’t install this model right now."
+        case .serverError(let message):
+            return message
+        }
+    }
 }
 
 /// A plain-language diagnosis for guiding non-technical users.
@@ -36,6 +73,7 @@ protocol OllamaStatusProviding: Actor {
     func diagnose() async -> OllamaDiagnosis
     func listModels() async throws -> [OllamaModel]
     func deleteModel(name: String) async throws
+    func pullModel(name: String, onProgress: @Sendable (PullProgress) -> Void) async throws
 }
 
 actor OllamaClient: OllamaStatusProviding {
@@ -111,7 +149,7 @@ actor OllamaClient: OllamaStatusProviding {
     func listModels() async throws -> [OllamaModel] {
         let baseURL = try await resolveReachableBaseURL()
         let response = try await fetchTags(baseURL: baseURL)
-        let models = response.models.map { OllamaModel(tag: $0.name) }
+        let models = response.models.map { OllamaModel(tag: $0.name, sizeBytes: $0.size) }
         return models.sorted { $0.tag.localizedStandardCompare($1.tag) == .orderedAscending }
     }
 
@@ -131,6 +169,52 @@ actor OllamaClient: OllamaStatusProviding {
         let (_, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
+        }
+    }
+
+    func pullModel(name: String, onProgress: @Sendable (PullProgress) -> Void) async throws {
+        guard let modelName = name.nonEmptyTrimmed else {
+            throw PullModelError.invalidRequest
+        }
+
+        let baseURL = try await resolveReachableBaseURL()
+        var request = URLRequest(url: baseURL.appendingPathComponent("api/pull"))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 30
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(PullModelRequest(name: modelName))
+
+        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw PullModelError.badResponse
+        }
+
+        guard (200...299).contains(http.statusCode) else {
+            let snippet = try await readBodySnippet(from: bytes)
+            throw PullModelError.httpStatus(http.statusCode, snippet.nonEmptyTrimmed)
+        }
+
+        for try await line in bytes.lines {
+            try Task.checkCancellation()
+
+            guard let trimmed = line.nonEmptyTrimmed,
+                  let data = trimmed.data(using: .utf8),
+                  let chunk = try? JSONDecoder().decode(PullModelChunk.self, from: data) else {
+                continue
+            }
+
+            if let error = chunk.error?.nonEmptyTrimmed {
+                throw PullModelError.serverError(error)
+            }
+
+            onProgress(
+                PullProgress(
+                    status: chunk.status?.nonEmptyTrimmed ?? "Downloading…",
+                    completed: chunk.completed,
+                    total: chunk.total
+                )
+            )
         }
     }
 
@@ -193,6 +277,24 @@ actor OllamaClient: OllamaStatusProviding {
         return try JSONDecoder().decode(TagsResponse.self, from: data)
     }
 
+    private func readBodySnippet(from bytes: URLSession.AsyncBytes) async throws -> String {
+        var body = ""
+
+        for try await line in bytes.lines {
+            if !body.isEmpty {
+                body.append("\n")
+            }
+
+            body.append(line)
+
+            if body.count >= 1_200 {
+                break
+            }
+        }
+
+        return body
+    }
+
     // MARK: - Installation detection
 
     /// Detect installation without shelling out (App Store-safe).
@@ -235,8 +337,20 @@ nonisolated private struct TagsResponse: Decodable {
 
 nonisolated private struct TagsModel: Decodable {
     let name: String
+    let size: Int64?
 }
 
 nonisolated private struct DeleteModelRequest: Encodable {
     let name: String
+}
+
+nonisolated private struct PullModelRequest: Encodable {
+    let name: String
+}
+
+nonisolated private struct PullModelChunk: Decodable {
+    let status: String?
+    let completed: Int64?
+    let total: Int64?
+    let error: String?
 }

@@ -10,16 +10,19 @@ private actor StubOllamaClient: OllamaStatusProviding {
     var diagnosis: OllamaDiagnosis
     var modelsResult: Result<[OllamaModel], StubFailure>
     var deleteResult: Result<Void, StubFailure>
+    var pullResult: Result<Void, StubFailure>
     private var deletedModelNames: [String] = []
 
     init(
         diagnosis: OllamaDiagnosis,
         modelsResult: Result<[OllamaModel], StubFailure> = .success([]),
-        deleteResult: Result<Void, StubFailure> = .success(())
+        deleteResult: Result<Void, StubFailure> = .success(()),
+        pullResult: Result<Void, StubFailure> = .success(())
     ) {
         self.diagnosis = diagnosis
         self.modelsResult = modelsResult
         self.deleteResult = deleteResult
+        self.pullResult = pullResult
     }
 
     func diagnose() async -> OllamaDiagnosis {
@@ -33,6 +36,11 @@ private actor StubOllamaClient: OllamaStatusProviding {
     func deleteModel(name: String) async throws {
         deletedModelNames.append(name)
         try deleteResult.get()
+    }
+
+    func pullModel(name: String, onProgress: @Sendable (PullProgress) -> Void) async throws {
+        onProgress(PullProgress(status: "Pulling manifest", completed: nil, total: nil))
+        try pullResult.get()
     }
 
     func readDeletedModelNames() -> [String] {
