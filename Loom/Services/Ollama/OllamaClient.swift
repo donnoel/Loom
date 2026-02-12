@@ -299,7 +299,7 @@ actor OllamaClient: OllamaStatusProviding {
 
     /// Detect installation without shelling out (App Store-safe).
     /// Supports both App installs and Homebrew/CLI installs.
-    nonisolated static func detectInstalled() -> Bool {
+    static func detectInstalled() -> Bool {
         let fm = FileManager.default
 
         // Ollama.app (common locations)

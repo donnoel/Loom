@@ -166,7 +166,7 @@ actor OllamaChatClient: OllamaChatStreaming {
 }
 
 nonisolated private struct ChatRequest: Encodable {
-    nonisolated struct Message: Encodable {
+    struct Message: Encodable {
         let role: String
         let content: String
     }
@@ -177,7 +177,7 @@ nonisolated private struct ChatRequest: Encodable {
 }
 
 nonisolated private struct ChatStreamChunk: Decodable {
-    nonisolated struct Message: Decodable {
+    struct Message: Decodable {
         let content: String?
     }
 
