@@ -33,6 +33,7 @@ final class SessionMessagesViewModel {
     private var lastStreamModel: String?
     private var lastStreamContext: [ChatMessage]?
     private var lastStreamPlaceholderID: UUID?
+    private var generatingMessageIndex: Int?
 
     init(
         store: SessionStore,
@@ -66,9 +67,11 @@ final class SessionMessagesViewModel {
         do {
             messages = try await store.loadRecentMessages(sessionID: sessionID, limit: 200)
             isShowingFullHistory = false
+            generatingMessageIndex = nil
         } catch {
             messages = []
             isShowingFullHistory = false
+            generatingMessageIndex = nil
         }
     }
 
@@ -76,6 +79,7 @@ final class SessionMessagesViewModel {
         do {
             messages = try await store.loadMessages(sessionID: sessionID)
             isShowingFullHistory = true
+            generatingMessageIndex = nil
         } catch {
             // Keep current tail-loaded messages if full history fails.
         }
@@ -130,6 +134,7 @@ final class SessionMessagesViewModel {
         messages.append(assistantPlaceholder)
         isGenerating = true
         generatingMessageID = assistantPlaceholder.id
+        generatingMessageIndex = messages.index(before: messages.endIndex)
 
         let context = contextMessages(excluding: assistantPlaceholder.id, limit: 20)
         lastStreamModel = activeModel
@@ -165,13 +170,14 @@ final class SessionMessagesViewModel {
         }
 
         if let failedPlaceholderID = lastStreamPlaceholderID,
-           let failedIndex = messages.firstIndex(where: { $0.id == failedPlaceholderID }) {
+           let failedIndex = resolvedMessageIndex(for: failedPlaceholderID) {
             messages.remove(at: failedIndex)
         }
 
         let freshPlaceholder = ChatMessage(role: .assistant, content: "")
         messages.append(freshPlaceholder)
         generatingMessageID = freshPlaceholder.id
+        generatingMessageIndex = messages.index(before: messages.endIndex)
         isGenerating = true
         banner = nil
         lastStreamPlaceholderID = freshPlaceholder.id
@@ -233,13 +239,21 @@ final class SessionMessagesViewModel {
     }
 
     private func contextMessages(excluding messageID: UUID, limit: Int) -> [ChatMessage] {
+        guard limit > 0 else { return [] }
+
+        if messages.last?.id == messageID {
+            let context = messages.dropLast()
+            guard context.count > limit else { return Array(context) }
+            return Array(context.suffix(limit))
+        }
+
         let context = messages.filter { $0.id != messageID }
         guard context.count > limit else { return context }
         return Array(context.suffix(limit))
     }
 
     private func applyDelta(_ delta: String, to messageID: UUID) {
-        guard let index = messages.firstIndex(where: { $0.id == messageID }) else { return }
+        guard let index = resolvedMessageIndex(for: messageID) else { return }
 
         let existing = messages[index]
         messages[index] = ChatMessage(
@@ -269,13 +283,16 @@ final class SessionMessagesViewModel {
     }
 
     private func persistAssistantMessage(id: UUID, forcePersist: Bool) async {
-        guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
+        guard let index = resolvedMessageIndex(for: id) else { return }
 
         let message = messages[index]
         let hasContent = message.content.nonEmptyTrimmed != nil
 
         guard forcePersist || hasContent else {
             messages.remove(at: index)
+            if id == generatingMessageID {
+                generatingMessageIndex = nil
+            }
             return
         }
 
@@ -297,10 +314,27 @@ final class SessionMessagesViewModel {
     private func finishStreaming(placeholderID: UUID) {
         if generatingMessageID == placeholderID {
             generatingMessageID = nil
+            generatingMessageIndex = nil
         }
 
         isGenerating = false
         generationTask = nil
+    }
+
+    private func resolvedMessageIndex(for id: UUID) -> Int? {
+        if let cached = generatingMessageIndex,
+           messages.indices.contains(cached),
+           messages[cached].id == id {
+            return cached
+        }
+
+        guard let found = messages.firstIndex(where: { $0.id == id }) else { return nil }
+
+        if id == generatingMessageID {
+            generatingMessageIndex = found
+        }
+
+        return found
     }
 }
 

@@ -723,6 +723,25 @@ private struct MessageContentView: View {
 
 nonisolated enum ChatDisplayFormatter {
     private static let marker = "\u{241E}"
+    private static let headingPunctuationSet = CharacterSet(charactersIn: ",;")
+    private static let headingStopWords: Set<String> = ["a", "an", "and", "in", "of", "on", "or", "the", "to", "with"]
+
+    private static let markdownBulletRegex = makeRegex("(?m)^\\s*[-*]\\s+")
+    private static let markdownNumberedRegex = makeRegex("(?m)^\\s*\\d+[\\.)]\\s+")
+    private static let markdownHeadingRegex = makeRegex("(?m)^\\s*#+\\s+")
+    private static let sentenceSpacingRegex = makeRegex("([A-Za-z][.!?])([A-Z])")
+    private static let sentenceQuoteSpacingRegex = makeRegex("([A-Za-z][.!?][\"”’])([A-Z])")
+    private static let collapsedHeadingRegex = makeRegex("([a-z]{2,})([A-Z][a-z]{2,})(\\s+[A-Z][A-Za-z]{2,}:)")
+    private static let collapsedTrailingHeadingRegex = makeRegex("([a-z]{2,})([A-Z][a-z]{2,}:)")
+    private static let sectionAfterPunctuationRegex = makeRegex("([.!?])\\s*(?=[A-Z][A-Za-z]{2,}(?: [A-Z][A-Za-z]{2,}){0,4}:)")
+    private static let sectionAfterLabelRegex = makeRegex("([A-Za-z][A-Za-z ]{2,40}:)\\s*(?=[A-Z])")
+    private static let listAfterPunctuationNumberedParenRegex = makeRegex("([.!?:;])\\s*(\\d+\\)\\s*)")
+    private static let listAfterPunctuationNumberedDotRegex = makeRegex("([.!?:;])\\s+(\\d+\\.\\s+)")
+    private static let listAfterPunctuationBulletRegex = makeRegex("([.!?:;])\\s*([•*\\-]\\s+)")
+    private static let listLeadingBulletRegex = makeRegex("(?m)^\\s*[•*]\\s+")
+    private static let listLeadingNumberedParenRegex = makeRegex("(?m)^\\s*(\\d+)\\)\\s*")
+    private static let listLeadingNumberedDotRegex = makeRegex("(?m)^\\s*(\\d+)\\.\\s*")
+    private static let sentenceSplitRegex = makeRegex("(?<=[.!?])\\s+(?=[A-Z0-9])")
 
     static func format(_ raw: String) -> String {
         let normalized = raw
@@ -791,53 +810,41 @@ nonisolated enum ChatDisplayFormatter {
     }
 
     private static func containsMarkdownStructure(_ text: String) -> Bool {
-        text.range(of: "(?m)^\\s*[-*]\\s+", options: .regularExpression) != nil
-            || text.range(of: "(?m)^\\s*\\d+[\\.)]\\s+", options: .regularExpression) != nil
-            || text.range(of: "(?m)^\\s*#+\\s+", options: .regularExpression) != nil
+        containsMatch(markdownBulletRegex, in: text)
+            || containsMatch(markdownNumberedRegex, in: text)
+            || containsMatch(markdownHeadingRegex, in: text)
     }
 
     private static func repairSentenceSpacing(in text: String) -> String {
-        var working = regexReplace("([A-Za-z][.!?])([A-Z])", in: text, with: "$1 $2")
-        working = regexReplace("([A-Za-z][.!?][\"”’])([A-Z])", in: working, with: "$1 $2")
+        var working = regexReplace(sentenceSpacingRegex, in: text, with: "$1 $2")
+        working = regexReplace(sentenceQuoteSpacingRegex, in: working, with: "$1 $2")
         return working
     }
 
     private static func repairCollapsedHeadingWords(in text: String) -> String {
-        var working = regexReplace(
-            "([a-z]{2,})([A-Z][a-z]{2,})(\\s+[A-Z][A-Za-z]{2,}:)",
-            in: text,
-            with: "$1 $2$3"
-        )
-        working = regexReplace("([a-z]{2,})([A-Z][a-z]{2,}:)", in: working, with: "$1 $2")
+        var working = regexReplace(collapsedHeadingRegex, in: text, with: "$1 $2$3")
+        working = regexReplace(collapsedTrailingHeadingRegex, in: working, with: "$1 $2")
         return working
     }
 
     private static func normalizeSectionBoundaries(in text: String) -> String {
-        var working = regexReplace(
-            "([.!?])\\s*(?=[A-Z][A-Za-z]{2,}(?: [A-Z][A-Za-z]{2,}){0,4}:)",
-            in: text,
-            with: "$1\n\n"
-        )
-        working = regexReplace(
-            "([A-Za-z][A-Za-z ]{2,40}:)\\s*(?=[A-Z])",
-            in: working,
-            with: "$1\n\n"
-        )
+        var working = regexReplace(sectionAfterPunctuationRegex, in: text, with: "$1\n\n")
+        working = regexReplace(sectionAfterLabelRegex, in: working, with: "$1\n\n")
         return working
     }
 
     private static func normalizeListMarkers(in text: String) -> String {
-        var working = regexReplace("([.!?:;])\\s*(\\d+\\)\\s*)", in: text, with: "$1\n$2")
-        working = regexReplace("([.!?:;])\\s+(\\d+\\.\\s+)", in: working, with: "$1\n$2")
-        working = regexReplace("([.!?:;])\\s*([•*\\-]\\s+)", in: working, with: "$1\n$2")
-        working = regexReplace("(?m)^\\s*[•*]\\s+", in: working, with: "- ")
-        working = regexReplace("(?m)^\\s*(\\d+)\\)\\s*", in: working, with: "$1. ")
-        working = regexReplace("(?m)^\\s*(\\d+)\\.\\s*", in: working, with: "$1. ")
+        var working = regexReplace(listAfterPunctuationNumberedParenRegex, in: text, with: "$1\n$2")
+        working = regexReplace(listAfterPunctuationNumberedDotRegex, in: working, with: "$1\n$2")
+        working = regexReplace(listAfterPunctuationBulletRegex, in: working, with: "$1\n$2")
+        working = regexReplace(listLeadingBulletRegex, in: working, with: "- ")
+        working = regexReplace(listLeadingNumberedParenRegex, in: working, with: "$1. ")
+        working = regexReplace(listLeadingNumberedDotRegex, in: working, with: "$1. ")
         return working
     }
 
     private static func splitIntoSentences(_ text: String) -> [String] {
-        let withMarkers = regexReplace("(?<=[.!?])\\s+(?=[A-Z0-9])", in: text, with: marker)
+        let withMarkers = regexReplace(sentenceSplitRegex, in: text, with: marker)
         return withMarkers
             .components(separatedBy: marker)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -847,7 +854,7 @@ nonisolated enum ChatDisplayFormatter {
     private static func isHeading(_ sentence: String) -> Bool {
         guard sentence.count <= 70 else { return false }
         guard !sentence.contains(":") else { return false }
-        guard sentence.rangeOfCharacter(from: CharacterSet(charactersIn: ",;")) == nil else { return false }
+        guard sentence.rangeOfCharacter(from: headingPunctuationSet) == nil else { return false }
         guard let last = sentence.last, !".!?".contains(last) else { return false }
 
         let words = sentence.split(separator: " ")
@@ -856,7 +863,7 @@ nonisolated enum ChatDisplayFormatter {
         for word in words {
             let cleaned = word.trimmingCharacters(in: .punctuationCharacters)
             let lower = cleaned.lowercased()
-            if ["a", "an", "and", "in", "of", "on", "or", "the", "to", "with"].contains(lower) {
+            if headingStopWords.contains(lower) {
                 continue
             }
             guard let scalar = cleaned.unicodeScalars.first, CharacterSet.uppercaseLetters.contains(scalar) else {
@@ -882,10 +889,18 @@ nonisolated enum ChatDisplayFormatter {
         return "- **\(prefix):** \(suffix)"
     }
 
-    private static func regexReplace(_ pattern: String, in text: String, with template: String) -> String {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
+    private static func containsMatch(_ regex: NSRegularExpression, in text: String) -> Bool {
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.firstMatch(in: text, options: [], range: range) != nil
+    }
+
+    private static func regexReplace(_ regex: NSRegularExpression, in text: String, with template: String) -> String {
         let range = NSRange(text.startIndex..., in: text)
         return regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: template)
+    }
+
+    private static func makeRegex(_ pattern: String) -> NSRegularExpression {
+        try! NSRegularExpression(pattern: pattern)
     }
 }
 

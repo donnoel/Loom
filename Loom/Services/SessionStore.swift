@@ -218,10 +218,11 @@ actor SessionStore {
             // Prepend chunk to buffer (we're reading backwards).
             buffer.insert(contentsOf: chunk, at: 0)
 
-            // Count newlines in the accumulated buffer. This is O(n) per loop, but loops are few (chunked).
-            newlineCount = buffer.reduce(into: 0) { acc, byte in
+            // Count newlines incrementally to avoid rescanning the whole buffer each loop.
+            let chunkNewlines = chunk.reduce(into: 0) { acc, byte in
                 if byte == 0x0A { acc += 1 }
             }
+            newlineCount += chunkNewlines
 
             // If the file is small, avoid looping too much.
             if cursor == 0 { break }
