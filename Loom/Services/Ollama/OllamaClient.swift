@@ -164,7 +164,7 @@ actor OllamaClient: OllamaStatusProviding {
         request.timeoutInterval = timeout
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(DeleteModelRequest(name: modelName))
+        request.httpBody = try JSONEncoder().encode(DeleteModelRequest(model: modelName))
 
         let (_, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
@@ -183,7 +183,7 @@ actor OllamaClient: OllamaStatusProviding {
         request.timeoutInterval = 30
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(PullModelRequest(name: modelName))
+        request.httpBody = try JSONEncoder().encode(PullModelRequest(model: modelName))
 
         let (bytes, response) = try await URLSession.shared.bytes(for: request)
         guard let http = response as? HTTPURLResponse else {
@@ -341,11 +341,11 @@ nonisolated private struct TagsModel: Decodable {
 }
 
 nonisolated private struct DeleteModelRequest: Encodable {
-    let name: String
+    let model: String
 }
 
 nonisolated private struct PullModelRequest: Encodable {
-    let name: String
+    let model: String
 }
 
 nonisolated private struct PullModelChunk: Decodable {
