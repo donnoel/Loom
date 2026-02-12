@@ -260,6 +260,11 @@ final class ModelsViewModel {
     private static let downloadURL = URL(string: "https://ollama.com/download")!
 
     private func deleteFailureMessage(for error: Error, modelTag: String) -> String {
+        if let deleteError = error as? DeleteModelError,
+           let description = deleteError.errorDescription?.nonEmptyTrimmed {
+            return description
+        }
+
         if let urlError = error as? URLError {
             switch urlError.code {
             case .cannotConnectToHost, .notConnectedToInternet, .networkConnectionLost, .timedOut:

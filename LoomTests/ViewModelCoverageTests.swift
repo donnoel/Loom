@@ -11,6 +11,7 @@ private actor StubOllamaClient: OllamaStatusProviding {
     var modelsResult: Result<[OllamaModel], StubFailure>
     var deleteResult: Result<Void, StubFailure>
     var pullResult: Result<Void, StubFailure>
+    var deleteThrownError: (any Error)?
     var pullProgressEvents: [PullProgress]
     var pullWaitsForCancellation: Bool
     var pullCompletionDelay: Duration?
@@ -22,6 +23,7 @@ private actor StubOllamaClient: OllamaStatusProviding {
         modelsResult: Result<[OllamaModel], StubFailure> = .success([]),
         deleteResult: Result<Void, StubFailure> = .success(()),
         pullResult: Result<Void, StubFailure> = .success(()),
+        deleteThrownError: (any Error)? = nil,
         pullProgressEvents: [PullProgress] = [PullProgress(status: "Pulling manifest", completed: nil, total: nil)],
         pullWaitsForCancellation: Bool = false,
         pullCompletionDelay: Duration? = nil
@@ -30,6 +32,7 @@ private actor StubOllamaClient: OllamaStatusProviding {
         self.modelsResult = modelsResult
         self.deleteResult = deleteResult
         self.pullResult = pullResult
+        self.deleteThrownError = deleteThrownError
         self.pullProgressEvents = pullProgressEvents
         self.pullWaitsForCancellation = pullWaitsForCancellation
         self.pullCompletionDelay = pullCompletionDelay
@@ -45,6 +48,9 @@ private actor StubOllamaClient: OllamaStatusProviding {
 
     func deleteModel(name: String) async throws {
         deletedModelNames.append(name)
+        if let deleteThrownError {
+            throw deleteThrownError
+        }
         try deleteResult.get()
     }
 
@@ -297,6 +303,28 @@ struct StatusViewModelCoverageTests {
         #expect(vm.selectedModelToDelete == nil)
         #expect(vm.deleteAlertMessage == nil)
         #expect(await client.readDeletedModelNames() == ["phi4"])
+    }
+
+    @Test
+    @MainActor
+    func confirmDeleteSurfacesDeleteServerMessage() async {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            modelsResult: .success([OllamaModel(tag: "llama3"), OllamaModel(tag: "phi4")]),
+            deleteThrownError: DeleteModelError.httpStatus(500, "model not found")
+        )
+        let vm = ModelsViewModel(client: client)
+        await vm.refresh()
+        vm.requestDelete(modelTag: "phi4")
+
+        let didDelete = await vm.confirmDelete()
+
+        #expect(!didDelete)
+        #expect(vm.deleteAlertMessage == "model not found")
     }
 
     @Test

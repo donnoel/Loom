@@ -44,6 +44,23 @@ nonisolated enum PullModelError: LocalizedError, Sendable {
     }
 }
 
+nonisolated enum DeleteModelError: LocalizedError, Sendable {
+    case invalidRequest
+    case badResponse
+    case httpStatus(Int, String?)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidRequest:
+            return "Loom couldn’t prepare this model delete request."
+        case .badResponse:
+            return "Loom got an unexpected response while deleting."
+        case .httpStatus(_, let snippet):
+            return snippet?.nonEmptyTrimmed ?? "Loom couldn’t delete this model right now."
+        }
+    }
+}
+
 /// A plain-language diagnosis for guiding non-technical users.
 nonisolated struct OllamaDiagnosis: Hashable, Sendable {
     enum NextStep: Hashable, Sendable {
@@ -155,7 +172,7 @@ actor OllamaClient: OllamaStatusProviding {
 
     func deleteModel(name: String) async throws {
         guard let modelName = name.nonEmptyTrimmed else {
-            throw URLError(.badURL)
+            throw DeleteModelError.invalidRequest
         }
 
         let baseURL = try await resolveReachableBaseURL()
@@ -166,9 +183,14 @@ actor OllamaClient: OllamaStatusProviding {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(DeleteModelRequest(model: modelName))
 
-        let (_, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw URLError(.badServerResponse)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw DeleteModelError.badResponse
+        }
+
+        guard (200...299).contains(http.statusCode) else {
+            let snippet = bodySnippet(from: data)
+            throw DeleteModelError.httpStatus(http.statusCode, snippet)
         }
     }
 
@@ -290,6 +312,18 @@ actor OllamaClient: OllamaStatusProviding {
             if body.count >= 1_200 {
                 break
             }
+        }
+
+        return body
+    }
+
+    private func bodySnippet(from data: Data, maxLength: Int = 1_200) -> String? {
+        guard var body = String(data: data, encoding: .utf8)?.nonEmptyTrimmed else {
+            return nil
+        }
+
+        if body.count > maxLength {
+            body = String(body.prefix(maxLength))
         }
 
         return body
