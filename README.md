@@ -31,7 +31,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | ⚡ **Streaming Assistant Replies** | Assistant responses stream live into the UI as tokens arrive. |
 | ⏹️ **Stop Generation** | Cancel generation any time and keep the partial assistant response. |
 | 🧠 **Helpful Setup Gating** | Clear in-context guidance if no active model is selected or Ollama is unavailable. |
-| 🧩 **Model Picker** | View installed Ollama models and choose an active model for chat. |
+| 🧩 **Model Picker** | View installed Ollama models, choose an active model, and keep that selection across launches until you change it. |
 | 🩺 **Readiness Status** | Dedicated Status view + toolbar pill showing ready/setup/not-ready state. |
 | 📤 **Markdown Export** | Export any session to Markdown (`⌘⇧E` command + toolbar action). |
 | 🔒 **Privacy-First by Default** | Chats and model usage stay local to your Mac. |

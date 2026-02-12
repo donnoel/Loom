@@ -4,9 +4,12 @@ import SwiftUI
 struct LoomApp: App {
     private let store = SessionStore()
     private static let uiTestResetDefaultsEnvironmentKey = "LOOM_UI_TEST_RESET_DEFAULTS"
+    private static let xCTestConfigurationPathEnvironmentKey = "XCTestConfigurationFilePath"
 
     init() {
-        guard ProcessInfo.processInfo.environment[Self.uiTestResetDefaultsEnvironmentKey] == "1" else {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment[Self.uiTestResetDefaultsEnvironmentKey] == "1",
+              environment[Self.xCTestConfigurationPathEnvironmentKey] != nil else {
             return
         }
 

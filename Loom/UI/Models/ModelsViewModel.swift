@@ -86,15 +86,13 @@ final class ModelsViewModel {
         }
 
         do {
-            models = try await client.listModels()
+            let listedModels = try await client.listModels()
+            models = listedModels
         } catch {
             log.error("Failed to load models: \(String(describing: error), privacy: .public)")
             models = []
         }
 
-        if let selected = activeModelTag, !models.contains(where: { $0.tag == selected }) {
-            activeModelTag = nil
-        }
     }
 
     func setActiveModel(tag: String) {

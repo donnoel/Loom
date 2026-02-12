@@ -81,17 +81,14 @@ final class StatusViewModel {
         var models: [OllamaModel] = []
         if isReachable {
             do {
-                models = try await client.listModels()
+                let listedModels = try await client.listModels()
+                models = listedModels
             } catch {
                 log.error("Failed to list models: \(String(describing: error), privacy: .public)")
             }
         }
 
-        var activeModelTag = UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag)?.nonEmptyTrimmed
-        if let selectedTag = activeModelTag, !models.contains(where: { $0.tag == selectedTag }) {
-            activeModelTag = nil
-            UserDefaults.standard.removeObject(forKey: LoomPreferenceKeys.activeModelTag)
-        }
+        let activeModelTag = UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag)?.nonEmptyTrimmed
 
         snapshot = LoomStatusSnapshot(
             ollamaReachable: isReachable,
