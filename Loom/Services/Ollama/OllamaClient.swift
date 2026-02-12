@@ -4,10 +4,19 @@ import OSLog
 nonisolated struct OllamaModel: Identifiable, Hashable, Sendable {
     let tag: String
     let sizeBytes: Int64?
+    let modifiedAt: Date?
+    let parameterSize: String?
 
-    init(tag: String, sizeBytes: Int64? = nil) {
+    init(
+        tag: String,
+        sizeBytes: Int64? = nil,
+        modifiedAt: Date? = nil,
+        parameterSize: String? = nil
+    ) {
         self.tag = tag
         self.sizeBytes = sizeBytes
+        self.modifiedAt = modifiedAt
+        self.parameterSize = parameterSize
     }
 
     var id: String { tag }
@@ -166,7 +175,14 @@ actor OllamaClient: OllamaStatusProviding {
     func listModels() async throws -> [OllamaModel] {
         let baseURL = try await resolveReachableBaseURL()
         let response = try await fetchTags(baseURL: baseURL)
-        let models = response.models.map { OllamaModel(tag: $0.name, sizeBytes: $0.size) }
+        let models = response.models.map { model in
+            OllamaModel(
+                tag: model.name,
+                sizeBytes: model.size,
+                modifiedAt: Self.parseOllamaTimestamp(model.modifiedAt),
+                parameterSize: model.details?.parameterSize
+            )
+        }
         return models.sorted { $0.tag.localizedStandardCompare($1.tag) == .orderedAscending }
     }
 
@@ -329,6 +345,26 @@ actor OllamaClient: OllamaStatusProviding {
         return body
     }
 
+    private static let ollamaDateFormatterWithFractionalSeconds: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let ollamaDateFormatterWithoutFractionalSeconds: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    private static func parseOllamaTimestamp(_ raw: String?) -> Date? {
+        guard let raw = raw?.nonEmptyTrimmed else { return nil }
+        if let date = ollamaDateFormatterWithFractionalSeconds.date(from: raw) {
+            return date
+        }
+        return ollamaDateFormatterWithoutFractionalSeconds.date(from: raw)
+    }
+
     // MARK: - Installation detection
 
     /// Detect installation without shelling out (App Store-safe).
@@ -372,6 +408,23 @@ nonisolated private struct TagsResponse: Decodable {
 nonisolated private struct TagsModel: Decodable {
     let name: String
     let size: Int64?
+    let modifiedAt: String?
+    let details: TagsModelDetails?
+
+    private enum CodingKeys: String, CodingKey {
+        case name
+        case size
+        case modifiedAt = "modified_at"
+        case details
+    }
+}
+
+nonisolated private struct TagsModelDetails: Decodable {
+    let parameterSize: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case parameterSize = "parameter_size"
+    }
 }
 
 nonisolated private struct DeleteModelRequest: Encodable {

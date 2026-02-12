@@ -40,6 +40,11 @@ final class ModelsViewModel {
     var installingTag: String?
     var pullProgressByTag: [String: PullProgress] = [:]
     var installErrorMessage: String?
+    var updateErrorMessage: String?
+    var updatingTag: String?
+    var isCheckingUpdates: Bool = false
+    var lastUpdateCheckAt: Date?
+    var checkedForUpdatesAtByTag: [String: Date] = [:]
 
     init(
         client: any OllamaStatusProviding = OllamaClient(),
@@ -66,6 +71,15 @@ final class ModelsViewModel {
     var isInstalled: Bool { diagnosis.isInstalled }
     var catalogModels: [CatalogModel] { catalog.all }
     var recommendedCatalogModels: [CatalogModel] { catalog.recommended }
+    var statusSnapshot: LoomStatusSnapshot {
+        LoomStatusSnapshot(
+            ollamaReachable: isRunning,
+            installedModelCount: models.count,
+            activeModelTag: activeModelTag,
+            offlineAvailable: isRunning && !models.isEmpty && activeModelTag != nil,
+            diskSpace: diskSpaceSnapshot
+        )
+    }
     var lowDiskSpaceWarningText: String? {
         guard let diskSpaceSnapshot, diskSpaceSnapshot.isLowSpace else { return nil }
         return DiskSpaceSnapshot.lowSpaceWarningMessage
@@ -114,15 +128,18 @@ final class ModelsViewModel {
 
         guard diagnosis.isRunning else {
             models = []
+            pruneUpdateCheckState()
             return
         }
 
         do {
             let listedModels = try await client.listModels()
             models = listedModels
+            pruneUpdateCheckState()
         } catch {
             log.error("Failed to load models: \(String(describing: error), privacy: .public)")
             models = []
+            pruneUpdateCheckState()
         }
     }
 
@@ -160,6 +177,34 @@ final class ModelsViewModel {
         return segments.isEmpty ? nil : segments.joined(separator: " • ")
     }
 
+    func catalogModel(for tag: String) -> CatalogModel? {
+        catalog.byTag(tag)
+    }
+
+    func parameterSizeText(for model: OllamaModel) -> String? {
+        if let parameterSize = model.parameterSize?.nonEmptyTrimmed {
+            return parameterSize
+        }
+
+        return Self.parameterSizeFromTag(model.tag)
+    }
+
+    func updateStatusText(for tag: String) -> String {
+        if updatingTag == tag {
+            return "Checking now…"
+        }
+
+        guard let checkedAt = checkedForUpdatesAtByTag[tag] else {
+            return "Not checked yet"
+        }
+
+        return "Checked \(checkedAt.formatted(date: .omitted, time: .shortened))"
+    }
+
+    func dismissUpdateError() {
+        updateErrorMessage = nil
+    }
+
     func pullProgress(for tag: String) -> PullProgress? {
         pullProgressByTag[tag]
     }
@@ -192,6 +237,49 @@ final class ModelsViewModel {
 
     func cancelInstall() {
         installTask?.cancel()
+    }
+
+    func updateInstalledModel(tag: String) async -> Bool {
+        guard let normalizedTag = tag.nonEmptyTrimmed else { return false }
+        guard canUpdateModel(tag: normalizedTag) else { return false }
+
+        updateErrorMessage = nil
+        let didUpdate = await runModelUpdate(tag: normalizedTag)
+        lastUpdateCheckAt = Date()
+
+        if didUpdate {
+            await refresh()
+        }
+
+        return didUpdate
+    }
+
+    func checkForUpdates() async {
+        guard diagnosis.isRunning else { return }
+        guard !isCheckingUpdates else { return }
+        guard installingTag == nil else { return }
+
+        isCheckingUpdates = true
+        updateErrorMessage = nil
+
+        defer {
+            isCheckingUpdates = false
+            lastUpdateCheckAt = Date()
+        }
+
+        let installedTags = models.map(\.tag)
+        guard !installedTags.isEmpty else { return }
+
+        var didUpdateAny = false
+        for tag in installedTags {
+            if await runModelUpdate(tag: tag) {
+                didUpdateAny = true
+            }
+        }
+
+        if didUpdateAny {
+            await refresh()
+        }
     }
 
     func requestDelete(modelTag: String) {
@@ -258,6 +346,35 @@ final class ModelsViewModel {
     }
 
     private static let downloadURL = URL(string: "https://ollama.com/download")!
+
+    private func canUpdateModel(tag: String) -> Bool {
+        guard diagnosis.isRunning else { return false }
+        guard isModelInstalled(tag: tag) else { return false }
+        guard !isCheckingUpdates else { return false }
+        guard installingTag == nil else { return false }
+        return updatingTag == nil || updatingTag == tag
+    }
+
+    private func runModelUpdate(tag: String) async -> Bool {
+        updatingTag = tag
+        defer {
+            if updatingTag == tag {
+                updatingTag = nil
+            }
+        }
+
+        do {
+            try await client.pullModel(name: tag) { _ in }
+            checkedForUpdatesAtByTag[tag] = Date()
+            return true
+        } catch is CancellationError {
+            return false
+        } catch {
+            log.error("Failed to update model \(tag, privacy: .public): \(String(describing: error), privacy: .public)")
+            updateErrorMessage = updateFailureMessage(for: error, modelTag: tag)
+            return false
+        }
+    }
 
     private func deleteFailureMessage(for error: Error, modelTag: String) -> String {
         if let deleteError = error as? DeleteModelError,
@@ -353,6 +470,50 @@ final class ModelsViewModel {
         }
 
         return "Loom couldn’t install '\(modelTag)'. Try again."
+    }
+
+    private func updateFailureMessage(for error: Error, modelTag: String) -> String {
+        if let pullError = error as? PullModelError,
+           let description = pullError.errorDescription?.nonEmptyTrimmed {
+            return description
+        }
+
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .cannotConnectToHost, .notConnectedToInternet, .networkConnectionLost, .timedOut:
+                return "Loom can’t reach Ollama. Start it to continue."
+            default:
+                break
+            }
+        }
+
+        return "Loom couldn’t check updates for '\(modelTag)'. Try again."
+    }
+
+    private func pruneUpdateCheckState() {
+        let installedTags = Set(models.map(\.tag))
+        checkedForUpdatesAtByTag = checkedForUpdatesAtByTag.filter { installedTags.contains($0.key) }
+        if let updatingTag, !installedTags.contains(updatingTag) {
+            self.updatingTag = nil
+        }
+    }
+
+    private static func parameterSizeFromTag(_ tag: String) -> String? {
+        guard let tagSuffix = tag.split(separator: ":").last else { return nil }
+
+        let trimmed = tagSuffix.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2 else { return nil }
+
+        let lastCharacter = trimmed.last?.lowercased()
+        guard lastCharacter == "b" else { return nil }
+
+        let value = String(trimmed.dropLast())
+        guard !value.isEmpty else { return nil }
+        guard value.allSatisfy({ $0.isNumber || $0 == "." }) else {
+            return nil
+        }
+
+        return "\(value)B"
     }
 
     private static func ollamaAppURL() -> URL? {

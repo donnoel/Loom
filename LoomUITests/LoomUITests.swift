@@ -26,9 +26,6 @@ final class LoomUITests: XCTestCase {
         tapSidebarItem(identifier: "sidebar.models", title: "Models", app: app)
         XCTAssertTrue(element("root.detail.models", app: app).waitForExistence(timeout: Self.mediumTimeout))
 
-        tapSidebarItem(identifier: "sidebar.status", title: "Status", app: app)
-        XCTAssertTrue(element("root.detail.status", app: app).waitForExistence(timeout: Self.mediumTimeout))
-
         tapSidebarItem(identifier: "sidebar.settings", title: "Settings", app: app)
         XCTAssertTrue(element("root.detail.settings", app: app).waitForExistence(timeout: Self.mediumTimeout))
 

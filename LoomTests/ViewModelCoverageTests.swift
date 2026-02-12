@@ -295,6 +295,48 @@ struct StatusViewModelCoverageTests {
 
     @Test
     @MainActor
+    func updateInstalledModelPullsAndMarksModelChecked() async {
+        let tag = "qwen2.5:7b"
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            modelsResult: .success([OllamaModel(tag: tag)]),
+            pullResult: .success(())
+        )
+        let vm = ModelsViewModel(client: client)
+        await vm.refresh()
+
+        let didUpdate = await vm.updateInstalledModel(tag: tag)
+
+        #expect(didUpdate)
+        #expect(await client.readPulledModelNames() == [tag])
+        #expect(vm.lastUpdateCheckAt != nil)
+        #expect(vm.updateStatusText(for: tag).contains("Checked"))
+    }
+
+    @Test
+    @MainActor
+    func checkForUpdatesPullsEachInstalledModel() async {
+        let firstTag = "llama3.2:3b"
+        let secondTag = "phi4:latest"
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            modelsResult: .success([OllamaModel(tag: firstTag), OllamaModel(tag: secondTag)]),
+            pullResult: .success(())
+        )
+        let vm = ModelsViewModel(client: client)
+        await vm.refresh()
+
+        await vm.checkForUpdates()
+
+        #expect(await client.readPulledModelNames() == [firstTag, secondTag])
+        #expect(vm.lastUpdateCheckAt != nil)
+        #expect(vm.updateStatusText(for: firstTag).contains("Checked"))
+        #expect(vm.updateStatusText(for: secondTag).contains("Checked"))
+        #expect(!vm.isCheckingUpdates)
+    }
+
+    @Test
+    @MainActor
     func requestDeleteBlocksDeletingActiveModel() async {
         clearModelSelectionPreference()
         defer { clearModelSelectionPreference() }

@@ -160,7 +160,6 @@ struct RootView: View {
 
             Section("System") {
                 destinationSidebarRow(.models)
-                destinationSidebarRow(.status)
             }
 
             Section("App") {
@@ -175,7 +174,7 @@ struct RootView: View {
     @ViewBuilder
     private var detailContent: some View {
         switch selectedSidebarSelection ?? .destination(.sessions) {
-        case .destination(.models):
+        case .destination(.models), .destination(.status):
             ModelsView(
                 onModelSelectionChanged: {
                     await statusViewModel.refresh()
@@ -183,15 +182,6 @@ struct RootView: View {
             )
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("root.detail.models")
-        case .destination(.status):
-            StatusView(
-                viewModel: statusViewModel,
-                browseModels: {
-                    selectedSidebarSelection = .destination(.models)
-                }
-            )
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("root.detail.status")
         case .destination(.settings):
             SettingsView(store: store)
                 .accessibilityElement(children: .contain)

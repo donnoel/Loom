@@ -18,7 +18,7 @@ struct ModelsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 topStatusCard
-                diskSpaceCard
+                statusDetailsCard
                 if let warning = viewModel.lowDiskSpaceWarningText {
                     lowDiskWarningBanner(warning)
                 }
@@ -29,7 +29,7 @@ struct ModelsView: View {
             .padding(24)
         }
         .accessibilityIdentifier("screen.models")
-        .navigationTitle("Models")
+        .navigationTitle("Model Library")
         .task {
             viewModel.startMonitoring()
             await viewModel.refresh()
@@ -76,71 +76,78 @@ struct ModelsView: View {
         } message: {
             Text(viewModel.deleteAlertMessage ?? "")
         }
+        .alert("Couldn't Check Updates", isPresented: isShowingUpdateAlert) {
+            Button("OK", role: .cancel) {
+                viewModel.dismissUpdateError()
+            }
+        } message: {
+            Text(viewModel.updateErrorMessage ?? "")
+        }
     }
 
     private var topStatusCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if viewModel.isRunning {
-                Text("Loom can use local models.")
-                    .font(.title3.weight(.semibold))
-                Text("Choose an active model below.")
+        let snapshot = viewModel.statusSnapshot
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: snapshot.readiness.symbolName)
+                    .foregroundStyle(snapshot.readiness.tintColor)
+                    .font(.title2)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Model Library")
+                        .font(.title3.weight(.semibold))
+                    Text(snapshot.readiness.label)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Text(statusSummaryText)
+                .foregroundStyle(.secondary)
+
+            if let lastUpdateCheckAt = viewModel.lastUpdateCheckAt {
+                Text("Last update check: \(lastUpdateCheckAt.formatted(date: .abbreviated, time: .shortened))")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-            } else if viewModel.isInstalled {
-                Text("Ollama is installed but not running.")
-                    .font(.title3.weight(.semibold))
-                Text("Start Ollama, then refresh to load your models.")
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 10) {
-                    Button("Start Ollama") {
+            }
+
+            HStack(spacing: 10) {
+                if !viewModel.isRunning {
+                    Button(viewModel.isInstalled ? "Start Ollama" : "Install Ollama…") {
                         handleOpenOrInstall()
                     }
                     .buttonStyle(.borderedProminent)
-
-                    Button("Refresh") {
-                        Task {
-                            await viewModel.refresh()
-                            await onModelSelectionChanged()
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(viewModel.isRefreshing)
                 }
-            } else {
-                Text("Ollama is not installed yet.")
-                    .font(.title3.weight(.semibold))
-                Text("Install it once, then come back and pick a model.")
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 10) {
-                    Button("Install Ollama…") {
-                        handleOpenOrInstall()
-                    }
-                    .buttonStyle(.borderedProminent)
 
-                    Button("Refresh") {
-                        Task {
-                            await viewModel.refresh()
-                            await onModelSelectionChanged()
-                        }
+                Button(viewModel.isCheckingUpdates ? "Checking…" : "Check for Updates") {
+                    Task {
+                        await viewModel.checkForUpdates()
+                        await onModelSelectionChanged()
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(viewModel.isRefreshing)
                 }
+                .buttonStyle(.bordered)
+                .disabled(!canCheckForUpdates)
+
+                Button("Refresh") {
+                    Task {
+                        await viewModel.refresh()
+                        await onModelSelectionChanged()
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(viewModel.isRefreshing)
             }
         }
         .padding(16)
         .loomCard(cornerRadius: 12)
     }
 
-    private var diskSpaceCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Disk")
+    private var statusDetailsCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Status")
                 .font(.headline)
-            Text(viewModel.diskFreeSpaceText)
-                .foregroundStyle(.secondary)
-                .font(.subheadline)
+            LoomStatusLinesView(snapshot: viewModel.statusSnapshot)
         }
-        .padding(14)
-        .loomCard(cornerRadius: 12)
     }
 
     private func lowDiskWarningBanner(_ message: String) -> some View {
@@ -224,15 +231,38 @@ struct ModelsView: View {
     }
 
     private func modelRow(_ model: OllamaModel) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(model.tag)
+        let catalogModel = viewModel.catalogModel(for: model.tag)
+        let isActiveModel = model.tag == viewModel.activeModelTag
+
+        return HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(catalogModel?.displayName ?? model.tag)
                     .font(.body)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
-                if let sizeText = viewModel.installedSizeText(tag: model.tag) {
-                    Text("Size: \(sizeText)")
+                if catalogModel != nil {
+                    Text(model.tag)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                HStack(spacing: 10) {
+                    if let sizeText = viewModel.installedSizeText(tag: model.tag) {
+                        Text("Size \(sizeText)")
+                    }
+
+                    if let parameterSize = viewModel.parameterSizeText(for: model) {
+                        Text("Parameters \(parameterSize)")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                if let modifiedAt = model.modifiedAt {
+                    Text("Updated \(modifiedAt.formatted(date: .abbreviated, time: .omitted))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -240,35 +270,64 @@ struct ModelsView: View {
 
             Spacer(minLength: 12)
 
-            if model.tag == viewModel.activeModelTag {
-                Text("Active")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.green)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(.green.opacity(0.12), in: Capsule())
-            }
+            VStack(alignment: .trailing, spacing: 8) {
+                if isActiveModel {
+                    Text("Active")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.green)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(.green.opacity(0.12), in: Capsule())
+                }
 
-            Button(model.tag == viewModel.activeModelTag ? "In Use" : "Use") {
-                viewModel.setActiveModel(tag: model.tag)
-                Task { await onModelSelectionChanged() }
-            }
-            .buttonStyle(.bordered)
-            .disabled(model.tag == viewModel.activeModelTag)
+                Text(viewModel.updateStatusText(for: model.tag))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
-            Button {
-                viewModel.requestDelete(modelTag: model.tag)
-            } label: {
-                Image(systemName: "trash")
+                HStack(spacing: 8) {
+                    Button(isActiveModel ? "In Use" : "Use") {
+                        viewModel.setActiveModel(tag: model.tag)
+                        Task { await onModelSelectionChanged() }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isActiveModel)
+
+                    Button(viewModel.updatingTag == model.tag ? "Updating…" : "Update") {
+                        Task {
+                            let didUpdate = await viewModel.updateInstalledModel(tag: model.tag)
+                            if didUpdate {
+                                await onModelSelectionChanged()
+                            }
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!canUpdate(model))
+
+                    Button {
+                        viewModel.requestDelete(modelTag: model.tag)
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .help("Delete model")
+                    .disabled(viewModel.isDeletingModel)
+                }
             }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .help("Delete model")
-            .disabled(viewModel.isDeletingModel)
         }
         .padding(12)
         .loomCard(cornerRadius: 10)
         .contextMenu {
+            Button("Update") {
+                Task {
+                    let didUpdate = await viewModel.updateInstalledModel(tag: model.tag)
+                    if didUpdate {
+                        await onModelSelectionChanged()
+                    }
+                }
+            }
+            .disabled(!canUpdate(model))
+
             Button("Delete…", role: .destructive) {
                 viewModel.requestDelete(modelTag: model.tag)
             }
@@ -280,6 +339,34 @@ struct ModelsView: View {
             .font(.footnote)
             .foregroundStyle(.secondary)
             .padding(.top, 4)
+    }
+
+    private var statusSummaryText: String {
+        if viewModel.isRunning {
+            let activeModel = viewModel.activeModelTag ?? "None selected"
+            return "\(viewModel.models.count) installed. Active model: \(activeModel)."
+        }
+
+        if viewModel.isInstalled {
+            return "Ollama is installed but not running. Start Ollama to manage models."
+        }
+
+        return "Install Ollama once, then choose a model and keep it updated from this screen."
+    }
+
+    private var canCheckForUpdates: Bool {
+        viewModel.isRunning
+            && !viewModel.models.isEmpty
+            && !viewModel.isCheckingUpdates
+            && viewModel.installingTag == nil
+    }
+
+    private func canUpdate(_ model: OllamaModel) -> Bool {
+        guard viewModel.isRunning else { return false }
+        guard viewModel.installingTag == nil else { return false }
+        guard !viewModel.isCheckingUpdates else { return false }
+        guard viewModel.isModelInstalled(tag: model.tag) else { return false }
+        return viewModel.updatingTag == nil || viewModel.updatingTag == model.tag
     }
 
     private var serveHelpSheet: some View {
@@ -352,6 +439,17 @@ struct ModelsView: View {
             set: { isPresented in
                 if !isPresented {
                     viewModel.dismissDeleteAlert()
+                }
+            }
+        )
+    }
+
+    private var isShowingUpdateAlert: Binding<Bool> {
+        Binding(
+            get: { viewModel.updateErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    viewModel.dismissUpdateError()
                 }
             }
         )

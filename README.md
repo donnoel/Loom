@@ -35,8 +35,8 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 🧩 **Model Picker** | View installed Ollama models, choose an active model, and keep that selection across launches until you change it. |
 | 📥 **In-App Model Install** | Use **Add Model…** to browse a curated catalog, review friendly model summaries, and install with live progress + cancel support. |
 | 🧹 **Model Cleanup** | Delete installed models directly from Loom (with confirmation and active-model safety checks). |
-| 💽 **Disk Awareness** | Models and Status screens show local free-space info and warn when free space is below 10%. |
-| 🩺 **Readiness Status** | Dedicated Status view + toolbar pill showing ready/setup/not-ready state. |
+| 💽 **Disk Awareness** | Model Library shows local free-space info and warns when free space is below 10%. |
+| 🩺 **Readiness Status** | Model Library + toolbar pill show ready/setup/not-ready state in plain language. |
 | 📤 **Markdown Export** | Export any session to Markdown (`⌘⇧E` command + toolbar action). |
 | 🔒 **Privacy-First by Default** | Chats and model usage stay local to your Mac. |
 
@@ -51,8 +51,8 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Auto-Correct + Spell Check** in the message field (uses your macOS Keyboard settings)
 - **Stop** to cancel streaming while keeping partial text
 - **Export Session** from toolbar or `⌘⇧E`
-- **Status / Models** from sidebar for setup and diagnostics
-- **Add Model…** from Models to install curated models without leaving Loom
+- **Models** from sidebar for setup, diagnostics, and update checks in one place
+- **Add Model…** from Model Library to install curated models without leaving Loom
 - **Automation toggles** in Settings let you disable background status/model checks and use manual Refresh instead
 
 ---
@@ -90,7 +90,7 @@ Chat interaction coordinator:
 - Exposes inline banner state for guidance
 
 ### **Root UI (SwiftUI + NavigationSplitView)**
-- Sidebar areas: Sessions, Models, Status, Settings
+- Sidebar areas: Sessions, Models, Settings
 - Status pill in toolbar with quick readiness visibility
 - Session detail optimized for steady, low-jank streaming updates
 
