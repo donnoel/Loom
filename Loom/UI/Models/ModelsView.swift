@@ -275,15 +275,15 @@ struct ModelsView: View {
             Spacer(minLength: 12)
 
             VStack(alignment: .trailing, spacing: 8) {
-                updateStatusBadge(for: model)
-
                 HStack(spacing: 8) {
-                    Button(isActiveModel ? "In Use" : "Use") {
-                        viewModel.setActiveModel(tag: model.tag)
-                        Task { await onModelSelectionChanged() }
+                    if !isActiveModel {
+                        Button("Set Active") {
+                            viewModel.setActiveModel(tag: model.tag)
+                            Task { await onModelSelectionChanged() }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(isActiveModel)
 
                     Button(updateButtonTitle(for: model)) {
                         Task {
@@ -294,14 +294,18 @@ struct ModelsView: View {
                         }
                     }
                     .buttonStyle(.bordered)
+                    .controlSize(.small)
                     .disabled(!canStartUpdate(model))
 
                     Button {
                         viewModel.requestDelete(modelTag: model.tag)
                     } label: {
                         Image(systemName: "trash")
+                            .font(.system(size: 12, weight: .semibold))
+                            .padding(7)
+                            .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     }
-                    .buttonStyle(.borderless)
+                    .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                     .help("Delete model")
                     .disabled(viewModel.isDeletingModel)
@@ -377,44 +381,12 @@ struct ModelsView: View {
             && viewModel.installingTag == nil
     }
 
-    @ViewBuilder
-    private func updateStatusBadge(for model: OllamaModel) -> some View {
-        if viewModel.updatingTag == model.tag {
-            statusBadge(
-                title: "Checking…",
-                foreground: .secondary,
-                background: .secondary.opacity(0.14)
-            )
-        } else if viewModel.isModelCurrent(tag: model.tag) {
-            statusBadge(
-                title: "Current",
-                foreground: .green,
-                background: .green.opacity(0.14)
-            )
-        } else {
-            statusBadge(
-                title: "Update",
-                foreground: .orange,
-                background: .orange.opacity(0.16)
-            )
-        }
-    }
-
-    private func statusBadge(title: String, foreground: Color, background: Color) -> some View {
-        Text(title)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(foreground)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(background, in: Capsule())
-    }
-
     private func updateButtonTitle(for model: OllamaModel) -> String {
         if viewModel.updatingTag == model.tag {
             return "Checking…"
         }
         if viewModel.isModelCurrent(tag: model.tag) {
-            return "Current"
+            return "Up to Date"
         }
         return "Update"
     }

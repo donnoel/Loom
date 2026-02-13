@@ -32,7 +32,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | ✍️ **Readable Chat Formatting** | Assistant text is auto-formatted into human-readable paragraphs and list-friendly markdown when raw output arrives as a dense block. |
 | ⏹️ **Stop Generation** | Cancel generation any time and keep the partial assistant response. |
 | 🧠 **Helpful Setup Gating** | Clear in-context guidance if no active model is selected or Ollama is unavailable. |
-| 🧩 **Model Picker** | View installed Ollama models with plain-language "good for" guidance plus maker/country details, choose an active model (highlighted in the list), and keep that selection across launches until you change it. |
+| 🧩 **Model Picker** | View installed Ollama models with plain-language "good for" guidance plus maker/country details, use streamlined actions (Set Active / Update / Delete), and keep model selection across launches until you change it. |
 | 📥 **In-App Model Install** | Use **Add Model…** to browse a curated catalog, review friendly model summaries, and install with live progress + cancel support. |
 | 🧹 **Model Cleanup** | Delete installed models directly from Loom (with confirmation and active-model safety checks). |
 | 💽 **Disk Awareness** | Model Library shows local free-space info and warns when free space is below 10%. |
