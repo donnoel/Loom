@@ -43,7 +43,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 
 ---
 
-## 🎛 Controls (simple by design)
+## 🎛 Controls
 
 - **Create Session** with the `+` toolbar button
 - **Browse Sessions** directly in the sidebar (chat-list style)

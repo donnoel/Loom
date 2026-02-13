@@ -104,6 +104,8 @@ protocol OllamaStatusProviding: Actor {
 
 actor OllamaClient: OllamaStatusProviding {
     private let log = Logger(subsystem: "com.loom.app", category: "OllamaClient")
+    private let session: URLSession
+    private let installedDetector: @Sendable () -> Bool
 
     /// Try multiple localhost variants to be resilient across environments.
     private let candidateBaseURLs: [URL] = [
@@ -118,9 +120,17 @@ actor OllamaClient: OllamaStatusProviding {
     /// Cache the last known good base URL to avoid re-probing on every call.
     private var cachedReachableBaseURL: URL?
 
+    init(
+        session: URLSession = .shared,
+        installedDetector: @escaping @Sendable () -> Bool = OllamaClient.detectInstalled
+    ) {
+        self.session = session
+        self.installedDetector = installedDetector
+    }
+
     /// Returns a diagnosis that is suitable for a “brain-dead helpful” UI.
     func diagnose() async -> OllamaDiagnosis {
-        let installed = Self.detectInstalled()
+        let installed = installedDetector()
 
         // If we already have a working base URL, try it first.
         if let cached = cachedReachableBaseURL {
@@ -199,7 +209,7 @@ actor OllamaClient: OllamaStatusProviding {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(DeleteModelRequest(model: modelName))
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw DeleteModelError.badResponse
         }
@@ -223,7 +233,7 @@ actor OllamaClient: OllamaStatusProviding {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(PullModelRequest(model: modelName))
 
-        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        let (bytes, response) = try await session.bytes(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw PullModelError.badResponse
         }
@@ -292,7 +302,7 @@ actor OllamaClient: OllamaStatusProviding {
         request.timeoutInterval = timeout
         request.cachePolicy = .reloadIgnoringLocalCacheData
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
@@ -306,7 +316,7 @@ actor OllamaClient: OllamaStatusProviding {
         request.timeoutInterval = timeout
         request.cachePolicy = .reloadIgnoringLocalCacheData
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
