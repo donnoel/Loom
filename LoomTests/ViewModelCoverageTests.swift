@@ -170,6 +170,7 @@ private func makeDiagnosis(isInstalled: Bool, isRunning: Bool) -> OllamaDiagnosi
 }
 
 private func cleanupSessionFolder(id: UUID) {
+    UserDefaults.standard.removeObject(forKey: LoomPreferenceKeys.sessionLastStreamModelKey(for: id))
     guard let folder = try? LoomPaths.sessionFolder(for: id) else { return }
     guard FileManager.default.fileExists(atPath: folder.path) else { return }
     try? FileManager.default.removeItem(at: folder)
@@ -856,6 +857,94 @@ struct SessionMessagesViewModelCoverageTests {
         if requests.count == 2 {
             #expect(requests[1].messages.allSatisfy { $0.role == .user })
             #expect(requests[1].messages.map(\.content) == ["Question one", "Question two"])
+        }
+    }
+
+    @Test
+    @MainActor
+    func sendDraftAfterViewReloadWithSameModelKeepsAssistantContext() async throws {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Reloaded Same Model Context")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let chatClient = ScriptedChatClient([
+            .complete(["Old model answer"]),
+            .complete(["Follow-up answer"])
+        ])
+        let ollamaClient = StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true))
+
+        let firstViewModel = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: ollamaClient,
+            chatClient: chatClient
+        )
+
+        await sendDraftWithModelRetry(firstViewModel, draft: "Question one", modelTag: "llama3")
+        await waitUntil { !firstViewModel.isGenerating }
+
+        let reloadedViewModel = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: ollamaClient,
+            chatClient: chatClient
+        )
+        await reloadedViewModel.load()
+
+        await sendDraftWithModelRetry(reloadedViewModel, draft: "Question two", modelTag: "llama3")
+        await waitUntil { !reloadedViewModel.isGenerating }
+
+        let requests = await chatClient.readRecordedRequests()
+        #expect(requests.count == 2)
+        #expect(requests.map(\.model) == ["llama3", "llama3"])
+
+        if requests.count == 2 {
+            #expect(requests[1].messages.contains(where: { $0.role == .assistant }))
+            #expect(requests[1].messages.map(\.content) == ["Question one", "Old model answer", "Question two"])
+        }
+    }
+
+    @Test
+    @MainActor
+    func retryLastReplyAfterModelSwitchUsesUserOnlyContext() async throws {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Retry Model Switch Context")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let chatClient = ScriptedChatClient([
+            .fail(["Old partial"], .serverError("Connection lost.")),
+            .complete(["Recovered on new model"])
+        ])
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)),
+            chatClient: chatClient
+        )
+
+        await sendDraftWithModelRetry(vm, draft: "Hello", modelTag: "llama3")
+        await waitUntil { !vm.isGenerating }
+        #expect(vm.banner?.action == .retryLastReply)
+
+        UserDefaults.standard.set("phi4", forKey: LoomPreferenceKeys.activeModelTag)
+        await vm.retryLastReply()
+        await waitUntil { !vm.isGenerating }
+
+        let requests = await chatClient.readRecordedRequests()
+        #expect(requests.count == 2)
+        #expect(requests.map(\.model) == ["llama3", "phi4"])
+
+        if requests.count == 2 {
+            #expect(requests[1].messages.allSatisfy { $0.role == .user })
+            #expect(requests[1].messages.map(\.content) == ["Hello"])
         }
     }
 

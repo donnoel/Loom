@@ -3,6 +3,7 @@ import Testing
 @testable import Loom
 
 private func cleanupSessionFolder(id: UUID) {
+    UserDefaults.standard.removeObject(forKey: LoomPreferenceKeys.sessionLastStreamModelKey(for: id))
     guard let folder = try? LoomPaths.sessionFolder(for: id) else { return }
     guard FileManager.default.fileExists(atPath: folder.path) else { return }
     try? FileManager.default.removeItem(at: folder)
@@ -102,6 +103,45 @@ struct SessionStoreTests {
     }
 
     @Test
+    func loadRecentMessagesReturnsLatestLimitInOrder() async throws {
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Recent \(UUID().uuidString)")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let messages: [ChatMessage] = [
+            ChatMessage(role: .user, content: "One", createdAt: fixedDate("2026-01-01T00:00:00Z")),
+            ChatMessage(role: .assistant, content: "Two", createdAt: fixedDate("2026-01-01T00:00:01Z")),
+            ChatMessage(role: .user, content: "Three", createdAt: fixedDate("2026-01-01T00:00:02Z")),
+            ChatMessage(role: .assistant, content: "Four", createdAt: fixedDate("2026-01-01T00:00:03Z"))
+        ]
+
+        for message in messages {
+            try await store.appendMessage(message, sessionID: session.id)
+        }
+
+        let recent = try await store.loadRecentMessages(sessionID: session.id, limit: 2)
+        #expect(recent == Array(messages.suffix(2)))
+    }
+
+    @Test
+    func loadRecentMessagesReturnsEmptyWhenLimitIsNonPositive() async throws {
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Recent Limit \(UUID().uuidString)")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        try await store.appendMessage(
+            ChatMessage(role: .user, content: "Hello", createdAt: fixedDate("2026-01-01T00:00:00Z")),
+            sessionID: session.id
+        )
+
+        let zero = try await store.loadRecentMessages(sessionID: session.id, limit: 0)
+        let negative = try await store.loadRecentMessages(sessionID: session.id, limit: -3)
+
+        #expect(zero.isEmpty)
+        #expect(negative.isEmpty)
+    }
+
+    @Test
     func updateMetadataPersistsTitleChange() async throws {
         let store = SessionStore()
         let session = try await store.createSession(title: "Original \(UUID().uuidString)")
@@ -133,6 +173,24 @@ struct SessionStoreTests {
 
         try await store.deleteSession(id: session.id)
         #expect(!FileManager.default.fileExists(atPath: folderURL.path))
+        #expect(UserDefaults.standard.string(forKey: modelKey) == nil)
+    }
+
+    @Test
+    func deleteSessionClearsModelKeyWhenFolderIsAlreadyMissing() async throws {
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Delete Missing \(UUID().uuidString)")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let modelKey = LoomPreferenceKeys.sessionLastStreamModelKey(for: session.id)
+        UserDefaults.standard.set("phi4", forKey: modelKey)
+
+        let folderURL = try LoomPaths.sessionFolder(for: session.id)
+        if FileManager.default.fileExists(atPath: folderURL.path) {
+            try FileManager.default.removeItem(at: folderURL)
+        }
+
+        try await store.deleteSession(id: session.id)
         #expect(UserDefaults.standard.string(forKey: modelKey) == nil)
     }
 }
