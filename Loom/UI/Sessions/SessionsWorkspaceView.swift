@@ -706,11 +706,12 @@ private struct MessageContentView: View {
 
     var body: some View {
         let displayContent = ChatDisplayFormatter.format(content)
+        let markdownSyntax = ChatDisplayFormatter.markdownSyntax(for: displayContent)
 
         Group {
             if let attributed = try? AttributedString(
                 markdown: displayContent,
-                options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .full)
+                options: AttributedString.MarkdownParsingOptions(interpretedSyntax: markdownSyntax)
             ) {
                 Text(attributed)
             } else {
@@ -741,12 +742,17 @@ nonisolated enum ChatDisplayFormatter {
     private static let markdownBulletRegex = makeRegex("(?m)^\\s*[-*]\\s+")
     private static let markdownNumberedRegex = makeRegex("(?m)^\\s*\\d+[\\.)]\\s+")
     private static let markdownHeadingRegex = makeRegex("(?m)^\\s*#+\\s+")
+    private static let markdownBlockQuoteRegex = makeRegex("(?m)^\\s*>\\s+")
     private static let sentenceSpacingRegex = makeRegex("([A-Za-z][.!?])([A-Z])")
     private static let sentenceQuoteSpacingRegex = makeRegex("([A-Za-z][.!?][\"”’])([A-Z])")
     private static let collapsedHeadingRegex = makeRegex("([a-z]{2,})([A-Z][a-z]{2,})(\\s+[A-Z][A-Za-z]{2,}:)")
     private static let collapsedTrailingHeadingRegex = makeRegex("([a-z]{2,})([A-Z][a-z]{2,}:)")
-    private static let sectionAfterPunctuationRegex = makeRegex("([.!?])\\s*(?=[A-Z][A-Za-z]{2,}(?: [A-Z][A-Za-z]{2,}){0,4}:)")
+    private static let sectionAfterPunctuationRegex = makeRegex("([.!?])\\s*(?=[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:)")
     private static let sectionAfterLabelRegex = makeRegex("([A-Za-z][A-Za-z ]{2,40}:)\\s*(?=[A-Z])")
+    private static let inlineLabelRegex = makeRegex("\\b[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:")
+    private static let denseLabelBoundaryRegex = makeRegex("(?<=[a-z0-9\\)])(?=[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:)")
+    private static let spacedLabelBoundaryRegex = makeRegex("(?<=[a-z0-9\\)])\\s+(?=[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:)")
+    private static let denseCollapsedWordRegex = makeRegex("([a-z]{4,})([A-Z][a-z]{3,})")
     private static let listAfterPunctuationNumberedParenRegex = makeRegex("([.!?:;])\\s*(\\d+\\)\\s*)")
     private static let listAfterPunctuationNumberedDotRegex = makeRegex("([.!?:;])\\s+(\\d+\\.\\s+)")
     private static let listAfterPunctuationBulletRegex = makeRegex("([.!?:;])\\s*([•*\\-]\\s+)")
@@ -762,7 +768,7 @@ nonisolated enum ChatDisplayFormatter {
 
         let trimmed = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return raw }
-        let hadMarkdownStructure = containsMarkdownStructure(trimmed)
+        let hadBlockMarkdown = containsBlockMarkdown(trimmed)
 
         // Repair common "no-space after punctuation" without touching URLs/versions.
         var working = repairSentenceSpacing(in: trimmed)
@@ -772,8 +778,10 @@ nonisolated enum ChatDisplayFormatter {
         working = normalizeSectionBoundaries(in: working)
         // Normalize list markers and split inline lists onto their own lines.
         working = normalizeListMarkers(in: working)
+        // Split dense inline label runs like "...collisionsBuild a foundation:".
+        working = splitDenseInlineLabels(in: working)
 
-        guard shouldAutoFormat(working, hadMarkdownStructure: hadMarkdownStructure) else { return working }
+        guard shouldAutoFormat(working, hadBlockMarkdown: hadBlockMarkdown) else { return working }
 
         let sentenceChunks = splitIntoSentences(working)
         guard sentenceChunks.count >= 2 else { return working }
@@ -812,12 +820,18 @@ nonisolated enum ChatDisplayFormatter {
         return formatted.isEmpty ? working : formatted
     }
 
-    private static func shouldAutoFormat(_ text: String, hadMarkdownStructure: Bool) -> Bool {
-        guard text.count >= 80 else { return false }
-        guard !text.contains("```") else { return false }
+    static func markdownSyntax(for text: String) -> AttributedString.MarkdownParsingOptions.InterpretedSyntax {
+        if containsBlockMarkdown(text) {
+            return .full
+        }
+        return .inlineOnlyPreservingWhitespace
+    }
+
+    private static func shouldAutoFormat(_ text: String, hadBlockMarkdown: Bool) -> Bool {
+        guard text.count >= 48 else { return false }
         guard !text.contains("\n\n") else { return false }
-        guard !containsMarkdownStructure(text) else { return false }
-        guard !hadMarkdownStructure else { return false }
+        guard !containsBlockMarkdown(text) else { return false }
+        guard !hadBlockMarkdown else { return false }
         return true
     }
 
@@ -825,6 +839,14 @@ nonisolated enum ChatDisplayFormatter {
         containsMatch(markdownBulletRegex, in: text)
             || containsMatch(markdownNumberedRegex, in: text)
             || containsMatch(markdownHeadingRegex, in: text)
+    }
+
+    private static func containsBlockMarkdown(_ text: String) -> Bool {
+        if text.contains("```") {
+            return true
+        }
+        return containsMarkdownStructure(text)
+            || containsMatch(markdownBlockQuoteRegex, in: text)
     }
 
     private static func repairSentenceSpacing(in text: String) -> String {
@@ -842,6 +864,16 @@ nonisolated enum ChatDisplayFormatter {
     private static func normalizeSectionBoundaries(in text: String) -> String {
         var working = regexReplace(sectionAfterPunctuationRegex, in: text, with: "$1\n\n")
         working = regexReplace(sectionAfterLabelRegex, in: working, with: "$1\n\n")
+        return working
+    }
+
+    private static func splitDenseInlineLabels(in text: String) -> String {
+        let labelCount = matchCount(inlineLabelRegex, in: text)
+        guard labelCount >= 3 else { return text }
+
+        var working = regexReplace(denseLabelBoundaryRegex, in: text, with: "\n\n")
+        working = regexReplace(spacedLabelBoundaryRegex, in: working, with: "\n\n")
+        working = regexReplace(denseCollapsedWordRegex, in: working, with: "$1 $2")
         return working
     }
 
@@ -904,6 +936,11 @@ nonisolated enum ChatDisplayFormatter {
     private static func containsMatch(_ regex: NSRegularExpression, in text: String) -> Bool {
         let range = NSRange(text.startIndex..., in: text)
         return regex.firstMatch(in: text, options: [], range: range) != nil
+    }
+
+    private static func matchCount(_ regex: NSRegularExpression, in text: String) -> Int {
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.numberOfMatches(in: text, options: [], range: range)
     }
 
     private static func regexReplace(_ regex: NSRegularExpression, in text: String, with template: String) -> String {

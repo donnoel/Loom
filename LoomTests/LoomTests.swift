@@ -324,4 +324,54 @@ struct ChatDisplayFormatterTests {
         #expect(!formatted.contains("isConsidered"))
         #expect(!formatted.contains("OtherSciences"))
     }
+
+    @Test
+    func formatAddsParagraphBreaksForDenseShortReplies() {
+        let input = "Loom is local. It stores chats on your Mac. You can stop any reply."
+        let formatted = ChatDisplayFormatter.format(input)
+
+        #expect(formatted.contains("\n\n"))
+    }
+
+    @Test
+    func markdownSyntaxPreservesLineBreaksForPlainText() {
+        let input = "Line one.\nLine two."
+        let syntax = ChatDisplayFormatter.markdownSyntax(for: input)
+
+        #expect({
+            if case .inlineOnlyPreservingWhitespace = syntax {
+                return true
+            }
+            return false
+        }())
+    }
+
+    @Test
+    func markdownSyntaxUsesFullForMarkdownLists() {
+        let input = "- One\n- Two"
+        let syntax = ChatDisplayFormatter.markdownSyntax(for: input)
+
+        #expect({
+            if case .full = syntax {
+                return true
+            }
+            return false
+        }())
+    }
+
+    @Test
+    func formatSplitsDenseInlineLabelRunsIntoParagraphs() {
+        let input = """
+        Physics is a vast and fascinating field that seeks to understand the fundamental laws governing the behavior of the physical universe. It's a subject that has been instrumental in shaping our understanding of the world around us, from the smallest subatomic particles to the entire cosmos.To get started with learning physics, here are some steps you can follow:Understand the basics: Start by learning about the fundamental concepts of physics, such as:Motion: speed, velocity, accelerationEnergy: types (kinetic, potential, thermal), conversionsForces: friction, gravity, normal forceWork and energy transfersMomentum and collisionsBuild a strong foundation in math: Physics relies heavily on mathematical concepts, particularly algebra, geometry, and calculus.Explore different areas of physics: There are many subfields within physics, such as:Mechanics: kinematics, dynamics, energyThermodynamics: heat transfer, temperature, entropyElectromagnetism: electric fields, magnetic fields, electromagnetic wavesQuantum mechanics: wave-particle duality, Schrodinger equationUse online resources: There are many excellent online resources available to learn physics.
+        """
+
+        let formatted = ChatDisplayFormatter.format(input)
+
+        #expect(formatted.contains("\n\nBuild a strong foundation in math:"))
+        #expect(formatted.contains("\n\nExplore different areas of physics:"))
+        #expect(formatted.contains("\n\nUse online resources:"))
+        #expect(!formatted.contains("forceWork"))
+        #expect(!formatted.contains("transfersMomentum"))
+        #expect(!formatted.contains("equationUse"))
+    }
 }

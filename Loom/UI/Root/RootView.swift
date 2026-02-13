@@ -37,12 +37,12 @@ private struct AppInfoView: View {
             CompanyCitation(
                 company: "Apple",
                 role: "macOS platform and SwiftUI interface framework used by Loom.",
-                url: URL(string: "https://developer.apple.com/xcode/swiftui/")!
+                url: URL(string: "https://developer.apple.com/xcode/")!
             ),
             CompanyCitation(
                 company: "Ollama",
                 role: "Local runtime that loads and runs models on your Mac.",
-                url: URL(string: "https://docs.ollama.com/")!
+                url: URL(string: "https://www.llama.com")!
             )
         ]
 
@@ -70,7 +70,7 @@ private struct AppInfoView: View {
             "Qwen": CompanyCitation(
                 company: "Alibaba Cloud (Qwen)",
                 role: "Organization behind the Qwen model family.",
-                url: URL(string: "https://www.alibabacloud.com/help/en/model-studio/getting-started/what-is-qwen")!
+                url: URL(string: "https://www.alibabacloud.com/en/solutions/generative-ai/qwen?_p_lc=1")!
             )
         ]
 

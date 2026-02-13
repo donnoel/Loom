@@ -29,7 +29,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 🗂️ **Session Workspace** | Create, rename, delete, and sort sessions by recent activity. |
 | 💾 **Disk-Backed Persistence** | Each session stores `metadata.json` + append-only `messages.jsonl`. |
 | ⚡ **Streaming Assistant Replies** | Assistant responses stream live into the UI as tokens arrive. |
-| ✍️ **Readable Chat Formatting** | Assistant text is auto-formatted into human-readable paragraphs and list-friendly markdown when raw output arrives as a dense block. |
+| ✍️ **Readable Chat Formatting** | Assistant text is auto-formatted into human-readable paragraphs and list-friendly markdown when raw output arrives as a dense block, while preserving plain-text line breaks when markdown structure is absent. |
 | ⏹️ **Stop Generation** | Cancel generation any time and keep the partial assistant response. |
 | 🧠 **Helpful Setup Gating** | Clear in-context guidance if no active model is selected or Ollama is unavailable. |
 | 🧩 **Model Picker** | View installed Ollama models with plain-language "good for" guidance plus maker/country and last-trained details, use streamlined actions (Set Active / Update / Delete), and keep model selection across launches until you change it. |
