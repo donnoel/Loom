@@ -815,6 +815,86 @@ struct SessionMessagesViewModelCoverageTests {
 
     @Test
     @MainActor
+    func retryLastReplyWithoutContextShowsHelpfulGuidance() async throws {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Retry Guidance")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)),
+            chatClient: ScriptedChatClient([.complete(["unused"])])
+        )
+
+        await vm.retryLastReply()
+
+        #expect(vm.banner?.text == "There isn’t a previous reply to retry yet.")
+        #expect(vm.banner?.actionTitle == nil)
+        #expect(vm.banner?.action == nil)
+    }
+
+    @Test
+    @MainActor
+    func sendDraftWhenModelIsUnavailableShowsChooseModelRecovery() async throws {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Missing Model Recovery")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)),
+            chatClient: ScriptedChatClient([.fail([], .serverError("model 'llama3' not found"))])
+        )
+
+        vm.draft = "Hello"
+        await vm.sendDraft()
+        await waitUntil { !vm.isGenerating }
+
+        #expect(vm.banner?.text == "Loom can’t use this model right now. Choose another model.")
+        #expect(vm.banner?.actionTitle == "Choose Model")
+        #expect(vm.banner?.action == .browseModels)
+    }
+
+    @Test
+    @MainActor
+    func sendDraftWhenModelIsLoadingShowsRetryGuidance() async throws {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Model Loading Recovery")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)),
+            chatClient: ScriptedChatClient([.fail([], .serverError("model is loading"))])
+        )
+
+        vm.draft = "Hello"
+        await vm.sendDraft()
+        await waitUntil { !vm.isGenerating }
+
+        #expect(vm.banner?.text == "That model is still loading. Try again in a moment.")
+        #expect(vm.banner?.actionTitle == "Retry")
+        #expect(vm.banner?.action == .retryLastReply)
+    }
+
+    @Test
+    @MainActor
     func sendDraftAfterModelChangeAndViewReloadUsesUserOnlyContext() async throws {
         clearModelSelectionPreference()
         defer { clearModelSelectionPreference() }

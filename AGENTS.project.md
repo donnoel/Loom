@@ -55,6 +55,8 @@ Additional expectations:
 Use plain language and actionable buttons.
 - No active model: **"Choose a model to chat with."**
 - Ollama unreachable: **"Loom can’t reach Ollama. Start it to continue."**
+- Selected model unavailable: **"Loom can’t use this model right now. Choose another model."**
+- Model still loading: **"That model is still loading. Try again in a moment."**
 - Avoid jargon (ports, localhost, API details) in user-facing copy.
 
 ## User experience goals

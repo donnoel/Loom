@@ -163,6 +163,11 @@ final class SessionMessagesViewModel {
     func retryLastReply() async {
         guard !isGenerating else { return }
         guard let context = lastStreamContext else {
+            banner = BannerState(
+                text: "There isn’t a previous reply to retry yet.",
+                actionTitle: nil,
+                action: nil
+            )
             return
         }
         guard let model = selectedActiveModelTag ?? lastStreamModel else {
@@ -319,21 +324,74 @@ final class SessionMessagesViewModel {
     }
 
     private func handleStreamFailure(_ error: Error) {
-        if let streamError = error as? OllamaChatClient.StreamError,
-           case .ollamaUnavailable = streamError {
-            banner = BannerState(
-                text: "Loom can’t reach Ollama. Start it to continue.",
-                actionTitle: OllamaClient.detectInstalled() ? "Start Ollama" : "Install Ollama…",
-                action: .openOrInstallOllama
-            )
-            return
+        if let streamError = error as? OllamaChatClient.StreamError {
+            switch streamError {
+            case .ollamaUnavailable:
+                banner = BannerState(
+                    text: "Loom can’t reach Ollama. Start it to continue.",
+                    actionTitle: OllamaClient.detectInstalled() ? "Start Ollama" : "Install Ollama…",
+                    action: .openOrInstallOllama
+                )
+                return
+
+            case .serverError(let message) where isModelUnavailableErrorMessage(message):
+                banner = BannerState(
+                    text: "Loom can’t use this model right now. Choose another model.",
+                    actionTitle: "Choose Model",
+                    action: .browseModels
+                )
+                return
+
+            case .serverError(let message) where isModelLoadingErrorMessage(message):
+                banner = BannerState(
+                    text: "That model is still loading. Try again in a moment.",
+                    actionTitle: "Retry",
+                    action: .retryLastReply
+                )
+                return
+
+            default:
+                break
+            }
         }
 
         banner = BannerState(
-            text: "Connection lost. Try again.",
+            text: "Loom lost connection while generating. Try again.",
             actionTitle: "Retry",
             action: .retryLastReply
         )
+    }
+
+    private func isModelUnavailableErrorMessage(_ message: String) -> Bool {
+        let normalized = normalizedServerErrorMessage(message)
+        if normalized.contains("unknown model") {
+            return true
+        }
+        if normalized.contains("model") && normalized.contains("not found") {
+            return true
+        }
+        if normalized.contains("model") && normalized.contains("does not exist") {
+            return true
+        }
+        return false
+    }
+
+    private func isModelLoadingErrorMessage(_ message: String) -> Bool {
+        let normalized = normalizedServerErrorMessage(message)
+        if normalized.contains("model is loading") {
+            return true
+        }
+        if normalized.contains("loading model") {
+            return true
+        }
+        if normalized.contains("model loading") {
+            return true
+        }
+        return false
+    }
+
+    private func normalizedServerErrorMessage(_ message: String) -> String {
+        message.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
     private func persistAssistantMessage(id: UUID, forcePersist: Bool) async {
