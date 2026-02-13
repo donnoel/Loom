@@ -92,6 +92,11 @@ private actor StubOllamaClient: OllamaStatusProviding {
 }
 
 private actor ScriptedChatClient: OllamaChatStreaming {
+    struct RecordedRequest: Sendable, Equatable {
+        let model: String
+        let messages: [ChatMessage]
+    }
+
     enum Step: Sendable {
         case complete([String])
         case fail([String], OllamaChatClient.StreamError)
@@ -99,6 +104,7 @@ private actor ScriptedChatClient: OllamaChatStreaming {
     }
 
     private var steps: [Step]
+    private var recordedRequests: [RecordedRequest] = []
 
     init(_ steps: [Step]) {
         self.steps = steps
@@ -109,6 +115,7 @@ private actor ScriptedChatClient: OllamaChatStreaming {
         messages: [ChatMessage],
         onDelta: @Sendable (String) async -> Void
     ) async throws {
+        recordedRequests.append(RecordedRequest(model: model, messages: messages))
         guard !steps.isEmpty else { return }
         let step = steps.removeFirst()
 
@@ -133,6 +140,10 @@ private actor ScriptedChatClient: OllamaChatStreaming {
             }
             throw CancellationError()
         }
+    }
+
+    func readRecordedRequests() -> [RecordedRequest] {
+        recordedRequests
     }
 }
 
@@ -799,6 +810,53 @@ struct SessionMessagesViewModelCoverageTests {
         #expect(vm.banner == nil)
         #expect(vm.messages.count == 2)
         #expect(vm.messages.last?.content == "Recovered")
+    }
+
+    @Test
+    @MainActor
+    func sendDraftAfterModelChangeAndViewReloadUsesUserOnlyContext() async throws {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Reloaded Model Switch")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let chatClient = ScriptedChatClient([
+            .complete(["Old model answer"]),
+            .complete(["New model answer"])
+        ])
+        let ollamaClient = StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true))
+
+        let firstViewModel = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: ollamaClient,
+            chatClient: chatClient
+        )
+
+        await sendDraftWithModelRetry(firstViewModel, draft: "Question one", modelTag: "llama3")
+        await waitUntil { !firstViewModel.isGenerating }
+
+        let reloadedViewModel = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: ollamaClient,
+            chatClient: chatClient
+        )
+        await reloadedViewModel.load()
+
+        await sendDraftWithModelRetry(reloadedViewModel, draft: "Question two", modelTag: "phi4")
+        await waitUntil { !reloadedViewModel.isGenerating }
+
+        let requests = await chatClient.readRecordedRequests()
+        #expect(requests.count == 2)
+        #expect(requests.map(\.model) == ["llama3", "phi4"])
+
+        if requests.count == 2 {
+            #expect(requests[1].messages.allSatisfy { $0.role == .user })
+            #expect(requests[1].messages.map(\.content) == ["Question one", "Question two"])
+        }
     }
 
     @Test

@@ -22,6 +22,7 @@ final class SessionMessagesViewModel {
     private let ollamaClient: any OllamaStatusProviding
     private let chatClient: any OllamaChatStreaming
     private let streamUpdateInterval: Duration = .milliseconds(60)
+    private static let sessionLastStreamModelKeyPrefix = "sessionLastStreamModel."
 
     var messages: [ChatMessage] = []
     var draft: String = ""
@@ -47,6 +48,7 @@ final class SessionMessagesViewModel {
         self.onActivity = onActivity
         self.ollamaClient = ollamaClient
         self.chatClient = chatClient ?? OllamaChatClient(ollamaClient: ollamaClient)
+        self.lastStreamModel = Self.storedLastStreamModel(for: sessionID)
     }
 
     init(
@@ -61,6 +63,7 @@ final class SessionMessagesViewModel {
         self.onActivity = onActivity
         self.ollamaClient = ollamaClient
         self.chatClient = chatClient
+        self.lastStreamModel = Self.storedLastStreamModel(for: sessionID)
     }
 
     func load() async {
@@ -91,7 +94,7 @@ final class SessionMessagesViewModel {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
 
-        guard let activeModel = UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag)?.nonEmptyTrimmed else {
+        guard let activeModel = selectedActiveModelTag else {
             banner = BannerState(
                 text: "Choose a model to chat with.",
                 actionTitle: "Choose Model",
@@ -136,8 +139,14 @@ final class SessionMessagesViewModel {
         generatingMessageID = assistantPlaceholder.id
         generatingMessageIndex = messages.index(before: messages.endIndex)
 
-        let context = contextMessages(excluding: assistantPlaceholder.id, limit: 20)
+        let context: [ChatMessage]
+        if didSwitchModels(from: lastStreamModel, to: activeModel) {
+            context = contextMessagesForModelSwitch(limit: 20)
+        } else {
+            context = contextMessages(excluding: assistantPlaceholder.id, limit: 20)
+        }
         lastStreamModel = activeModel
+        persistLastStreamModel(activeModel)
         lastStreamContext = context
         lastStreamPlaceholderID = assistantPlaceholder.id
 
@@ -154,9 +163,22 @@ final class SessionMessagesViewModel {
 
     func retryLastReply() async {
         guard !isGenerating else { return }
-        guard let model = lastStreamModel,
-              let context = lastStreamContext else {
+        guard let context = lastStreamContext else {
             return
+        }
+        guard let model = selectedActiveModelTag ?? lastStreamModel else {
+            banner = BannerState(
+                text: "Choose a model to chat with.",
+                actionTitle: "Choose Model",
+                action: .browseModels
+            )
+            return
+        }
+        let effectiveContext: [ChatMessage]
+        if didSwitchModels(from: lastStreamModel, to: model) {
+            effectiveContext = contextMessagesForModelSwitch(limit: 20)
+        } else {
+            effectiveContext = context
         }
 
         let diagnosis = await ollamaClient.diagnose()
@@ -180,13 +202,50 @@ final class SessionMessagesViewModel {
         generatingMessageIndex = messages.index(before: messages.endIndex)
         isGenerating = true
         banner = nil
+        lastStreamModel = model
+        persistLastStreamModel(model)
+        lastStreamContext = effectiveContext
         lastStreamPlaceholderID = freshPlaceholder.id
 
         startStreamingReply(
             model: model,
             placeholderID: freshPlaceholder.id,
-            context: context
+            context: effectiveContext
         )
+    }
+
+    private var selectedActiveModelTag: String? {
+        UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag)?.nonEmptyTrimmed
+    }
+
+    private func contextMessagesForModelSwitch(limit: Int) -> [ChatMessage] {
+        guard limit > 0 else { return [] }
+        let userOnlyMessages = messages.filter { $0.role == .user }
+        guard userOnlyMessages.count > limit else {
+            return userOnlyMessages
+        }
+        return Array(userOnlyMessages.suffix(limit))
+    }
+
+    private func didSwitchModels(from previousModel: String?, to currentModel: String?) -> Bool {
+        guard let previousModel = previousModel?.nonEmptyTrimmed,
+              let currentModel = currentModel?.nonEmptyTrimmed else {
+            return false
+        }
+        return previousModel != currentModel
+    }
+
+    private func persistLastStreamModel(_ model: String) {
+        guard let model = model.nonEmptyTrimmed else { return }
+        UserDefaults.standard.set(model, forKey: Self.sessionLastStreamModelKey(for: sessionID))
+    }
+
+    private static func storedLastStreamModel(for sessionID: UUID) -> String? {
+        UserDefaults.standard.string(forKey: sessionLastStreamModelKey(for: sessionID))?.nonEmptyTrimmed
+    }
+
+    private static func sessionLastStreamModelKey(for sessionID: UUID) -> String {
+        "\(sessionLastStreamModelKeyPrefix)\(sessionID.uuidString)"
     }
 
     private func startStreamingReply(model: String, placeholderID: UUID, context: [ChatMessage]) {

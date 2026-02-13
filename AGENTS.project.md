@@ -48,6 +48,7 @@ Additional expectations:
 - Keep the user draft intact if send fails.
 - Throttle/coalesce streaming UI updates (currently ~50ms).
 - Keep context bounded (currently last 20 messages).
+- If active model changes for a session (including after leaving and returning), use user-only context for the next turn to avoid old-model anchoring.
 - Avoid full message-list reload per token.
 
 ## Setup-gating UX rules
