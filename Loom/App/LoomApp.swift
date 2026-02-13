@@ -4,12 +4,14 @@ import SwiftUI
 struct LoomApp: App {
     private let store = SessionStore()
     private static let uiTestResetDefaultsEnvironmentKey = "LOOM_UI_TEST_RESET_DEFAULTS"
-    private static let xCTestConfigurationPathEnvironmentKey = "XCTestConfigurationFilePath"
+    private static let uiTestResetStorageEnvironmentKey = "LOOM_UI_TEST_RESET_STORAGE"
+    private static let uiTestActiveModelTagEnvironmentKey = "LOOM_UI_TEST_ACTIVE_MODEL_TAG"
+    private static let uiTestChatScenarioEnvironmentKey = "LOOM_UI_TEST_CHAT_STUB_SCENARIO"
+    private static let uiTestChatScenarioDefaultsKey = "loom.uiTest.chatScenario"
 
     init() {
         let environment = ProcessInfo.processInfo.environment
-        guard environment[Self.uiTestResetDefaultsEnvironmentKey] == "1",
-              environment[Self.xCTestConfigurationPathEnvironmentKey] != nil else {
+        guard environment[Self.uiTestResetDefaultsEnvironmentKey] == "1" else {
             return
         }
 
@@ -17,6 +19,26 @@ struct LoomApp: App {
         defaults.removeObject(forKey: LoomPreferenceKeys.activeModelTag)
         defaults.removeObject(forKey: LoomPreferenceKeys.statusAutoRefreshEnabled)
         defaults.removeObject(forKey: LoomPreferenceKeys.modelsAutoCheckEnabled)
+        defaults.removeObject(forKey: Self.uiTestChatScenarioDefaultsKey)
+
+        if environment[Self.uiTestResetStorageEnvironmentKey] == "1" {
+            if let sessionsRoot = try? LoomPaths.sessionsRoot(),
+               FileManager.default.fileExists(atPath: sessionsRoot.path) {
+                try? FileManager.default.removeItem(at: sessionsRoot)
+            }
+        }
+
+        if let activeModelTag = environment[Self.uiTestActiveModelTagEnvironmentKey]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !activeModelTag.isEmpty {
+            defaults.set(activeModelTag, forKey: LoomPreferenceKeys.activeModelTag)
+        }
+
+        if let chatScenario = environment[Self.uiTestChatScenarioEnvironmentKey]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !chatScenario.isEmpty {
+            defaults.set(chatScenario.lowercased(), forKey: Self.uiTestChatScenarioDefaultsKey)
+        }
     }
 
     var body: some Scene {

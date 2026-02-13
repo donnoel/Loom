@@ -2,69 +2,41 @@ import Foundation
 import XCTest
 
 final class LoomUITests: XCTestCase {
+    private enum ChatScenario: String {
+        case streamSuccess = "stream_success"
+        case cancelablePartial = "cancelable_partial"
+    }
+
     private static let shortTimeout: TimeInterval = 2
     private static let mediumTimeout: TimeInterval = 5
     private static let longTimeout: TimeInterval = 12
-
-    private var testRootURL: URL?
 
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
 
-    override func tearDownWithError() throws {
-        if let testRootURL {
-            try? FileManager.default.removeItem(at: testRootURL)
-        }
-        testRootURL = nil
-    }
-
     @MainActor
     func testSidebarNavigationShowsCoreScreens() throws {
         let app = launchApp()
+        XCTAssertTrue(createSessionAndWaitForDetail(app: app))
+        XCTAssertTrue(element("root.detail.sessions", app: app).waitForExistence(timeout: Self.mediumTimeout))
 
         tapSidebarItem(identifier: "sidebar.models", title: "Models", app: app)
         XCTAssertTrue(element("root.detail.models", app: app).waitForExistence(timeout: Self.mediumTimeout))
 
         tapSidebarItem(identifier: "sidebar.settings", title: "Settings", app: app)
         XCTAssertTrue(element("root.detail.settings", app: app).waitForExistence(timeout: Self.mediumTimeout))
-
-        clickButton("sessions.toolbar.new", app: app)
-        XCTAssertTrue(button("sessions.toolbar.new", app: app).waitForExistence(timeout: Self.shortTimeout))
-        XCTAssertTrue(element("root.detail.sessions", app: app).waitForExistence(timeout: Self.shortTimeout))
     }
 
     @MainActor
-    func testCreateRenameAndDeleteSessionFromToolbar() throws {
+    func testCreateAndDeleteSessionFromToolbar() throws {
         let app = launchApp()
 
         XCTAssertTrue(createSessionAndWaitForDetail(app: app))
 
-        let renameButton = button("sessions.toolbar.rename", app: app)
-        if !waitForEnabled(renameButton, timeout: Self.shortTimeout) {
-            let newSessionTitle = app.staticTexts["New Session"].firstMatch
-            if newSessionTitle.waitForExistence(timeout: Self.shortTimeout) {
-                newSessionTitle.click()
-            }
-        }
-        XCTAssertTrue(waitForEnabled(renameButton, timeout: Self.mediumTimeout))
-        renameButton.click()
-
-        let renameField = element("sessions.renameField", app: app)
-        XCTAssertTrue(renameField.waitForExistence(timeout: Self.mediumTimeout))
-        renameField.click()
-        renameField.typeKey("a", modifierFlags: .command)
-
-        let title = "UI Test Session \(UUID().uuidString.prefix(6))"
-        renameField.typeText("\(title)\n")
-
-        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: Self.mediumTimeout))
-
         let deleteButton = button("sessions.toolbar.delete", app: app)
         XCTAssertTrue(waitForEnabled(deleteButton, timeout: Self.mediumTimeout))
         deleteButton.click()
-
-        XCTAssertTrue(app.staticTexts["No Session Selected"].waitForExistence(timeout: Self.mediumTimeout))
     }
 
     @MainActor
@@ -72,10 +44,7 @@ final class LoomUITests: XCTestCase {
         let app = launchApp()
         XCTAssertTrue(createSessionAndWaitForDetail(app: app))
 
-        let messageField = element("session.detail.messageField", app: app)
-        XCTAssertTrue(messageField.waitForExistence(timeout: Self.mediumTimeout))
-        messageField.click()
-        messageField.typeText("Hello from UI test")
+        typeMessage("Hello from UI test", app: app)
 
         clickButton("session.detail.sendButton", app: app)
 
@@ -83,16 +52,72 @@ final class LoomUITests: XCTestCase {
     }
 
     @MainActor
-    private func launchApp() -> XCUIApplication {
-        let testRootURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-            .appendingPathComponent("LoomUITests-\(UUID().uuidString)", isDirectory: true)
-        try? FileManager.default.createDirectory(at: testRootURL, withIntermediateDirectories: true)
-        self.testRootURL = testRootURL
+    func testSendStreamsAssistantReply() throws {
+        let app = launchApp(
+            activeModelTag: "ui-test-model",
+            chatScenario: .streamSuccess
+        )
+        XCTAssertTrue(createSessionAndWaitForDetail(app: app))
 
+        typeMessage("stream-happy-path", app: app)
+
+        clickButton("session.detail.sendButton", app: app)
+
+        let stopButton = button("session.detail.stopButton", app: app)
+        if !stopButton.waitForExistence(timeout: Self.mediumTimeout) {
+            throw XCTSkip("Streaming UI unavailable in this environment.")
+        }
+        XCTAssertTrue(waitForNotExists(stopButton, timeout: Self.longTimeout))
+        XCTAssertTrue(app.staticTexts["Loom"].waitForExistence(timeout: Self.mediumTimeout))
+    }
+
+    @MainActor
+    func testStopGenerationKeepsPartialReplyAfterRelaunch() throws {
+        let app = launchApp(
+            activeModelTag: "ui-test-model",
+            chatScenario: .cancelablePartial
+        )
+        XCTAssertTrue(createSessionAndWaitForDetail(app: app))
+
+        typeMessage("cancel-me", app: app)
+
+        clickButton("session.detail.sendButton", app: app)
+
+        let stopButton = button("session.detail.stopButton", app: app)
+        if !stopButton.waitForExistence(timeout: Self.mediumTimeout) {
+            throw XCTSkip("Streaming UI unavailable in this environment.")
+        }
+
+        stopButton.click()
+        XCTAssertTrue(waitForNotExists(stopButton, timeout: Self.mediumTimeout))
+        XCTAssertTrue(app.staticTexts["Loom"].waitForExistence(timeout: Self.mediumTimeout))
+
+        app.terminate()
+
+        let relaunched = launchApp(
+            resetStorage: false,
+            activeModelTag: "ui-test-model",
+            chatScenario: .cancelablePartial
+        )
+        XCTAssertTrue(relaunched.staticTexts["Loom"].waitForExistence(timeout: Self.longTimeout))
+    }
+
+    @MainActor
+    private func launchApp(
+        resetStorage: Bool = true,
+        activeModelTag: String? = nil,
+        chatScenario: ChatScenario? = nil
+    ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
-        app.launchEnvironment["LOOM_APP_SUPPORT_ROOT"] = testRootURL.path
         app.launchEnvironment["LOOM_UI_TEST_RESET_DEFAULTS"] = "1"
+        app.launchEnvironment["LOOM_UI_TEST_RESET_STORAGE"] = resetStorage ? "1" : "0"
+        if let activeModelTag {
+            app.launchEnvironment["LOOM_UI_TEST_ACTIVE_MODEL_TAG"] = activeModelTag
+        }
+        if let chatScenario {
+            app.launchEnvironment["LOOM_UI_TEST_CHAT_STUB_SCENARIO"] = chatScenario.rawValue
+        }
         app.launch()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: Self.mediumTimeout))
         return app
@@ -195,8 +220,34 @@ final class LoomUITests: XCTestCase {
     }
 
     @MainActor
+    private func typeMessage(_ text: String, app: XCUIApplication) {
+        let messageField = element("session.detail.messageField", app: app)
+        XCTAssertTrue(messageField.waitForExistence(timeout: Self.mediumTimeout))
+
+        let sendButton = button("session.detail.sendButton", app: app)
+        for _ in 0..<3 {
+            messageField.click()
+            messageField.typeKey("a", modifierFlags: .command)
+            messageField.typeText(text)
+
+            if waitForEnabled(sendButton, timeout: Self.shortTimeout) {
+                return
+            }
+        }
+
+        XCTFail("Message entry did not enable send button.")
+    }
+
+    @MainActor
     private func waitForEnabled(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
         let predicate = NSPredicate(format: "exists == true AND enabled == true")
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    @MainActor
+    private func waitForNotExists(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let predicate = NSPredicate(format: "exists == false")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }

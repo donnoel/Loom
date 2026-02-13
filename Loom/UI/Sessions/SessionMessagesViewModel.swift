@@ -22,6 +22,9 @@ final class SessionMessagesViewModel {
     private let ollamaClient: any OllamaStatusProviding
     private let chatClient: any OllamaChatStreaming
     private let streamUpdateInterval: Duration = .milliseconds(60)
+    private static let uiTestChatScenarioEnvironmentKey = "LOOM_UI_TEST_CHAT_STUB_SCENARIO"
+    private static let uiTestActiveModelTagEnvironmentKey = "LOOM_UI_TEST_ACTIVE_MODEL_TAG"
+    private static let uiTestChatScenarioDefaultsKey = "loom.uiTest.chatScenario"
 
     var messages: [ChatMessage] = []
     var draft: String = ""
@@ -45,8 +48,16 @@ final class SessionMessagesViewModel {
         self.store = store
         self.sessionID = sessionID
         self.onActivity = onActivity
-        self.ollamaClient = ollamaClient
-        self.chatClient = chatClient ?? OllamaChatClient(ollamaClient: ollamaClient)
+
+        if let scenario = Self.uiTestChatScenario() {
+            let uiTestModelTag = Self.uiTestActiveModelTag()
+            self.ollamaClient = UITestOllamaStatusClient(modelTag: uiTestModelTag)
+            self.chatClient = UITestOllamaChatClient(scenario: scenario)
+        } else {
+            self.ollamaClient = ollamaClient
+            self.chatClient = chatClient ?? OllamaChatClient(ollamaClient: ollamaClient)
+        }
+
         self.lastStreamModel = Self.storedLastStreamModel(for: sessionID)
     }
 
@@ -246,6 +257,26 @@ final class SessionMessagesViewModel {
 
     private static func storedLastStreamModel(for sessionID: UUID) -> String? {
         UserDefaults.standard.string(forKey: LoomPreferenceKeys.sessionLastStreamModelKey(for: sessionID))?.nonEmptyTrimmed
+    }
+
+    private static func uiTestChatScenario() -> UITestOllamaChatClient.Scenario? {
+        if let raw = ProcessInfo.processInfo.environment[uiTestChatScenarioEnvironmentKey]?.nonEmptyTrimmed {
+            return UITestOllamaChatClient.Scenario(rawValue: raw.lowercased())
+        }
+        if let raw = UserDefaults.standard.string(forKey: uiTestChatScenarioDefaultsKey)?.nonEmptyTrimmed {
+            return UITestOllamaChatClient.Scenario(rawValue: raw.lowercased())
+        }
+        return nil
+    }
+
+    private static func uiTestActiveModelTag() -> String {
+        if let tag = ProcessInfo.processInfo.environment[uiTestActiveModelTagEnvironmentKey]?.nonEmptyTrimmed {
+            return tag
+        }
+        if let tag = UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag)?.nonEmptyTrimmed {
+            return tag
+        }
+        return "ui-test-model"
     }
 
     private func startStreamingReply(model: String, placeholderID: UUID, context: [ChatMessage]) {
@@ -460,5 +491,66 @@ private actor StreamDeltaBuffer {
     func drain() -> String {
         defer { pending = "" }
         return pending
+    }
+}
+
+private actor UITestOllamaStatusClient: OllamaStatusProviding {
+    private let modelTag: String
+
+    init(modelTag: String) {
+        self.modelTag = modelTag
+    }
+
+    func diagnose() async -> OllamaDiagnosis {
+        OllamaDiagnosis(
+            isInstalled: true,
+            isRunning: true,
+            reachableBaseURL: URL(string: "http://localhost:11434"),
+            summary: "Ready",
+            nextStep: .ready
+        )
+    }
+
+    func listModels() async throws -> [OllamaModel] {
+        [OllamaModel(tag: modelTag)]
+    }
+
+    func deleteModel(name: String) async throws {}
+
+    func pullModel(name: String, onProgress: @Sendable (PullProgress) -> Void) async throws {}
+}
+
+private actor UITestOllamaChatClient: OllamaChatStreaming {
+    enum Scenario: String {
+        case streamSuccess = "stream_success"
+        case cancelablePartial = "cancelable_partial"
+    }
+
+    private let scenario: Scenario
+
+    init(scenario: Scenario) {
+        self.scenario = scenario
+    }
+
+    func streamChat(
+        model: String,
+        messages: [ChatMessage],
+        onDelta: @Sendable (String) async -> Void
+    ) async throws {
+        switch scenario {
+        case .streamSuccess:
+            for delta in ["Hello", " from", " stub", " response"] {
+                try Task.checkCancellation()
+                await onDelta(delta)
+                try await Task.sleep(for: .milliseconds(200))
+            }
+
+        case .cancelablePartial:
+            for _ in 0..<200 {
+                try Task.checkCancellation()
+                await onDelta("partial ")
+                try await Task.sleep(for: .milliseconds(120))
+            }
+        }
     }
 }
