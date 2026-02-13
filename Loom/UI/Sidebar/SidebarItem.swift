@@ -3,6 +3,7 @@ import Foundation
 nonisolated enum SidebarItem: String, Hashable, Identifiable, Sendable {
     case sessions
     case models
+    case info
     case status
     case settings
 
@@ -12,6 +13,7 @@ nonisolated enum SidebarItem: String, Hashable, Identifiable, Sendable {
         switch self {
         case .sessions: "Sessions"
         case .models: "Models"
+        case .info: "Info"
         case .status: "Status"
         case .settings: "Settings"
         }
@@ -21,6 +23,7 @@ nonisolated enum SidebarItem: String, Hashable, Identifiable, Sendable {
         switch self {
         case .sessions: "bubble.left.and.bubble.right"
         case .models: "cube.box"
+        case .info: "info.circle"
         case .status: "waveform.path.ecg"
         case .settings: "gearshape"
         }

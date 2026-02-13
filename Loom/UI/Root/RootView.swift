@@ -7,6 +7,207 @@ private enum SidebarSelection: Hashable {
     case session(Session.ID)
 }
 
+private struct AppInfoView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    private struct CompanyCitation: Identifiable {
+        let company: String
+        let role: String
+        let url: URL
+
+        var id: String { company }
+    }
+
+    private let catalog: ModelCatalog
+
+    init(catalog: ModelCatalog = .load()) {
+        self.catalog = catalog
+    }
+
+    private var modelVendors: [String] {
+        Array(Set(catalog.all.map(\.vendor))).sorted()
+    }
+
+    private var modelVendorListText: String {
+        modelVendors.joined(separator: ", ")
+    }
+
+    private var citations: [CompanyCitation] {
+        var references: [CompanyCitation] = [
+            CompanyCitation(
+                company: "Apple",
+                role: "macOS platform and SwiftUI interface framework used by Loom.",
+                url: URL(string: "https://developer.apple.com/xcode/swiftui/")!
+            ),
+            CompanyCitation(
+                company: "Ollama",
+                role: "Local runtime that loads and runs models on your Mac.",
+                url: URL(string: "https://docs.ollama.com/")!
+            )
+        ]
+
+        let providerByVendor: [String: CompanyCitation] = [
+            "Google": CompanyCitation(
+                company: "Google",
+                role: "Creator of Gemma models.",
+                url: URL(string: "https://deepmind.google/models/gemma/")!
+            ),
+            "Meta": CompanyCitation(
+                company: "Meta",
+                role: "Creator of Llama models.",
+                url: URL(string: "https://github.com/meta-llama/llama-models")!
+            ),
+            "Microsoft": CompanyCitation(
+                company: "Microsoft",
+                role: "Creator of Phi models.",
+                url: URL(string: "https://azure.microsoft.com/en-us/products/phi")!
+            ),
+            "Mistral AI": CompanyCitation(
+                company: "Mistral AI",
+                role: "Creator of Mistral models.",
+                url: URL(string: "https://docs.mistral.ai/getting-started/models/")!
+            ),
+            "Qwen": CompanyCitation(
+                company: "Alibaba Cloud (Qwen)",
+                role: "Organization behind the Qwen model family.",
+                url: URL(string: "https://www.alibabacloud.com/help/en/model-studio/getting-started/what-is-qwen")!
+            )
+        ]
+
+        for vendor in modelVendors {
+            if let citation = providerByVendor[vendor] {
+                references.append(citation)
+            }
+        }
+
+        return references
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                introCard
+                flowCard
+                modelsCard
+                citationsCard
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityIdentifier("screen.info")
+        .navigationTitle("Info")
+    }
+
+    private var introCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("How Loom works (plain English)")
+                .font(.title3.weight(.semibold))
+
+            Text("Loom is the chat workspace you see. Ollama is the local engine that does the heavy lifting. Models are the brains made by different AI companies.")
+                .foregroundStyle(.secondary)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(LoomTheme.accentGradient(for: colorScheme).opacity(colorScheme == .dark ? 0.28 : 0.16))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+        )
+    }
+
+    private var flowCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("What Happens When You Send A Message")
+                .font(.headline)
+
+            flowStep(
+                icon: "1.circle.fill",
+                title: "You type in Loom",
+                detail: "The app collects your message and keeps your project/session organized."
+            )
+            flowStep(
+                icon: "2.circle.fill",
+                title: "Loom talks to Ollama on this Mac",
+                detail: "Your message is sent to a local Ollama service, not a random cloud service."
+            )
+            flowStep(
+                icon: "3.circle.fill",
+                title: "Ollama runs your selected model",
+                detail: "The active model does the reasoning and creates the reply."
+            )
+            flowStep(
+                icon: "4.circle.fill",
+                title: "Reply streams back into Loom",
+                detail: "You see the answer appear live, and Loom keeps your chat history locally."
+            )
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .loomCard(cornerRadius: 12)
+    }
+
+    private func flowStep(icon: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
+                .foregroundStyle(Color.accentColor)
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(detail)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var modelsCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Model Makers In Loom")
+                .font(.headline)
+
+            Text("Current model providers in this catalog: \(modelVendorListText).")
+                .foregroundStyle(.secondary)
+
+            Text("Different models have different strengths. For example, some are better for writing, some for coding, and some for quick low-memory tasks.")
+                .foregroundStyle(.secondary)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .loomCard(cornerRadius: 12)
+    }
+
+    private var citationsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Citations")
+                .font(.headline)
+
+            Text("Official references for each company involved in this stack:")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            ForEach(citations) { citation in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(citation.company)
+                        .font(.subheadline.weight(.semibold))
+                    Text(citation.role)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Link(citation.url.absoluteString, destination: citation.url)
+                        .font(.caption.monospaced())
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .loomCard(cornerRadius: 12)
+    }
+}
+
 struct RootView: View {
     private let store: SessionStore
 
@@ -163,6 +364,7 @@ struct RootView: View {
             }
 
             Section("App") {
+                destinationSidebarRow(.info)
                 destinationSidebarRow(.settings)
             }
         }
@@ -182,6 +384,10 @@ struct RootView: View {
             )
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("root.detail.models")
+        case .destination(.info):
+            AppInfoView()
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("root.detail.info")
         case .destination(.settings):
             SettingsView(store: store)
                 .accessibilityElement(children: .contain)

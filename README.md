@@ -33,6 +33,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | ⏹️ **Stop Generation** | Cancel generation any time and keep the partial assistant response. |
 | 🧠 **Helpful Setup Gating** | Clear in-context guidance if no active model is selected or Ollama is unavailable. |
 | 🧩 **Model Picker** | View installed Ollama models with plain-language "good for" guidance plus maker/country and last-trained details, use streamlined actions (Set Active / Update / Delete), and keep model selection across launches until you change it. |
+| ℹ️ **System Info Sheet** | Open **App → Info** in the sidebar to see a plain-language walkthrough of how Loom, Ollama, and local models work together, with official source links per company. |
 | 📥 **In-App Model Install** | Use **Add Model…** to browse a curated catalog, review friendly model summaries, and install with live progress + cancel support. |
 | 🧹 **Model Cleanup** | Delete installed models directly from Loom (with confirmation and active-model safety checks). |
 | 💽 **Disk Awareness** | Model Library shows local free-space info and warns when free space is below 10%. |
