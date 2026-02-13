@@ -347,12 +347,12 @@ struct ChatDisplayFormatterTests {
     }
 
     @Test
-    func markdownSyntaxUsesFullForMarkdownLists() {
+    func markdownSyntaxStaysWhitespacePreservingForMarkdownLists() {
         let input = "- One\n- Two"
         let syntax = ChatDisplayFormatter.markdownSyntax(for: input)
 
         #expect({
-            if case .full = syntax {
+            if case .inlineOnlyPreservingWhitespace = syntax {
                 return true
             }
             return false
@@ -388,5 +388,29 @@ struct ChatDisplayFormatterTests {
         #expect(formatted.contains("\n\nInstructions:"))
         #expect(formatted.contains("\n\nCut the potatoes into strips:"))
         #expect(formatted.contains("\n\nHeat the oil:"))
+    }
+
+    @Test
+    func formatSplitsDenseBoldLabelBlocks() {
+        let input = """
+        Here's a guide:**Ingredients:**2 potatoes**Equipment:**Large pot**Instructions:**Wash potatoes**Cut:**Thin strips**Fry:**Until golden.
+        """
+
+        let formatted = ChatDisplayFormatter.format(input)
+
+        #expect(formatted.contains("\n\n**Ingredients:**\n2 potatoes"))
+        #expect(formatted.contains("\n\n**Equipment:**\nLarge pot"))
+        #expect(formatted.contains("\n\n**Instructions:**\nWash potatoes"))
+    }
+
+    @Test
+    func formatFallbackParagraphizesLongMixedMarkdownWhenStillDense() {
+        let input = """
+        1. prep potatoes. 2. heat oil. this is still one dense block with many steps and no helpful spacing even though a numbered token exists near the start and the response keeps running without clear breaks so it becomes hard to scan. keep frying in batches and season immediately while hot for best texture and flavor.
+        """
+
+        let formatted = ChatDisplayFormatter.format(input)
+
+        #expect(formatted.contains("\n\n"))
     }
 }

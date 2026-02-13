@@ -751,9 +751,12 @@ nonisolated enum ChatDisplayFormatter {
     private static let sectionAfterPunctuationRegex = makeRegex("([.!?])\\s*(?=[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:)")
     private static let sectionAfterLabelRegex = makeRegex("([A-Za-z][A-Za-z ]{2,40}:)\\s*(?=[A-Z])")
     private static let inlineLabelRegex = makeRegex("\\b[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:")
+    private static let boldInlineLabelRegex = makeRegex("\\*\\*[A-Z][^*]{1,80}:\\*\\*")
     private static let denseLabelBoundaryRegex = makeRegex("(?<=[a-z0-9\\):])(?=[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:)")
     private static let spacedLabelBoundaryRegex = makeRegex("(?<=[a-z0-9\\)])\\s+(?=[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:)")
     private static let labelValueBoundaryRegex = makeRegex("(?m)([A-Z][A-Za-z ]{2,80}:)\\s*(?=[0-9A-Za-z])")
+    private static let denseBoldLabelBoundaryRegex = makeRegex("(?<=\\S)(?=\\*\\*[A-Z][^*]{1,80}:\\*\\*)")
+    private static let boldLabelValueBoundaryRegex = makeRegex("(\\*\\*[^*]{1,80}:\\*\\*)\\s*(?=[0-9A-Za-z])")
     private static let denseCollapsedWordRegex = makeRegex("([a-z]{4,})([A-Z][a-z]{3,})")
     private static let listAfterPunctuationNumberedParenRegex = makeRegex("([.!?:;])\\s*(\\d+\\)\\s*)")
     private static let listAfterPunctuationNumberedDotRegex = makeRegex("([.!?:;])\\s+(\\d+\\.\\s+)")
@@ -827,9 +830,9 @@ nonisolated enum ChatDisplayFormatter {
     }
 
     static func markdownSyntax(for text: String) -> AttributedString.MarkdownParsingOptions.InterpretedSyntax {
-        if containsBlockMarkdown(text) {
-            return .full
-        }
+        // Keep rendering mode stable during streaming; switching between
+        // markdown syntaxes mid-response can collapse whitespace and make
+        // content appear to "snap back" into a dense block.
         return .inlineOnlyPreservingWhitespace
     }
 
@@ -880,11 +883,14 @@ nonisolated enum ChatDisplayFormatter {
 
     private static func splitDenseInlineLabels(in text: String) -> String {
         let labelCount = matchCount(inlineLabelRegex, in: text)
-        guard labelCount >= 3 else { return text }
+        let boldLabelCount = matchCount(boldInlineLabelRegex, in: text)
+        guard labelCount >= 2 || boldLabelCount >= 1 else { return text }
 
         var working = regexReplace(denseLabelBoundaryRegex, in: text, with: "\n\n")
         working = regexReplace(spacedLabelBoundaryRegex, in: working, with: "\n\n")
         working = regexReplace(labelValueBoundaryRegex, in: working, with: "$1\n")
+        working = regexReplace(denseBoldLabelBoundaryRegex, in: working, with: "\n\n")
+        working = regexReplace(boldLabelValueBoundaryRegex, in: working, with: "$1\n")
         working = regexReplace(denseCollapsedWordRegex, in: working, with: "$1 $2")
         return working
     }
@@ -900,8 +906,11 @@ nonisolated enum ChatDisplayFormatter {
     }
 
     private static func forceParagraphizeDensePlainText(_ text: String) -> String {
-        guard !containsBlockMarkdown(text) else { return text }
+        guard !text.contains("```") else { return text }
         guard text.count >= 140 else { return text }
+        if hasStructuredMarkdownLayout(text) {
+            return text
+        }
         let paragraphCount = text
             .components(separatedBy: "\n\n")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -930,6 +939,16 @@ nonisolated enum ChatDisplayFormatter {
 
         let formatted = outputBlocks.joined(separator: "\n\n")
         return formatted.isEmpty ? text : formatted
+    }
+
+    private static func hasStructuredMarkdownLayout(_ text: String) -> Bool {
+        guard containsBlockMarkdown(text) else { return false }
+        let nonEmptyLineCount = text
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .count
+        return nonEmptyLineCount >= 8
     }
 
     private static func splitIntoSentences(_ text: String) -> [String] {
