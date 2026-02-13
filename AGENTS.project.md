@@ -73,6 +73,7 @@ Use plain language and actionable buttons.
 - Preserve backward compatibility if you change the on-disk format.
 - Keep operations robust: missing files should not crash; treat as empty.
 - Favor deterministic sorting (e.g., `updatedAt` descending for sessions).
+- Session deletion should clear associated per-session preferences (for example, remembered model context keys).
 
 ## Build/run notes
 - Target: macOS app (SwiftUI).

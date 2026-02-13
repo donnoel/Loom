@@ -124,11 +124,16 @@ struct SessionStoreTests {
         let session = try await store.createSession(title: "Delete \(UUID().uuidString)")
         defer { cleanupSessionFolder(id: session.id) }
 
+        let modelKey = LoomPreferenceKeys.sessionLastStreamModelKey(for: session.id)
+        UserDefaults.standard.set("llama3", forKey: modelKey)
+
         let folderURL = try LoomPaths.sessionFolder(for: session.id)
         #expect(FileManager.default.fileExists(atPath: folderURL.path))
+        #expect(UserDefaults.standard.string(forKey: modelKey) == "llama3")
 
         try await store.deleteSession(id: session.id)
         #expect(!FileManager.default.fileExists(atPath: folderURL.path))
+        #expect(UserDefaults.standard.string(forKey: modelKey) == nil)
     }
 }
 

@@ -113,9 +113,16 @@ actor SessionStore {
         let state = signposter.beginInterval("deleteSession", id: spID)
         defer { signposter.endInterval("deleteSession", state) }
         let folder = try LoomPaths.sessionFolder(for: id)
-        if FileManager.default.fileExists(atPath: folder.path) {
-            try FileManager.default.removeItem(at: folder)
+        do {
+            if FileManager.default.fileExists(atPath: folder.path) {
+                try FileManager.default.removeItem(at: folder)
+            }
+        } catch {
+            if !Self.isMissingFileError(error) {
+                throw error
+            }
         }
+        UserDefaults.standard.removeObject(forKey: LoomPreferenceKeys.sessionLastStreamModelKey(for: id))
     }
 
     func deleteAllSessions() throws {
@@ -132,7 +139,16 @@ actor SessionStore {
         )
 
         for url in urls {
-            try FileManager.default.removeItem(at: url)
+            if let id = UUID(uuidString: url.lastPathComponent) {
+                UserDefaults.standard.removeObject(forKey: LoomPreferenceKeys.sessionLastStreamModelKey(for: id))
+            }
+            do {
+                try FileManager.default.removeItem(at: url)
+            } catch {
+                if !Self.isMissingFileError(error) {
+                    throw error
+                }
+            }
         }
     }
 
@@ -282,5 +298,16 @@ actor SessionStore {
         let metaURL = try LoomPaths.sessionMetadataURL(for: id)
         let data = try Data(contentsOf: metaURL)
         return try decoder.decode(Session.Metadata.self, from: data)
+    }
+
+    private nonisolated static func isMissingFileError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        if nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileNoSuchFileError {
+            return true
+        }
+        if nsError.domain == NSPOSIXErrorDomain && nsError.code == ENOENT {
+            return true
+        }
+        return false
     }
 }

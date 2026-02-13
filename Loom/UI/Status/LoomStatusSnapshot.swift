@@ -82,6 +82,11 @@ nonisolated enum LoomPreferenceKeys {
     static let activeModelTag = "activeModelTag"
     static let statusAutoRefreshEnabled = "statusAutoRefreshEnabled"
     static let modelsAutoCheckEnabled = "modelsAutoCheckEnabled"
+    static let sessionLastStreamModelKeyPrefix = "sessionLastStreamModel."
+
+    static func sessionLastStreamModelKey(for sessionID: UUID) -> String {
+        "\(sessionLastStreamModelKeyPrefix)\(sessionID.uuidString)"
+    }
 }
 
 nonisolated extension String {

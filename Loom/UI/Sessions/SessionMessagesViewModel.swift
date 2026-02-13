@@ -22,7 +22,6 @@ final class SessionMessagesViewModel {
     private let ollamaClient: any OllamaStatusProviding
     private let chatClient: any OllamaChatStreaming
     private let streamUpdateInterval: Duration = .milliseconds(60)
-    private static let sessionLastStreamModelKeyPrefix = "sessionLastStreamModel."
 
     var messages: [ChatMessage] = []
     var draft: String = ""
@@ -237,15 +236,11 @@ final class SessionMessagesViewModel {
 
     private func persistLastStreamModel(_ model: String) {
         guard let model = model.nonEmptyTrimmed else { return }
-        UserDefaults.standard.set(model, forKey: Self.sessionLastStreamModelKey(for: sessionID))
+        UserDefaults.standard.set(model, forKey: LoomPreferenceKeys.sessionLastStreamModelKey(for: sessionID))
     }
 
     private static func storedLastStreamModel(for sessionID: UUID) -> String? {
-        UserDefaults.standard.string(forKey: sessionLastStreamModelKey(for: sessionID))?.nonEmptyTrimmed
-    }
-
-    private static func sessionLastStreamModelKey(for sessionID: UUID) -> String {
-        "\(sessionLastStreamModelKeyPrefix)\(sessionID.uuidString)"
+        UserDefaults.standard.string(forKey: LoomPreferenceKeys.sessionLastStreamModelKey(for: sessionID))?.nonEmptyTrimmed
     }
 
     private func startStreamingReply(model: String, placeholderID: UUID, context: [ChatMessage]) {
