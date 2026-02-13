@@ -753,17 +753,21 @@ nonisolated enum ChatDisplayFormatter {
     private static let inlineLabelRegex = makeRegex("\\b[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:")
     private static let boldInlineLabelRegex = makeRegex("\\*\\*[A-Z][^*]{1,80}:\\*\\*")
     private static let denseLabelBoundaryRegex = makeRegex("(?<=[a-z0-9\\):])(?=[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:)")
-    private static let spacedLabelBoundaryRegex = makeRegex("(?<=[a-z0-9\\)])\\s+(?=[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:)")
+    private static let spacedLabelBoundaryRegex = makeRegex("(?<!\\d\\.)(?<=[\\.:;\\)0-9])\\s+(?=[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:)")
     private static let labelValueBoundaryRegex = makeRegex("(?m)([A-Z][A-Za-z ]{2,80}:)\\s*(?=[0-9A-Za-z])")
     private static let denseBoldLabelBoundaryRegex = makeRegex("(?<=\\S)(?=\\*\\*[A-Z][^*]{1,80}:\\*\\*)")
     private static let boldLabelValueBoundaryRegex = makeRegex("(\\*\\*[^*]{1,80}:\\*\\*)\\s*(?=[0-9A-Za-z])")
     private static let denseCollapsedWordRegex = makeRegex("([a-z]{4,})([A-Z][a-z]{3,})")
+    private static let numberedAfterColonRegex = makeRegex("(:)\\s*(\\d+\\.\\s+)")
+    private static let bulletAfterColonRegex = makeRegex("(:)\\s*(-\\s+)")
     private static let listAfterPunctuationNumberedParenRegex = makeRegex("([.!?:;])\\s*(\\d+\\)\\s*)")
-    private static let listAfterPunctuationNumberedDotRegex = makeRegex("([.!?:;])\\s+(\\d+\\.\\s+)")
+    private static let listAfterPunctuationNumberedDotRegex = makeRegex("([.!?:;])\\s*(\\d+\\.\\s+)")
     private static let listAfterPunctuationBulletRegex = makeRegex("([.!?:;])\\s*([•*\\-]\\s+)")
     private static let listLeadingBulletRegex = makeRegex("(?m)^\\s*[•*]\\s+")
+    private static let listLeadingDashRegex = makeRegex("(?m)^\\s*[–—]\\s+")
     private static let listLeadingNumberedParenRegex = makeRegex("(?m)^\\s*(\\d+)\\)\\s*")
     private static let listLeadingNumberedDotRegex = makeRegex("(?m)^\\s*(\\d+)\\.\\s*")
+    private static let listSpacingRegex = makeRegex("(?m)(?<!\\n)\\n(?=(?:\\d+\\.\\s+|-\\s+))")
     private static let sentenceSplitRegex = makeRegex("(?<=[.!?])\\s+(?=[A-Za-z0-9])")
 
     static func format(_ raw: String) -> String {
@@ -826,7 +830,8 @@ nonisolated enum ChatDisplayFormatter {
             }
         }
 
-        return forceParagraphizeDensePlainText(working)
+        let paragraphized = forceParagraphizeDensePlainText(working)
+        return rebalanceLongParagraphs(in: paragraphized)
     }
 
     static func markdownSyntax(for text: String) -> AttributedString.MarkdownParsingOptions.InterpretedSyntax {
@@ -899,9 +904,13 @@ nonisolated enum ChatDisplayFormatter {
         var working = regexReplace(listAfterPunctuationNumberedParenRegex, in: text, with: "$1\n$2")
         working = regexReplace(listAfterPunctuationNumberedDotRegex, in: working, with: "$1\n$2")
         working = regexReplace(listAfterPunctuationBulletRegex, in: working, with: "$1\n$2")
+        working = regexReplace(numberedAfterColonRegex, in: working, with: "$1\n\n$2")
+        working = regexReplace(bulletAfterColonRegex, in: working, with: "$1\n\n$2")
         working = regexReplace(listLeadingBulletRegex, in: working, with: "- ")
+        working = regexReplace(listLeadingDashRegex, in: working, with: "- ")
         working = regexReplace(listLeadingNumberedParenRegex, in: working, with: "$1. ")
         working = regexReplace(listLeadingNumberedDotRegex, in: working, with: "$1. ")
+        working = regexReplace(listSpacingRegex, in: working, with: "\n\n")
         return working
     }
 
@@ -949,6 +958,52 @@ nonisolated enum ChatDisplayFormatter {
             .filter { !$0.isEmpty }
             .count
         return nonEmptyLineCount >= 8
+    }
+
+    private static func rebalanceLongParagraphs(in text: String) -> String {
+        guard !text.contains("```") else { return text }
+
+        let paragraphs = text
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard !paragraphs.isEmpty else { return text }
+
+        var output: [String] = []
+        var didRebalance = false
+
+        for paragraph in paragraphs {
+            guard paragraph.count > 360 else {
+                output.append(paragraph)
+                continue
+            }
+
+            let sentenceChunks = splitIntoSentences(paragraph)
+            guard sentenceChunks.count >= 4 else {
+                output.append(paragraph)
+                continue
+            }
+
+            didRebalance = true
+            var buffer: [String] = []
+
+            for sentence in sentenceChunks {
+                buffer.append(sentence)
+                let bufferLength = buffer.joined(separator: " ").count
+                if buffer.count >= 2 || bufferLength >= 280 {
+                    output.append(buffer.joined(separator: " "))
+                    buffer.removeAll(keepingCapacity: true)
+                }
+            }
+
+            if !buffer.isEmpty {
+                output.append(buffer.joined(separator: " "))
+            }
+        }
+
+        guard didRebalance else { return text }
+        return output.joined(separator: "\n\n")
     }
 
     private static func splitIntoSentences(_ text: String) -> [String] {

@@ -413,4 +413,21 @@ struct ChatDisplayFormatterTests {
 
         #expect(formatted.contains("\n\n"))
     }
+
+    @Test
+    func formatAddsSpacingForDenseWeatherStyleLists() {
+        let input = """
+        Determining the weather forecast involves a combination of observations, computer models, and scientific expertise. Here's an overview of the process:1. Observations: Weather forecasting begins with observing current weather conditions from various sources, including:- Radar: Uses radio waves to detect precipitation and other weather phenomena.- Satellites: Provide images of clouds, storms, and temperature patterns.2. Data Collection: Collected data is fed into computer models to analyze and predict future weather patterns.3. Computer Models: Numerical weather prediction models use complex algorithms to simulate the behavior of the atmosphere.
+        """
+
+        let formatted = ChatDisplayFormatter.format(input)
+
+        #expect(formatted.contains("\n\n1. Observations:"))
+        #expect(formatted.contains("\n\n- Radar:"))
+        #expect(formatted.contains("\n\n- Satellites:"))
+        #expect(formatted.contains("\n\n2. Data Collection:"))
+        #expect(formatted.contains("\n\n3. Computer Models:"))
+        #expect(!formatted.contains("Data\n\nCollection:"))
+        #expect(!formatted.contains("Computer\n\nModels:"))
+    }
 }
