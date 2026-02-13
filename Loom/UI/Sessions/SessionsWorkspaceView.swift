@@ -457,7 +457,7 @@ struct SessionDetailView: View {
                         }
 
                         if vm.messages.isEmpty {
-                            Text("This session is ready.")
+                            Text("AI can make mistakes.  Check important info.")
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.vertical, 8)

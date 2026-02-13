@@ -100,7 +100,7 @@ private struct AppInfoView: View {
 
     private var introCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("How Loom works (plain English)")
+            Text("How Loom works")
                 .font(.title3.weight(.semibold))
 
             Text("Loom is the chat workspace you see. Ollama is the local engine that does the heavy lifting. Models are the brains made by different AI companies.")
