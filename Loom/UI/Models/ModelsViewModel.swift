@@ -215,6 +215,15 @@ final class ModelsViewModel {
         return catalogModel.summary
     }
 
+    func installedModelLastTrainedText(for model: OllamaModel) -> String {
+        guard let catalogModel = catalogModel(for: model.tag),
+              let lastTrained = catalogModel.lastTrained?.nonEmptyTrimmed else {
+            return "Last trained date isn’t listed for this model."
+        }
+
+        return "Last trained: \(lastTrained)."
+    }
+
     func parameterSizeText(for model: OllamaModel) -> String? {
         if let parameterSize = model.parameterSize?.nonEmptyTrimmed {
             return parameterSize

@@ -7,6 +7,7 @@ nonisolated struct CatalogModel: Codable, Identifiable, Equatable, Sendable {
     let displayName: String
     let vendor: String
     let country: String?
+    let lastTrained: String?
     let summary: String
     let bestAt: [String]
     let approxDownloadBytes: Int64?
@@ -56,6 +57,7 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             displayName: "Llama 3.1 (8B)",
             vendor: "Meta",
             country: "United States",
+            lastTrained: "July 2024",
             summary: "Balanced all-around model for chat, drafting, and summaries.",
             bestAt: ["General chat", "Summaries", "Writing help"],
             approxDownloadBytes: 4_700_000_000,
@@ -69,6 +71,7 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             displayName: "Qwen 2.5 (7B)",
             vendor: "Qwen",
             country: "China",
+            lastTrained: "September 2024",
             summary: "Fast and strong at structured responses and coding support.",
             bestAt: ["Coding help", "Structured output", "Reasoning"],
             approxDownloadBytes: 4_400_000_000,
@@ -82,6 +85,7 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             displayName: "Phi 4",
             vendor: "Microsoft",
             country: "United States",
+            lastTrained: "December 2024",
             summary: "Compact reasoning-focused model with strong instruction following.",
             bestAt: ["Reasoning", "Task planning", "Short analyses"],
             approxDownloadBytes: 8_000_000_000,
@@ -95,6 +99,7 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             displayName: "Mistral (7B)",
             vendor: "Mistral AI",
             country: "France",
+            lastTrained: "2023",
             summary: "Reliable lightweight model for everyday prompts and edits.",
             bestAt: ["Quick answers", "Rewrite tasks", "General chat"],
             approxDownloadBytes: 4_100_000_000,
@@ -108,6 +113,7 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             displayName: "Gemma 2 (9B)",
             vendor: "Google",
             country: "United States",
+            lastTrained: "June 2024",
             summary: "Helpful for concise answers, summaries, and research notes.",
             bestAt: ["Summaries", "Research notes", "General chat"],
             approxDownloadBytes: 5_600_000_000,
@@ -121,6 +127,7 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             displayName: "Llama 3.2 (3B)",
             vendor: "Meta",
             country: "United States",
+            lastTrained: "September 2024",
             summary: "Small model for lightweight local tasks and quick drafts.",
             bestAt: ["Fast drafts", "Simple Q&A", "Low-memory Macs"],
             approxDownloadBytes: 2_000_000_000,

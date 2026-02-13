@@ -26,5 +26,6 @@ struct ModelCatalogTests {
         #expect(model?.displayName == "Qwen 2.5 (7B)")
         #expect(model?.vendor == "Qwen")
         #expect(model?.country == "China")
+        #expect(model?.lastTrained == "September 2024")
     }
 }

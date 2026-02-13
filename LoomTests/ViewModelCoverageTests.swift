@@ -340,6 +340,24 @@ struct StatusViewModelCoverageTests {
 
     @Test
     @MainActor
+    func installedModelLastTrainedTextUsesCatalogData() {
+        let vm = ModelsViewModel(client: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)))
+        let model = OllamaModel(tag: "qwen2.5:7b")
+
+        #expect(vm.installedModelLastTrainedText(for: model) == "Last trained: September 2024.")
+    }
+
+    @Test
+    @MainActor
+    func installedModelLastTrainedTextFallsBackForUnknownModel() {
+        let vm = ModelsViewModel(client: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)))
+        let model = OllamaModel(tag: "custom-model:latest")
+
+        #expect(vm.installedModelLastTrainedText(for: model) == "Last trained date isn’t listed for this model.")
+    }
+
+    @Test
+    @MainActor
     func unverifiedModelShowsUpdateStatus() async {
         let tag = "llama3"
         let client = StubOllamaClient(

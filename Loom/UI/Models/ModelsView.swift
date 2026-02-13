@@ -253,6 +253,11 @@ struct ModelsView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
 
+                Text(viewModel.installedModelLastTrainedText(for: model))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
                 HStack(spacing: 10) {
                     if let sizeText = viewModel.installedSizeText(tag: model.tag) {
                         Text("Size \(sizeText)")
