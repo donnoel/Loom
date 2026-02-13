@@ -93,6 +93,15 @@ final class ModelsViewModel {
         return "Free space: \(DiskSpaceSnapshot.formattedBytes(diskSpaceSnapshot.availableBytes)) of \(DiskSpaceSnapshot.formattedBytes(diskSpaceSnapshot.totalBytes)) (\(diskSpaceSnapshot.availablePercentDisplay))"
     }
 
+    var totalInstalledSizeText: String {
+        let totalBytes = models.reduce(into: Int64(0)) { partialResult, model in
+            guard let size = model.sizeBytes, size > 0 else { return }
+            let (nextValue, overflow) = partialResult.addingReportingOverflow(size)
+            partialResult = overflow ? Int64.max : nextValue
+        }
+        return DiskSpaceSnapshot.formattedBytes(totalBytes)
+    }
+
     func startMonitoring() {
         if activationObserver == nil {
             activationObserver = NotificationCenter.default.addObserver(
@@ -181,6 +190,31 @@ final class ModelsViewModel {
         catalog.byTag(tag)
     }
 
+    func installedModelCompanyCountryText(for model: OllamaModel) -> String {
+        guard let catalogModel = catalogModel(for: model.tag) else {
+            return "Maker and country details aren’t listed for this model."
+        }
+
+        if let country = catalogModel.country?.nonEmptyTrimmed {
+            return "Made by \(catalogModel.vendor) in \(country)."
+        }
+
+        return "Made by \(catalogModel.vendor)."
+    }
+
+    func installedModelBestForText(for model: OllamaModel) -> String {
+        guard let catalogModel = catalogModel(for: model.tag) else {
+            return "Good for everyday questions, writing help, and summaries."
+        }
+
+        let highlights = catalogModel.bestAt.prefix(2)
+        if !highlights.isEmpty {
+            return "Good for: \(highlights.joined(separator: ", "))."
+        }
+
+        return catalogModel.summary
+    }
+
     func parameterSizeText(for model: OllamaModel) -> String? {
         if let parameterSize = model.parameterSize?.nonEmptyTrimmed {
             return parameterSize
@@ -189,16 +223,16 @@ final class ModelsViewModel {
         return Self.parameterSizeFromTag(model.tag)
     }
 
+    func isModelCurrent(tag: String) -> Bool {
+        checkedForUpdatesAtByTag[tag] != nil
+    }
+
     func updateStatusText(for tag: String) -> String {
         if updatingTag == tag {
             return "Checking now…"
         }
 
-        guard let checkedAt = checkedForUpdatesAtByTag[tag] else {
-            return "Not checked yet"
-        }
-
-        return "Checked \(checkedAt.formatted(date: .omitted, time: .shortened))"
+        return isModelCurrent(tag: tag) ? "Current" : "Update"
     }
 
     func dismissUpdateError() {

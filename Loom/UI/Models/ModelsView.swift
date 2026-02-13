@@ -138,6 +138,7 @@ struct ModelsView: View {
                 .disabled(viewModel.isRefreshing)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .loomCard(cornerRadius: 12)
     }
@@ -186,6 +187,7 @@ struct ModelsView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .loomCard(cornerRadius: 12)
     }
@@ -199,11 +201,11 @@ struct ModelsView: View {
 
                 Spacer()
 
-                Button("Add Model…") {
-                    isShowingAddModelSheet = true
+                if !viewModel.models.isEmpty {
+                    Text("Total space used: \(viewModel.totalInstalledSizeText)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.bordered)
-                .disabled(!viewModel.isRunning)
             }
 
             if viewModel.isRunning && viewModel.models.isEmpty {
@@ -241,13 +243,15 @@ struct ModelsView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
 
-                if catalogModel != nil {
-                    Text(model.tag)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
+                Text(viewModel.installedModelCompanyCountryText(for: model))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+
+                Text(viewModel.installedModelBestForText(for: model))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
 
                 HStack(spacing: 10) {
                     if let sizeText = viewModel.installedSizeText(tag: model.tag) {
@@ -271,18 +275,7 @@ struct ModelsView: View {
             Spacer(minLength: 12)
 
             VStack(alignment: .trailing, spacing: 8) {
-                if isActiveModel {
-                    Text("Active")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(.green.opacity(0.12), in: Capsule())
-                }
-
-                Text(viewModel.updateStatusText(for: model.tag))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                updateStatusBadge(for: model)
 
                 HStack(spacing: 8) {
                     Button(isActiveModel ? "In Use" : "Use") {
@@ -292,7 +285,7 @@ struct ModelsView: View {
                     .buttonStyle(.bordered)
                     .disabled(isActiveModel)
 
-                    Button(viewModel.updatingTag == model.tag ? "Updating…" : "Update") {
+                    Button(updateButtonTitle(for: model)) {
                         Task {
                             let didUpdate = await viewModel.updateInstalledModel(tag: model.tag)
                             if didUpdate {
@@ -301,7 +294,7 @@ struct ModelsView: View {
                         }
                     }
                     .buttonStyle(.bordered)
-                    .disabled(!canUpdate(model))
+                    .disabled(!canStartUpdate(model))
 
                     Button {
                         viewModel.requestDelete(modelTag: model.tag)
@@ -314,9 +307,32 @@ struct ModelsView: View {
                     .disabled(viewModel.isDeletingModel)
                 }
             }
+            .frame(minWidth: 230, alignment: .trailing)
         }
+        .frame(minHeight: 110)
         .padding(12)
+        .background {
+            if isActiveModel {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.green.opacity(0.18),
+                                Color.mint.opacity(0.10)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+        }
         .loomCard(cornerRadius: 10)
+        .overlay {
+            if isActiveModel {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.green.opacity(0.32), lineWidth: 1)
+            }
+        }
         .contextMenu {
             Button("Update") {
                 Task {
@@ -326,7 +342,7 @@ struct ModelsView: View {
                     }
                 }
             }
-            .disabled(!canUpdate(model))
+            .disabled(!canStartUpdate(model))
 
             Button("Delete…", role: .destructive) {
                 viewModel.requestDelete(modelTag: model.tag)
@@ -359,6 +375,53 @@ struct ModelsView: View {
             && !viewModel.models.isEmpty
             && !viewModel.isCheckingUpdates
             && viewModel.installingTag == nil
+    }
+
+    @ViewBuilder
+    private func updateStatusBadge(for model: OllamaModel) -> some View {
+        if viewModel.updatingTag == model.tag {
+            statusBadge(
+                title: "Checking…",
+                foreground: .secondary,
+                background: .secondary.opacity(0.14)
+            )
+        } else if viewModel.isModelCurrent(tag: model.tag) {
+            statusBadge(
+                title: "Current",
+                foreground: .green,
+                background: .green.opacity(0.14)
+            )
+        } else {
+            statusBadge(
+                title: "Update",
+                foreground: .orange,
+                background: .orange.opacity(0.16)
+            )
+        }
+    }
+
+    private func statusBadge(title: String, foreground: Color, background: Color) -> some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(background, in: Capsule())
+    }
+
+    private func updateButtonTitle(for model: OllamaModel) -> String {
+        if viewModel.updatingTag == model.tag {
+            return "Checking…"
+        }
+        if viewModel.isModelCurrent(tag: model.tag) {
+            return "Current"
+        }
+        return "Update"
+    }
+
+    private func canStartUpdate(_ model: OllamaModel) -> Bool {
+        guard !viewModel.isModelCurrent(tag: model.tag) else { return false }
+        return canUpdate(model)
     }
 
     private func canUpdate(_ model: OllamaModel) -> Bool {

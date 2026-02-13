@@ -279,6 +279,82 @@ struct StatusViewModelCoverageTests {
 
     @Test
     @MainActor
+    func totalInstalledSizeTextSumsInstalledModelSizes() {
+        let vm = ModelsViewModel(client: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)))
+        vm.models = [
+            OllamaModel(tag: "llama3", sizeBytes: 1_024),
+            OllamaModel(tag: "phi4", sizeBytes: 2_048),
+            OllamaModel(tag: "qwen2.5", sizeBytes: nil)
+        ]
+
+        #expect(vm.totalInstalledSizeText == DiskSpaceSnapshot.formattedBytes(3_072))
+    }
+
+    @Test
+    @MainActor
+    func totalInstalledSizeTextClampsWhenByteSumOverflows() {
+        let vm = ModelsViewModel(client: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)))
+        vm.models = [
+            OllamaModel(tag: "huge-1", sizeBytes: Int64.max),
+            OllamaModel(tag: "huge-2", sizeBytes: 1)
+        ]
+
+        #expect(vm.totalInstalledSizeText == DiskSpaceSnapshot.formattedBytes(Int64.max))
+    }
+
+    @Test
+    @MainActor
+    func installedModelBestForTextUsesCatalogHighlights() {
+        let vm = ModelsViewModel(client: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)))
+        let model = OllamaModel(tag: "qwen2.5:7b")
+
+        #expect(vm.installedModelBestForText(for: model) == "Good for: Coding help, Structured output.")
+    }
+
+    @Test
+    @MainActor
+    func installedModelBestForTextFallsBackForUnknownModel() {
+        let vm = ModelsViewModel(client: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)))
+        let model = OllamaModel(tag: "custom-model:latest")
+
+        #expect(vm.installedModelBestForText(for: model) == "Good for everyday questions, writing help, and summaries.")
+    }
+
+    @Test
+    @MainActor
+    func installedModelCompanyCountryTextUsesCatalogData() {
+        let vm = ModelsViewModel(client: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)))
+        let model = OllamaModel(tag: "qwen2.5:7b")
+
+        #expect(vm.installedModelCompanyCountryText(for: model) == "Made by Qwen in China.")
+    }
+
+    @Test
+    @MainActor
+    func installedModelCompanyCountryTextFallsBackForUnknownModel() {
+        let vm = ModelsViewModel(client: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)))
+        let model = OllamaModel(tag: "custom-model:latest")
+
+        #expect(vm.installedModelCompanyCountryText(for: model) == "Maker and country details aren’t listed for this model.")
+    }
+
+    @Test
+    @MainActor
+    func unverifiedModelShowsUpdateStatus() async {
+        let tag = "llama3"
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            modelsResult: .success([OllamaModel(tag: tag)])
+        )
+        let vm = ModelsViewModel(client: client)
+        await vm.refresh()
+
+        #expect(!vm.isModelCurrent(tag: tag))
+        #expect(vm.updateStatusText(for: tag) == "Update")
+    }
+
+    @Test
+    @MainActor
     func refreshHandlesListModelsFailure() async {
         let client = StubOllamaClient(
             diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
@@ -310,7 +386,8 @@ struct StatusViewModelCoverageTests {
         #expect(didUpdate)
         #expect(await client.readPulledModelNames() == [tag])
         #expect(vm.lastUpdateCheckAt != nil)
-        #expect(vm.updateStatusText(for: tag).contains("Checked"))
+        #expect(vm.isModelCurrent(tag: tag))
+        #expect(vm.updateStatusText(for: tag) == "Current")
     }
 
     @Test
@@ -330,8 +407,10 @@ struct StatusViewModelCoverageTests {
 
         #expect(await client.readPulledModelNames() == [firstTag, secondTag])
         #expect(vm.lastUpdateCheckAt != nil)
-        #expect(vm.updateStatusText(for: firstTag).contains("Checked"))
-        #expect(vm.updateStatusText(for: secondTag).contains("Checked"))
+        #expect(vm.isModelCurrent(tag: firstTag))
+        #expect(vm.isModelCurrent(tag: secondTag))
+        #expect(vm.updateStatusText(for: firstTag) == "Current")
+        #expect(vm.updateStatusText(for: secondTag) == "Current")
         #expect(!vm.isCheckingUpdates)
     }
 

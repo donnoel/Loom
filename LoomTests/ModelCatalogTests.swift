@@ -24,5 +24,7 @@ struct ModelCatalogTests {
 
         let model = catalog.byTag("qwen2.5:7b")
         #expect(model?.displayName == "Qwen 2.5 (7B)")
+        #expect(model?.vendor == "Qwen")
+        #expect(model?.country == "China")
     }
 }
