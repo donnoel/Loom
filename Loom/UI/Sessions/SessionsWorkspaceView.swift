@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
+import NaturalLanguage
 
 struct SessionsWorkspaceView: View {
     private let store: SessionStore
@@ -750,8 +751,9 @@ nonisolated enum ChatDisplayFormatter {
     private static let sectionAfterPunctuationRegex = makeRegex("([.!?])\\s*(?=[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:)")
     private static let sectionAfterLabelRegex = makeRegex("([A-Za-z][A-Za-z ]{2,40}:)\\s*(?=[A-Z])")
     private static let inlineLabelRegex = makeRegex("\\b[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:")
-    private static let denseLabelBoundaryRegex = makeRegex("(?<=[a-z0-9\\)])(?=[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:)")
+    private static let denseLabelBoundaryRegex = makeRegex("(?<=[a-z0-9\\):])(?=[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:)")
     private static let spacedLabelBoundaryRegex = makeRegex("(?<=[a-z0-9\\)])\\s+(?=[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:)")
+    private static let labelValueBoundaryRegex = makeRegex("(?m)([A-Z][A-Za-z ]{2,80}:)\\s*(?=[0-9A-Za-z])")
     private static let denseCollapsedWordRegex = makeRegex("([a-z]{4,})([A-Z][a-z]{3,})")
     private static let listAfterPunctuationNumberedParenRegex = makeRegex("([.!?:;])\\s*(\\d+\\)\\s*)")
     private static let listAfterPunctuationNumberedDotRegex = makeRegex("([.!?:;])\\s+(\\d+\\.\\s+)")
@@ -759,7 +761,7 @@ nonisolated enum ChatDisplayFormatter {
     private static let listLeadingBulletRegex = makeRegex("(?m)^\\s*[•*]\\s+")
     private static let listLeadingNumberedParenRegex = makeRegex("(?m)^\\s*(\\d+)\\)\\s*")
     private static let listLeadingNumberedDotRegex = makeRegex("(?m)^\\s*(\\d+)\\.\\s*")
-    private static let sentenceSplitRegex = makeRegex("(?<=[.!?])\\s+(?=[A-Z0-9])")
+    private static let sentenceSplitRegex = makeRegex("(?<=[.!?])\\s+(?=[A-Za-z0-9])")
 
     static func format(_ raw: String) -> String {
         let normalized = raw
@@ -781,43 +783,47 @@ nonisolated enum ChatDisplayFormatter {
         // Split dense inline label runs like "...collisionsBuild a foundation:".
         working = splitDenseInlineLabels(in: working)
 
-        guard shouldAutoFormat(working, hadBlockMarkdown: hadBlockMarkdown) else { return working }
+        if shouldAutoFormat(working, hadBlockMarkdown: hadBlockMarkdown) {
+            let sentenceChunks = splitIntoSentences(working)
+            if sentenceChunks.count >= 2 {
+                var outputBlocks: [String] = []
+                var paragraphBuffer: [String] = []
 
-        let sentenceChunks = splitIntoSentences(working)
-        guard sentenceChunks.count >= 2 else { return working }
+                func flushParagraph() {
+                    guard !paragraphBuffer.isEmpty else { return }
+                    outputBlocks.append(paragraphBuffer.joined(separator: " "))
+                    paragraphBuffer.removeAll(keepingCapacity: true)
+                }
 
-        var outputBlocks: [String] = []
-        var paragraphBuffer: [String] = []
+                for sentence in sentenceChunks {
+                    if isHeading(sentence) {
+                        flushParagraph()
+                        outputBlocks.append("**\(sentence)**")
+                        continue
+                    }
 
-        func flushParagraph() {
-            guard !paragraphBuffer.isEmpty else { return }
-            outputBlocks.append(paragraphBuffer.joined(separator: " "))
-            paragraphBuffer.removeAll(keepingCapacity: true)
+                    if let bullet = bulletLine(sentence) {
+                        flushParagraph()
+                        outputBlocks.append(bullet)
+                        continue
+                    }
+
+                    paragraphBuffer.append(sentence)
+                    let bufferLength = paragraphBuffer.joined(separator: " ").count
+                    if paragraphBuffer.count >= 2 || bufferLength >= 280 {
+                        flushParagraph()
+                    }
+                }
+
+                flushParagraph()
+                let formatted = outputBlocks.joined(separator: "\n\n")
+                if !formatted.isEmpty {
+                    working = formatted
+                }
+            }
         }
 
-        for sentence in sentenceChunks {
-            if isHeading(sentence) {
-                flushParagraph()
-                outputBlocks.append("**\(sentence)**")
-                continue
-            }
-
-            if let bullet = bulletLine(sentence) {
-                flushParagraph()
-                outputBlocks.append(bullet)
-                continue
-            }
-
-            paragraphBuffer.append(sentence)
-            let bufferLength = paragraphBuffer.joined(separator: " ").count
-            if paragraphBuffer.count >= 2 || bufferLength >= 280 {
-                flushParagraph()
-            }
-        }
-
-        flushParagraph()
-        let formatted = outputBlocks.joined(separator: "\n\n")
-        return formatted.isEmpty ? working : formatted
+        return forceParagraphizeDensePlainText(working)
     }
 
     static func markdownSyntax(for text: String) -> AttributedString.MarkdownParsingOptions.InterpretedSyntax {
@@ -829,9 +835,14 @@ nonisolated enum ChatDisplayFormatter {
 
     private static func shouldAutoFormat(_ text: String, hadBlockMarkdown: Bool) -> Bool {
         guard text.count >= 48 else { return false }
-        guard !text.contains("\n\n") else { return false }
         guard !containsBlockMarkdown(text) else { return false }
         guard !hadBlockMarkdown else { return false }
+        let paragraphCount = text
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .count
+        guard paragraphCount < 3 else { return false }
         return true
     }
 
@@ -873,6 +884,7 @@ nonisolated enum ChatDisplayFormatter {
 
         var working = regexReplace(denseLabelBoundaryRegex, in: text, with: "\n\n")
         working = regexReplace(spacedLabelBoundaryRegex, in: working, with: "\n\n")
+        working = regexReplace(labelValueBoundaryRegex, in: working, with: "$1\n")
         working = regexReplace(denseCollapsedWordRegex, in: working, with: "$1 $2")
         return working
     }
@@ -887,7 +899,56 @@ nonisolated enum ChatDisplayFormatter {
         return working
     }
 
+    private static func forceParagraphizeDensePlainText(_ text: String) -> String {
+        guard !containsBlockMarkdown(text) else { return text }
+        guard text.count >= 140 else { return text }
+        let paragraphCount = text
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .count
+        guard paragraphCount < 4 else { return text }
+
+        let sentenceChunks = splitIntoSentences(text)
+        guard sentenceChunks.count >= 3 else { return text }
+
+        var outputBlocks: [String] = []
+        var paragraphBuffer: [String] = []
+
+        for sentence in sentenceChunks {
+            paragraphBuffer.append(sentence)
+            let bufferLength = paragraphBuffer.joined(separator: " ").count
+            if paragraphBuffer.count >= 2 || bufferLength >= 280 {
+                outputBlocks.append(paragraphBuffer.joined(separator: " "))
+                paragraphBuffer.removeAll(keepingCapacity: true)
+            }
+        }
+
+        if !paragraphBuffer.isEmpty {
+            outputBlocks.append(paragraphBuffer.joined(separator: " "))
+        }
+
+        let formatted = outputBlocks.joined(separator: "\n\n")
+        return formatted.isEmpty ? text : formatted
+    }
+
     private static func splitIntoSentences(_ text: String) -> [String] {
+        let tokenizer = NLTokenizer(unit: .sentence)
+        tokenizer.string = text
+
+        var sentences: [String] = []
+        tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
+            let sentence = text[range].trimmingCharacters(in: .whitespacesAndNewlines)
+            if !sentence.isEmpty {
+                sentences.append(sentence)
+            }
+            return true
+        }
+
+        if sentences.count >= 2 {
+            return sentences
+        }
+
         let withMarkers = regexReplace(sentenceSplitRegex, in: text, with: marker)
         return withMarkers
             .components(separatedBy: marker)

@@ -374,4 +374,19 @@ struct ChatDisplayFormatterTests {
         #expect(!formatted.contains("transfersMomentum"))
         #expect(!formatted.contains("equationUse"))
     }
+
+    @Test
+    func formatSplitsDenseColonLabelBlocks() {
+        let input = """
+        Here's a step-by-step guide on how to make delicious French fries at home:Ingredients:2-3 large potatoesEquipment:Large potInstructions:Select and peel the potatoes:Choose starchy potatoes.Cut the potatoes into strips:Soak the potato strips in cold water:Drain and dry the potato strips:Heat the oil:
+        """
+
+        let formatted = ChatDisplayFormatter.format(input)
+
+        #expect(formatted.contains("Ingredients:\n2-3 large potatoes"))
+        #expect(formatted.contains("Equipment:\nLarge pot"))
+        #expect(formatted.contains("\n\nInstructions:"))
+        #expect(formatted.contains("\n\nCut the potatoes into strips:"))
+        #expect(formatted.contains("\n\nHeat the oil:"))
+    }
 }
