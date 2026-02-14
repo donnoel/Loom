@@ -1,6 +1,13 @@
 import SwiftUI
 
 nonisolated enum LoomTheme {
+    private static let darkTextPrimary = Color(red: 0.91, green: 0.93, blue: 0.97)
+    private static let darkTextSecondary = Color(red: 0.67, green: 0.71, blue: 0.78)
+    private static let darkTextMuted = Color(red: 0.50, green: 0.54, blue: 0.64)
+    private static let darkSurfaceBorder = Color.white.opacity(0.14)
+    private static let darkFocusRing = Color(red: 0.37, green: 0.66, blue: 1.00)
+    private static let darkActiveInputBorder = Color(red: 0.47, green: 0.65, blue: 1.00)
+
     private static let darkBackground = LinearGradient(
         colors: [
             Color(red: 0.09, green: 0.13, blue: 0.20).opacity(0.92),
@@ -84,6 +91,34 @@ nonisolated enum LoomTheme {
         scheme == .dark ? darkAccent : lightAccent
     }
 
+    static func textPrimary(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? darkTextPrimary : .primary
+    }
+
+    static func textSecondary(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? darkTextSecondary : .secondary
+    }
+
+    static func textMuted(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? darkTextMuted : Color.secondary.opacity(0.75)
+    }
+
+    static func surfaceBorder(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? darkSurfaceBorder : Color.primary.opacity(0.12)
+    }
+
+    static func focusRing(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? darkFocusRing : Color.accentColor.opacity(0.70)
+    }
+
+    static func activeInputBorder(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? darkActiveInputBorder : Color.accentColor.opacity(0.72)
+    }
+
+    static func inputPlaceholder(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(red: 0.59, green: 0.64, blue: 0.73) : Color.secondary.opacity(0.72)
+    }
+
     // Backward-compatible label form used in a few existing call sites.
     static func backgroundGradient(for scheme: ColorScheme) -> LinearGradient {
         backgroundGradient(scheme)
@@ -105,6 +140,7 @@ nonisolated enum LoomTheme {
         alignment: Alignment,
         background: AnyShapeStyle,
         foreground: Color,
+        stroke: Color,
         strokeOpacity: Double,
         cornerRadius: CGFloat,
         shadow: Color,
@@ -117,8 +153,9 @@ nonisolated enum LoomTheme {
                 alignment: .trailing,
                 background: AnyShapeStyle(scheme == .dark ? darkUserBubble : lightUserBubble),
                 foreground: scheme == .dark ? .white : Color(red: 0.14, green: 0.23, blue: 0.39),
+                stroke: scheme == .dark ? Color.white : Color.primary,
                 strokeOpacity: scheme == .dark ? 0.30 : 0.18,
-                cornerRadius: 21,
+                cornerRadius: 20,
                 shadow: Color.black.opacity(scheme == .dark ? 0.14 : 0.05),
                 shadowRadius: scheme == .dark ? 8 : 5,
                 shadowYOffset: scheme == .dark ? 2 : 1
@@ -127,10 +164,13 @@ nonisolated enum LoomTheme {
         case .assistant:
             return (
                 alignment: .leading,
-                background: AnyShapeStyle(.ultraThinMaterial),
-                foreground: .primary,
-                strokeOpacity: scheme == .dark ? 0.22 : 0.14,
-                cornerRadius: 21,
+                background: scheme == .dark
+                    ? AnyShapeStyle(Color.white.opacity(0.025))
+                    : AnyShapeStyle(.ultraThinMaterial),
+                foreground: textPrimary(scheme),
+                stroke: scheme == .dark ? Color.white : Color.primary,
+                strokeOpacity: scheme == .dark ? 0.16 : 0.14,
+                cornerRadius: 20,
                 shadow: Color.black.opacity(scheme == .dark ? 0.08 : 0.03),
                 shadowRadius: scheme == .dark ? 5 : 3,
                 shadowYOffset: 1
@@ -140,7 +180,8 @@ nonisolated enum LoomTheme {
             return (
                 alignment: .leading,
                 background: AnyShapeStyle(Color.secondary.opacity(scheme == .dark ? 0.18 : 0.12)),
-                foreground: .secondary,
+                foreground: textSecondary(scheme),
+                stroke: scheme == .dark ? Color.white : Color.primary,
                 strokeOpacity: scheme == .dark ? 0.18 : 0.14,
                 cornerRadius: 12,
                 shadow: .clear,
@@ -185,18 +226,18 @@ private struct LoomBubbleModifier: ViewModifier {
 
         content
             .foregroundStyle(palette.foreground)
-            .font(isChipRole ? .callout : .body)
-            .lineSpacing(isChipRole ? 1 : 2)
+            .font(isChipRole ? .callout : .system(size: 19, weight: .regular, design: .default))
+            .lineSpacing(isChipRole ? 1 : 9)
             .multilineTextAlignment(.leading)
             .contentShape(RoundedRectangle(cornerRadius: palette.cornerRadius, style: .continuous))
-            .padding(.horizontal, isChipRole ? 10 : 12)
-            .padding(.vertical, isChipRole ? 6 : 10)
+            .padding(.horizontal, isChipRole ? 10 : 22)
+            .padding(.vertical, isChipRole ? 6 : 16)
             .background {
                 bubbleShape
                     .fill(palette.background)
                     .overlay {
                         bubbleShape
-                            .strokeBorder(Color.primary.opacity(palette.strokeOpacity), lineWidth: 1)
+                            .strokeBorder(palette.stroke.opacity(palette.strokeOpacity), lineWidth: 1)
                     }
                     .overlay {
                         bubbleShape
@@ -207,7 +248,7 @@ private struct LoomBubbleModifier: ViewModifier {
                     }
             }
             .shadow(color: palette.shadow, radius: palette.shadowRadius, x: 0, y: palette.shadowYOffset)
-            .frame(maxWidth: 680, alignment: palette.alignment)
+            .frame(maxWidth: 760, alignment: palette.alignment)
     }
 }
 
@@ -224,14 +265,25 @@ private struct LoomSidebarItemModifier: ViewModifier {
         content
             .background {
                 if selected {
-                    shape
-                        .fill(LoomTheme.accentGradient(colorScheme).opacity(colorScheme == .dark ? 0.33 : 0.20))
-                        .overlay {
-                            shape.fill(Color.white.opacity(colorScheme == .dark ? 0.04 : 0.34))
-                        }
-                        .overlay {
-                            shape.strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.45), lineWidth: 0.8)
-                        }
+                    if colorScheme == .dark {
+                        shape
+                            .fill(Color(red: 0.48, green: 0.34, blue: 0.66).opacity(0.70))
+                            .overlay {
+                                shape.fill(Color.white.opacity(0.06))
+                            }
+                            .overlay {
+                                shape.strokeBorder(Color(red: 0.78, green: 0.61, blue: 1.00).opacity(0.40), lineWidth: 0.8)
+                            }
+                    } else {
+                        shape
+                            .fill(LoomTheme.accentGradient(colorScheme).opacity(0.20))
+                            .overlay {
+                                shape.fill(Color.white.opacity(0.34))
+                            }
+                            .overlay {
+                                shape.strokeBorder(Color.white.opacity(0.45), lineWidth: 0.8)
+                            }
+                    }
                 } else {
                     shape
                         .fill(Color.primary.opacity(colorScheme == .dark ? 0.045 : 0.020))

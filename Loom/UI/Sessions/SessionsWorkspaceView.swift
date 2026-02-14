@@ -97,15 +97,6 @@ struct SessionsWorkspaceView: View {
                     .accessibilityIdentifier("sessions.toolbar.rename")
                     .disabled(vm.selectedSessionID == nil)
 
-                    Button {
-                        Task { @MainActor in
-                            await exportSelectedSession()
-                        }
-                    } label: {
-                        Label("Export Session", systemImage: "square.and.arrow.up")
-                    }
-                    .disabled(vm.selectedSessionID == nil)
-
                     Button(role: .destructive) {
                         Task { await vm.deleteSelected() }
                     } label: {
@@ -416,6 +407,7 @@ struct SessionDetailView: View {
     @State private var bottomMarkerFrame: CGRect = .null
     @State private var isShowingFileImporter: Bool = false
     @State private var isDictating: Bool = false
+    @State private var isComposerHovered: Bool = false
     @FocusState private var isDraftFieldFocused: Bool
     @AppStorage(LoomPreferenceKeys.voiceReplyVoiceIdentifier)
     private var voiceReplyVoiceIdentifier: String = ""
@@ -449,6 +441,7 @@ struct SessionDetailView: View {
             VStack(spacing: 2) {
                 Text(session.metadata.title)
                     .font(LoomTheme.sessionHeaderFont())
+                    .foregroundStyle(LoomTheme.textPrimary(colorScheme))
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -457,7 +450,7 @@ struct SessionDetailView: View {
 
                 Text("Updated \(session.metadata.updatedAt.formatted(date: .abbreviated, time: .omitted))")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LoomTheme.textSecondary(colorScheme))
             }
             .frame(maxWidth: .infinity, alignment: .center)
 
@@ -479,7 +472,7 @@ struct SessionDetailView: View {
             ScrollViewReader { proxy in
                 ZStack(alignment: .bottom) {
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 8) {
+                        LazyVStack(alignment: .leading, spacing: 10) {
                             if !vm.isShowingFullHistory && vm.messages.count >= 200 {
                                 Button("Load Earlier") {
                                     loadEarlierAndPreservePosition(proxy)
@@ -570,7 +563,7 @@ struct SessionDetailView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 10) {
                     if !vm.pendingAttachments.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
@@ -610,22 +603,25 @@ struct SessionDetailView: View {
                         }
                     }
 
-                    TextField("Ask anything", text: $vm.draft, axis: .vertical)
+                    TextField(
+                        "",
+                        text: $vm.draft,
+                        prompt: Text("Ask anything")
+                            .foregroundStyle(LoomTheme.inputPlaceholder(colorScheme)),
+                        axis: .vertical
+                    )
                         .textFieldStyle(.plain)
                         .lineLimit(2...8)
+                        .foregroundStyle(LoomTheme.textPrimary(colorScheme))
                         .focused($isDraftFieldFocused)
                         .accessibilityIdentifier("session.detail.messageField")
                         .onSubmit {
                             guard !vm.isGenerating else { return }
                             sendAndScroll(proxy)
                         }
-                        .padding(.horizontal, 6)
-                        .padding(.top, 2)
-                        .padding(.bottom, 4)
-
-                    Rectangle()
-                        .fill(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.08))
-                        .frame(height: 0.7)
+                        .padding(.horizontal, 10)
+                        .padding(.top, 6)
+                        .padding(.bottom, 8)
 
                     HStack(alignment: .center, spacing: 8) {
                         HStack(spacing: 4) {
@@ -696,20 +692,22 @@ struct SessionDetailView: View {
                                 Text(vm.activeModelSelectionLabel)
                                     .lineLimit(1)
                                     .truncationMode(.middle)
+                                    .foregroundStyle(LoomTheme.textPrimary(colorScheme))
                                 Image(systemName: "chevron.up.chevron.down")
                                     .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(LoomTheme.textSecondary(colorScheme))
                             }
                             .font(.subheadline.weight(.semibold))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .frame(minHeight: 32)
                             .frame(maxWidth: 260, alignment: .leading)
                             .background(
                                 Capsule(style: .continuous)
-                                    .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color.white.opacity(0.42))
+                                    .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.48))
                                     .overlay(
                                         Capsule(style: .continuous)
-                                            .stroke(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10), lineWidth: 0.75)
+                                            .stroke(LoomTheme.surfaceBorder(colorScheme), lineWidth: 1)
                                     )
                             )
                         }
@@ -726,13 +724,15 @@ struct SessionDetailView: View {
                                 Image(systemName: "stop.fill")
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundStyle(.white)
-                                    .frame(width: 30, height: 30)
+                                    .frame(width: 32, height: 32)
                                     .background(
                                         Circle()
                                             .fill(Color.red.opacity(colorScheme == .dark ? 0.84 : 0.92))
                                     )
                             }
                             .buttonStyle(.plain)
+                            .padding(2)
+                            .contentShape(Rectangle())
                             .accessibilityIdentifier("session.detail.stopButton")
                             .accessibilityLabel("Stop")
                         } else {
@@ -742,7 +742,7 @@ struct SessionDetailView: View {
                                 Image(systemName: "arrow.up")
                                     .font(.system(size: 12, weight: .bold))
                                     .foregroundStyle(draftIsEmpty ? Color.secondary.opacity(0.65) : .white)
-                                    .frame(width: 30, height: 30)
+                                    .frame(width: 32, height: 32)
                                     .background(
                                         Circle()
                                             .fill(
@@ -760,25 +760,48 @@ struct SessionDetailView: View {
                             .accessibilityLabel("Send")
                             .buttonStyle(.plain)
                             .disabled(draftIsEmpty)
+                            .padding(2)
+                            .contentShape(Rectangle())
                         }
                     }
+                    .padding(.horizontal, 8)
+                    .frame(minHeight: 42)
+                    .background {
+                        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        shape
+                            .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.46))
+                            .overlay {
+                                shape.strokeBorder(
+                                    isDraftFieldFocused
+                                        ? LoomTheme.activeInputBorder(colorScheme)
+                                        : LoomTheme.surfaceBorder(colorScheme),
+                                    lineWidth: isDraftFieldFocused ? 1.4 : 1
+                                )
+                            }
+                    }
+                    .animation(.easeOut(duration: 0.16), value: isDraftFieldFocused)
 
                 }
-                .padding(.top, 16)
+                .padding(.top, 14)
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .frame(maxWidth: 700)
+                .padding(.bottom, 14)
+                .frame(maxWidth: 760)
+                .frame(minHeight: 148)
                 .frame(maxWidth: .infinity)
                 .background {
-                    let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
                     shape
-                        .fill(.ultraThinMaterial)
+                        .fill(
+                            colorScheme == .dark
+                                ? Color(red: 0.04, green: 0.06, blue: 0.13).opacity(0.72)
+                                : Color.white.opacity(0.84)
+                        )
                         .overlay {
                             shape.fill(
                                 LinearGradient(
                                     colors: [
-                                        colorScheme == .dark ? Color.black.opacity(0.30) : Color.white.opacity(0.38),
-                                        colorScheme == .dark ? Color.black.opacity(0.18) : Color.white.opacity(0.18)
+                                        Color.white.opacity(colorScheme == .dark ? 0.06 : 0.24),
+                                        Color.clear
                                     ],
                                     startPoint: .top,
                                     endPoint: .bottom
@@ -786,18 +809,28 @@ struct SessionDetailView: View {
                             )
                         }
                         .overlay {
-                            shape.strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.42), lineWidth: 0.6)
+                            shape.strokeBorder(LoomTheme.surfaceBorder(colorScheme), lineWidth: 1)
                         }
                         .overlay {
-                            shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10), lineWidth: 0.8)
+                            if isDraftFieldFocused {
+                                shape.strokeBorder(LoomTheme.focusRing(colorScheme), lineWidth: 2)
+                            } else if isComposerHovered {
+                                shape.strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.18 : 0.28), lineWidth: 1)
+                            }
                         }
                 }
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.24 : 0.08), radius: 12, x: 0, y: 5)
+                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.28 : 0.10), radius: 12, x: 0, y: 5)
+                .onHover { hovering in
+                    withAnimation(.easeOut(duration: 0.16)) {
+                        isComposerHovered = hovering
+                    }
+                }
+                .animation(.easeOut(duration: 0.16), value: isDraftFieldFocused)
 
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 56)
-            .padding(.vertical, 18)
+            .padding(.horizontal, 48)
+            .padding(.vertical, 20)
         }
         .fileImporter(
             isPresented: $isShowingFileImporter,
@@ -844,31 +877,13 @@ struct SessionDetailView: View {
         isDisabled: Bool,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            Image(systemName: symbolName)
-                .font(.system(size: 12.5, weight: .semibold))
-                .foregroundStyle(
-                    isDisabled
-                        ? Color.secondary.opacity(0.60)
-                        : (isActive ? Color.accentColor : Color.primary.opacity(0.80))
-                )
-                .frame(width: 28, height: 28)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(
-                            colorScheme == .dark
-                                ? Color.white.opacity(isActive ? 0.11 : 0.02)
-                                : Color.white.opacity(isActive ? 0.48 : 0.20)
-                        )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.10), lineWidth: 0.7)
-                )
-        }
-        .help(helpText)
-        .buttonStyle(.plain)
-        .disabled(isDisabled)
+        ComposerUtilityIconButton(
+            symbolName: symbolName,
+            helpText: helpText,
+            isActive: isActive,
+            isDisabled: isDisabled,
+            action: action
+        )
     }
 
     private func sendAndScroll(_ proxy: ScrollViewProxy) {
@@ -1191,7 +1206,8 @@ private struct MessageRowView: View, Equatable {
         .padding(.vertical, 4)
         .scaleEffect(isHovered ? 1.006 : 1.0)
         .offset(y: isHovered ? -1 : 0)
-        .animation(.easeInOut(duration: 0.14), value: isHovered)
+        .brightness(isHovered ? 0.06 : 0)
+        .animation(.easeOut(duration: 0.16), value: isHovered)
         .onHover { hovering in
             guard message.role == .assistant || message.role == .user else { return }
             isHovered = hovering
@@ -1258,7 +1274,55 @@ private struct StarterPromptChip: View {
         }
         .buttonStyle(.plain)
         .scaleEffect(isHovered ? 1.02 : 1.0)
-        .animation(.easeInOut(duration: 0.14), value: isHovered)
+        .brightness(isHovered ? 0.06 : 0)
+        .animation(.easeOut(duration: 0.16), value: isHovered)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+    }
+}
+
+private struct ComposerUtilityIconButton: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    let symbolName: String
+    let helpText: String
+    let isActive: Bool
+    let isDisabled: Bool
+    let action: () -> Void
+
+    @State private var isHovered: Bool = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbolName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(
+                    isDisabled
+                        ? LoomTheme.textMuted(colorScheme)
+                        : (isActive ? Color.accentColor : LoomTheme.textPrimary(colorScheme).opacity(0.88))
+                )
+                .frame(width: 32, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(
+                            colorScheme == .dark
+                                ? Color.white.opacity(isActive ? 0.12 : 0.03)
+                                : Color.white.opacity(isActive ? 0.50 : 0.24)
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(LoomTheme.surfaceBorder(colorScheme), lineWidth: 1)
+                )
+        }
+        .help(helpText)
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .padding(2)
+        .contentShape(Rectangle())
+        .brightness(isHovered && !isDisabled ? 0.06 : 0)
+        .animation(.easeOut(duration: 0.16), value: isHovered)
         .onHover { hovering in
             isHovered = hovering
         }

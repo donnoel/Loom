@@ -280,15 +280,6 @@ struct RootView: View {
                         .accessibilityIdentifier("sessions.toolbar.rename")
                         .disabled(selectedSession == nil)
 
-                        Button {
-                            Task { @MainActor in
-                                await exportSelectedSession()
-                            }
-                        } label: {
-                            Label("Export Session", systemImage: "square.and.arrow.up")
-                        }
-                        .disabled(selectedSession == nil)
-
                         Button(role: .destructive) {
                             Task { await deleteSelectedSession() }
                         } label: {
@@ -384,7 +375,7 @@ struct RootView: View {
             }
         }
         .searchable(text: $sessionsViewModel.searchQuery, placement: .automatic)
-        .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 360)
+        .navigationSplitViewColumnWidth(min: 272, ideal: 272, max: 272)
         .navigationTitle("Loom")
     }
 
@@ -513,8 +504,8 @@ struct RootView: View {
         let isSelected = selectedSidebarSelection == .destination(item)
 
         return Label(item.title, systemImage: item.systemImage)
-            .padding(.vertical, 4)
-            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityIdentifier("sidebar.\(item.id)")
             .loomSidebarItem(selected: isSelected)
@@ -524,29 +515,30 @@ struct RootView: View {
     private func sessionSidebarRow(_ session: Session) -> some View {
         let isSelected = selectedSidebarSelection == .session(session.id)
 
-        return HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
+        return HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(session.metadata.title)
                         .font(.headline)
+                        .foregroundStyle(LoomTheme.textPrimary(colorScheme))
                         .lineLimit(1)
 
                     if session.metadata.isPinned {
                         Image(systemName: "pin.fill")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(LoomTheme.textSecondary(colorScheme))
                     }
                 }
 
                 Text(session.metadata.updatedAt, style: .date)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LoomTheme.textMuted(colorScheme))
             }
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 5)
-        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
         .accessibilityIdentifier("sidebar.session.\(session.id.uuidString)")
         .loomSidebarItem(selected: isSelected)
     }

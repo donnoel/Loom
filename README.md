@@ -36,7 +36,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 🧭 **Capability-Aware Guidance** | Model cards and chat composer clearly show which models support speech input/output and file uploads. |
 | 💬 **Animated Typing Pulse** | While Loom is generating, assistant placeholders show a pulsing typing indicator. |
 | ✍️ **Readable Chat Formatting** | Assistant text is normalized for paragraph/list readability when raw output arrives as a dense block, while keeping stable whitespace-preserving rendering during streaming to avoid visual "snap back." |
-| 🎨 **Airy Workspace Styling** | The app uses a softer blue atmosphere with warmer sidebar highlights, sleeker bubble depth, and a lighter liquid-glass chat composer for a calmer, friendlier feel. |
+| 🎨 **Airy Workspace Styling** | The app uses a softer blue atmosphere with tuned dark-mode contrast, calmer selected-session emphasis, more readable chat bubbles, and a more defined glass chat composer for a calmer, friendlier feel. |
 | 💡 **Starter Prompt Chips** | New sessions include one-tap prompt suggestions that prefill the composer to help non-technical users get started quickly. |
 | ⏹️ **Stop Generation** | Cancel generation any time and keep the partial assistant response. |
 | 🧠 **Helpful Setup Gating** | Clear in-context guidance if no active model is selected or Ollama is unavailable. |
