@@ -40,6 +40,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | ⏹️ **Stop Generation** | Cancel generation any time and keep the partial assistant response. |
 | 🧠 **Helpful Setup Gating** | Clear in-context guidance if no active model is selected or Ollama is unavailable. |
 | 🔁 **Model-Aware Context Switching** | If the active model changes for a session, the next turn uses user-only context to avoid old-model anchoring. |
+| 🔀 **In-Session Model Switcher** | Change the active model directly from the chat composer without leaving the current session. |
 | 🧩 **Model Picker** | View installed Ollama models with plain-language "good for" guidance plus maker/country and last-trained details, use streamlined actions (Set Active / Update / Delete), and keep model selection across launches until you change it. |
 | ↕️ **Drag-Reorder Models** | Reorder installed models in Model Library with drag-and-drop, and Loom remembers your order across refresh/relaunch. |
 | ℹ️ **System Info Sheet** | Open **App → Info** in the sidebar to see a plain-language walkthrough of how Loom, Ollama, and local models work together, with official source links per company. |
@@ -63,6 +64,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
   Limits: up to 8 files, max ~2 MB per text file, max ~5 MB per PDF, and excerpt trimming when total attachment context is too large.
 - **Dictate Message** with the mic button (when supported by the active model)
 - **Read Replies Aloud** with the speaker toggle (when supported by the active model)
+- **Switch Models In Session** from the model menu above the message composer
 - **Tune Voice Quality** in Settings with a voice picker, speaking-rate slider, and preview button
 - **Auto-Correct + Spell Check** in the message field (uses your macOS Keyboard settings)
 - **Stop** to cancel streaming while keeping partial text
@@ -108,6 +110,7 @@ Chat interaction coordinator:
 - Supports retry/regenerate and model-switch-safe context behavior
 - Adds local attachment excerpts into request context for file-aware turns
 - Enforces attachment guardrails (file count, file size, and total context budget) with plain-language skip guidance
+- Loads installed-model choices for in-session switching and keeps active-model preference in sync
 - Exposes model capability gating for speech/file tools and inline guidance
 - Exposes inline banner state for guidance
 

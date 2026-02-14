@@ -51,6 +51,8 @@ final class SessionMessagesViewModel {
     var banner: BannerState?
     private(set) var isShowingFullHistory: Bool = false
     private(set) var pendingAttachments: [PendingAttachment] = []
+    private(set) var availableModelTags: [String] = []
+    private var activeModelTagStorage: String?
     private var lastStreamModel: String?
     private var lastStreamContext: [ChatMessage]?
     private var lastStreamPlaceholderID: UUID?
@@ -80,6 +82,7 @@ final class SessionMessagesViewModel {
             self.chatClient = chatClient ?? OllamaChatClient(ollamaClient: ollamaClient)
         }
 
+        self.activeModelTagStorage = Self.storedActiveModelTag()
         self.lastStreamModel = Self.storedLastStreamModel(for: sessionID)
     }
 
@@ -99,6 +102,7 @@ final class SessionMessagesViewModel {
         self.chatClient = chatClient
         self.catalog = catalog
         self.attachmentImporter = attachmentImporter
+        self.activeModelTagStorage = Self.storedActiveModelTag()
         self.lastStreamModel = Self.storedLastStreamModel(for: sessionID)
     }
 
@@ -114,8 +118,35 @@ final class SessionMessagesViewModel {
         activeModelCapabilities.fileUploads
     }
 
+    var activeModelTag: String? {
+        get {
+            activeModelTagStorage
+        }
+        set {
+            if let value = newValue?.nonEmptyTrimmed {
+                activeModelTagStorage = value
+                UserDefaults.standard.set(value, forKey: LoomPreferenceKeys.activeModelTag)
+            } else {
+                activeModelTagStorage = nil
+                UserDefaults.standard.removeObject(forKey: LoomPreferenceKeys.activeModelTag)
+            }
+        }
+    }
+
+    var activeModelSelectionLabel: String {
+        guard let activeModelTag else {
+            return "Choose Model"
+        }
+
+        let baseName = modelDisplayName(for: activeModelTag)
+        guard availableModelTags.contains(activeModelTag) else {
+            return "\(baseName) (Unavailable)"
+        }
+        return baseName
+    }
+
     var activeModelCapabilityNote: String? {
-        guard let activeModelTag = selectedActiveModelTag,
+        guard let activeModelTag,
               let model = catalog.byTag(activeModelTag) else {
             return nil
         }
@@ -149,6 +180,31 @@ final class SessionMessagesViewModel {
         }
     }
 
+    func modelDisplayName(for tag: String) -> String {
+        catalog.byTag(tag)?.displayName ?? tag
+    }
+
+    func selectActiveModel(tag: String) {
+        activeModelTag = tag
+        banner = nil
+    }
+
+    func refreshInstalledModels() async {
+        synchronizeActiveModelSelectionFromPreferences()
+        let diagnosis = await ollamaClient.diagnose()
+        guard diagnosis.isRunning else {
+            availableModelTags = []
+            return
+        }
+
+        do {
+            let listedModels = try await ollamaClient.listModels()
+            availableModelTags = applyPreferredModelOrder(to: listedModels).map(\.tag)
+        } catch {
+            availableModelTags = []
+        }
+    }
+
     func load() async {
         do {
             messages = try await store.loadRecentMessages(sessionID: sessionID, limit: 200)
@@ -159,6 +215,8 @@ final class SessionMessagesViewModel {
             isShowingFullHistory = false
             generatingMessageIndex = nil
         }
+
+        await refreshInstalledModels()
     }
 
     func loadFullHistory() async {
@@ -217,6 +275,7 @@ final class SessionMessagesViewModel {
 
     func sendDraft() async {
         guard !isGenerating else { return }
+        synchronizeActiveModelSelectionFromPreferences()
 
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
@@ -230,7 +289,7 @@ final class SessionMessagesViewModel {
             return
         }
 
-        guard let activeModel = selectedActiveModelTag else {
+        guard let activeModelTag else {
             banner = BannerState(
                 text: "Choose a model to chat with.",
                 actionTitle: "Choose Model",
@@ -278,7 +337,7 @@ final class SessionMessagesViewModel {
         generatingMessageIndex = messages.index(before: messages.endIndex)
 
         var context: [ChatMessage]
-        if didSwitchModels(from: lastStreamModel, to: activeModel) {
+        if didSwitchModels(from: lastStreamModel, to: activeModelTag) {
             context = contextMessagesForModelSwitch(limit: 20)
         } else {
             context = contextMessages(excluding: assistantPlaceholder.id, limit: 20)
@@ -286,13 +345,13 @@ final class SessionMessagesViewModel {
         if let attachmentContext = attachmentContextMessage(for: attachmentsForThisTurn) {
             context.append(attachmentContext)
         }
-        lastStreamModel = activeModel
-        persistLastStreamModel(activeModel)
+        lastStreamModel = activeModelTag
+        persistLastStreamModel(activeModelTag)
         lastStreamContext = context
         lastStreamPlaceholderID = assistantPlaceholder.id
 
         startStreamingReply(
-            model: activeModel,
+            model: activeModelTag,
             placeholderID: assistantPlaceholder.id,
             context: context
         )
@@ -304,6 +363,7 @@ final class SessionMessagesViewModel {
 
     func retryLastReply() async {
         guard !isGenerating else { return }
+        synchronizeActiveModelSelectionFromPreferences()
         guard let context = lastStreamContext else {
             banner = BannerState(
                 text: "There isn’t a previous reply to retry yet.",
@@ -312,7 +372,7 @@ final class SessionMessagesViewModel {
             )
             return
         }
-        guard let model = selectedActiveModelTag ?? lastStreamModel else {
+        guard let model = activeModelTag ?? lastStreamModel else {
             banner = BannerState(
                 text: "Choose a model to chat with.",
                 actionTitle: "Choose Model",
@@ -360,12 +420,8 @@ final class SessionMessagesViewModel {
         )
     }
 
-    private var selectedActiveModelTag: String? {
-        UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag)?.nonEmptyTrimmed
-    }
-
     private var activeModelCapabilities: CatalogModelCapabilities {
-        guard let activeModelTag = selectedActiveModelTag,
+        guard let activeModelTag,
               let model = catalog.byTag(activeModelTag) else {
             return .default
         }
@@ -387,6 +443,44 @@ final class SessionMessagesViewModel {
             return false
         }
         return previousModel != currentModel
+    }
+
+    private func applyPreferredModelOrder(to listedModels: [OllamaModel]) -> [OllamaModel] {
+        let preferredTags = storedModelOrder
+        guard !preferredTags.isEmpty else { return listedModels }
+
+        var preferredRank: [String: Int] = [:]
+        for (index, tag) in preferredTags.enumerated() where preferredRank[tag] == nil {
+            preferredRank[tag] = index
+        }
+
+        var fallbackOrder: [String: Int] = [:]
+        for (index, model) in listedModels.enumerated() where fallbackOrder[model.tag] == nil {
+            fallbackOrder[model.tag] = index
+        }
+
+        return listedModels.sorted { lhs, rhs in
+            let lhsRank = preferredRank[lhs.tag]
+            let rhsRank = preferredRank[rhs.tag]
+
+            switch (lhsRank, rhsRank) {
+            case let (left?, right?):
+                return left < right
+            case (_?, nil):
+                return true
+            case (nil, _?):
+                return false
+            case (nil, nil):
+                return (fallbackOrder[lhs.tag] ?? 0) < (fallbackOrder[rhs.tag] ?? 0)
+            }
+        }
+    }
+
+    private var storedModelOrder: [String] {
+        guard let stored = UserDefaults.standard.array(forKey: LoomPreferenceKeys.modelLibraryOrder) as? [String] else {
+            return []
+        }
+        return stored.compactMap(\.nonEmptyTrimmed)
     }
 
     private func attachmentContextMessage(for attachments: [PendingAttachment]) -> ChatMessage? {
@@ -440,6 +534,14 @@ final class SessionMessagesViewModel {
 
     private static func storedLastStreamModel(for sessionID: UUID) -> String? {
         UserDefaults.standard.string(forKey: LoomPreferenceKeys.sessionLastStreamModelKey(for: sessionID))?.nonEmptyTrimmed
+    }
+
+    private static func storedActiveModelTag() -> String? {
+        UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag)?.nonEmptyTrimmed
+    }
+
+    private func synchronizeActiveModelSelectionFromPreferences() {
+        activeModelTagStorage = Self.storedActiveModelTag()
     }
 
     private static func uiTestChatScenario() -> UITestOllamaChatClient.Scenario? {

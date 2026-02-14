@@ -569,6 +569,50 @@ struct SessionDetailView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Menu {
+                            if vm.availableModelTags.isEmpty {
+                                Button("No installed models") {}
+                                    .disabled(true)
+                                Divider()
+                                Button("Refresh Models") {
+                                    Task { await vm.refreshInstalledModels() }
+                                }
+                                Button("Browse Models…") {
+                                    browseModels()
+                                }
+                            } else {
+                                ForEach(vm.availableModelTags, id: \.self) { tag in
+                                    Button {
+                                        vm.selectActiveModel(tag: tag)
+                                    } label: {
+                                        if vm.activeModelTag == tag {
+                                            Label(vm.modelDisplayName(for: tag), systemImage: "checkmark")
+                                        } else {
+                                            Text(vm.modelDisplayName(for: tag))
+                                        }
+                                    }
+                                }
+                                Divider()
+                                Button("Refresh Models") {
+                                    Task { await vm.refreshInstalledModels() }
+                                }
+                                Button("Browse Models…") {
+                                    browseModels()
+                                }
+                            }
+                        } label: {
+                            Label(vm.activeModelSelectionLabel, systemImage: "cpu")
+                                .lineLimit(1)
+                                .frame(maxWidth: 260, alignment: .leading)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .accessibilityIdentifier("session.detail.modelPicker")
+
+                        Spacer()
+                    }
+
                     if let note = vm.activeModelCapabilityNote {
                         Text(note)
                             .font(.caption)

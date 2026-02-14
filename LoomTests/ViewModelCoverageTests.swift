@@ -758,6 +758,78 @@ struct StatusViewModelCoverageTests {
 struct SessionMessagesViewModelCoverageTests {
     @Test
     @MainActor
+    func loadRefreshesInstalledModelsAndRespectsPreferredOrder() async throws {
+        clearModelSelectionPreference()
+        clearModelLibraryOrderPreference()
+        defer {
+            clearModelSelectionPreference()
+            clearModelLibraryOrderPreference()
+        }
+
+        UserDefaults.standard.set(
+            ["phi4:latest", "qwen2.5:7b"],
+            forKey: LoomPreferenceKeys.modelLibraryOrder
+        )
+        UserDefaults.standard.set("qwen2.5:7b", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Session Model Ordering")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(
+                diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+                modelsResult: .success([
+                    OllamaModel(tag: "qwen2.5:7b"),
+                    OllamaModel(tag: "mistral:7b"),
+                    OllamaModel(tag: "phi4:latest")
+                ])
+            ),
+            chatClient: ScriptedChatClient([])
+        )
+
+        await vm.load()
+
+        #expect(vm.availableModelTags == ["phi4:latest", "qwen2.5:7b", "mistral:7b"])
+        #expect(vm.activeModelSelectionLabel == "Qwen 2.5 (7B)")
+    }
+
+    @Test
+    @MainActor
+    func activeModelTagSetterTrimsAndClearsValueForSessionPicker() async throws {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Session Model Picker")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(
+                diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)
+            ),
+            chatClient: ScriptedChatClient([])
+        )
+
+        vm.activeModelTag = "  qwen2.5:7b  "
+        #expect(vm.activeModelTag == "qwen2.5:7b")
+        #expect(
+            UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag) == "qwen2.5:7b"
+        )
+        #expect(vm.activeModelSelectionLabel == "Qwen 2.5 (7B) (Unavailable)")
+
+        vm.activeModelTag = "   "
+        #expect(vm.activeModelTag == nil)
+        #expect(UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag) == nil)
+        #expect(vm.activeModelSelectionLabel == "Choose Model")
+    }
+
+    @Test
+    @MainActor
     func sendDraftShowsOllamaNotRunningBanner() async throws {
         clearModelSelectionPreference()
         defer { clearModelSelectionPreference() }
