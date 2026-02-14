@@ -147,6 +147,22 @@ private actor ScriptedChatClient: OllamaChatStreaming {
     }
 }
 
+private actor StubAIChatbotStatusClient: AIChatbotStatusProviding {
+    var snapshots: [AIChatbotServiceSnapshot]
+
+    init(snapshots: [AIChatbotServiceSnapshot]) {
+        self.snapshots = snapshots
+    }
+
+    func placeholderSnapshots() -> [AIChatbotServiceSnapshot] {
+        snapshots
+    }
+
+    func fetchStatuses() async -> [AIChatbotServiceSnapshot] {
+        snapshots
+    }
+}
+
 private actor ActivityCounter {
     private var count: Int = 0
 
@@ -166,6 +182,32 @@ private func makeDiagnosis(isInstalled: Bool, isRunning: Bool) -> OllamaDiagnosi
         reachableBaseURL: isRunning ? URL(string: "http://localhost:11434") : nil,
         summary: isRunning ? "Ready" : (isInstalled ? "Ollama is installed but not running" : "Ollama is not installed yet"),
         nextStep: isRunning ? .ready : (isInstalled ? .startOllama : .installOllama)
+    )
+}
+
+private func fixedDate(_ iso8601: String) -> Date {
+    let formatter = ISO8601DateFormatter()
+    guard let date = formatter.date(from: iso8601) else {
+        Issue.record("Failed to build fixed test date: \(iso8601)")
+        return Date(timeIntervalSince1970: 0)
+    }
+    return date
+}
+
+private func makeAIServiceSnapshot(
+    id: String,
+    name: String,
+    state: AIChatbotOperationalState = .operational
+) -> AIChatbotServiceSnapshot {
+    AIChatbotServiceSnapshot(
+        id: id,
+        name: name,
+        homepageURL: URL(string: "https://example.com/\(id)")!,
+        statusPageURL: URL(string: "https://status.example.com/\(id)")!,
+        state: state,
+        summary: state.label,
+        knownIssues: [],
+        checkedAt: fixedDate("2026-02-14T00:00:00Z")
     )
 }
 
@@ -211,6 +253,11 @@ private func clearModelSelectionPreference() {
 @MainActor
 private func clearModelLibraryOrderPreference() {
     UserDefaults.standard.removeObject(forKey: LoomPreferenceKeys.modelLibraryOrder)
+}
+
+@MainActor
+private func clearAIStatusOrderPreference() {
+    UserDefaults.standard.removeObject(forKey: LoomPreferenceKeys.aiStatusServiceOrder)
 }
 
 @MainActor
@@ -361,6 +408,57 @@ struct StatusViewModelCoverageTests {
 
         #expect(vm.models.map(\.tag) == ["phi4:latest", "llama3:latest"])
         #expect((UserDefaults.standard.array(forKey: LoomPreferenceKeys.modelLibraryOrder) as? [String]) == ["phi4:latest", "llama3:latest"])
+    }
+
+    @Test
+    @MainActor
+    func moveAIStatusServicePersistsOrderAcrossRefreshes() async {
+        clearAIStatusOrderPreference()
+        defer { clearAIStatusOrderPreference() }
+
+        let snapshots = [
+            makeAIServiceSnapshot(id: "chatgpt", name: "ChatGPT"),
+            makeAIServiceSnapshot(id: "claude", name: "Claude"),
+            makeAIServiceSnapshot(id: "grok", name: "Grok")
+        ]
+
+        let client = StubAIChatbotStatusClient(snapshots: snapshots)
+        let vm = AIChatbotStatusViewModel(client: client)
+
+        await vm.refresh()
+        vm.moveService(id: "grok", before: "chatgpt")
+
+        #expect(vm.services.map(\.id) == ["grok", "chatgpt", "claude"])
+        #expect((UserDefaults.standard.array(forKey: LoomPreferenceKeys.aiStatusServiceOrder) as? [String]) == ["grok", "chatgpt", "claude"])
+
+        let reloadedVM = AIChatbotStatusViewModel(client: client)
+        await reloadedVM.refresh()
+
+        #expect(reloadedVM.services.map(\.id) == ["grok", "chatgpt", "claude"])
+    }
+
+    @Test
+    @MainActor
+    func refreshAIStatusAppliesStoredOrderAndPrunesMissingIDs() async {
+        clearAIStatusOrderPreference()
+        defer { clearAIStatusOrderPreference() }
+
+        UserDefaults.standard.set(
+            ["missing", "grok", "chatgpt"],
+            forKey: LoomPreferenceKeys.aiStatusServiceOrder
+        )
+
+        let snapshots = [
+            makeAIServiceSnapshot(id: "chatgpt", name: "ChatGPT"),
+            makeAIServiceSnapshot(id: "claude", name: "Claude"),
+            makeAIServiceSnapshot(id: "grok", name: "Grok")
+        ]
+        let vm = AIChatbotStatusViewModel(client: StubAIChatbotStatusClient(snapshots: snapshots))
+
+        await vm.refresh()
+
+        #expect(vm.services.map(\.id) == ["grok", "chatgpt", "claude"])
+        #expect((UserDefaults.standard.array(forKey: LoomPreferenceKeys.aiStatusServiceOrder) as? [String]) == ["grok", "chatgpt", "claude"])
     }
 
     @Test

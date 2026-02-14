@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct StatusView: View {
     let viewModel: StatusViewModel
@@ -170,5 +171,210 @@ extension LoomReadiness {
         case .needsSetup: "exclamationmark.triangle.fill"
         case .notReady: "xmark.octagon.fill"
         }
+    }
+}
+
+struct AIChatbotStatusView: View {
+    @State private var viewModel = AIChatbotStatusViewModel()
+    @State private var draggingServiceID: String?
+
+    private static let timestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                headerCard
+
+                VStack(spacing: 10) {
+                    ForEach(viewModel.services) { service in
+                        draggableServiceCard(service)
+                    }
+
+                    Color.clear
+                        .frame(height: 12)
+                        .onDrop(
+                            of: [UTType.plainText],
+                            delegate: AIStatusServiceDropToEndDelegate(
+                                draggingServiceID: $draggingServiceID,
+                                viewModel: viewModel
+                            )
+                        )
+                }
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityIdentifier("screen.aiStatus")
+        .navigationTitle("AI Status")
+        .task {
+            viewModel.startMonitoring()
+        }
+        .onDisappear {
+            viewModel.stopMonitoring()
+        }
+    }
+
+    private var headerCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Top AI Chatbot Monitor")
+                .font(.title3.weight(.semibold))
+            Text("Loom checks official public status feeds for major chatbot services. Refresh any time to see live uptime and known issues.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 10) {
+                Button(viewModel.isRefreshing ? "Refreshing…" : "Refresh") {
+                    Task { await viewModel.refresh() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(viewModel.isRefreshing)
+
+                if let lastRefreshAt = viewModel.lastRefreshAt {
+                    Text("Last checked \(Self.timestampFormatter.string(from: lastRefreshAt))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .loomCard(cornerRadius: 12)
+    }
+
+    private func draggableServiceCard(_ service: AIChatbotServiceSnapshot) -> some View {
+        serviceCard(service)
+            .onDrag {
+                draggingServiceID = service.id
+                return NSItemProvider(object: service.id as NSString)
+            }
+            .onDrop(
+                of: [UTType.plainText],
+                delegate: AIStatusServiceDropDelegate(
+                    destinationID: service.id,
+                    draggingServiceID: $draggingServiceID,
+                    viewModel: viewModel
+                )
+            )
+    }
+
+    private func serviceCard(_ service: AIChatbotServiceSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "line.3.horizontal")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary.opacity(0.8))
+                    .help("Drag to reorder")
+
+                Text(service.name)
+                    .font(.headline)
+
+                Spacer()
+
+                Label(service.state.label, systemImage: service.state.symbolName)
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(service.state.tintColor.opacity(0.12), in: Capsule())
+                    .foregroundStyle(service.state.tintColor)
+            }
+
+            Text(service.summary)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if service.knownIssues.isEmpty {
+                Text("Known issues: none reported right now.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Known issues:")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    ForEach(service.knownIssues, id: \.self) { issue in
+                        Text("• \(issue)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+
+            HStack(spacing: 12) {
+                Link("Open status page", destination: service.statusPageURL)
+                    .font(.caption)
+                Link("Open service", destination: service.homepageURL)
+                    .font(.caption)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .loomCard(cornerRadius: 12)
+    }
+}
+
+extension AIChatbotOperationalState {
+    var tintColor: Color {
+        switch self {
+        case .operational: .green
+        case .degraded: .yellow
+        case .outage: .red
+        case .unknown: .secondary
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .operational: "checkmark.circle.fill"
+        case .degraded: "exclamationmark.triangle.fill"
+        case .outage: "xmark.octagon.fill"
+        case .unknown: "questionmark.circle.fill"
+        }
+    }
+}
+
+private struct AIStatusServiceDropDelegate: DropDelegate {
+    let destinationID: String
+    @Binding var draggingServiceID: String?
+    let viewModel: AIChatbotStatusViewModel
+
+    func dropEntered(info: DropInfo) {
+        guard let draggingServiceID,
+              draggingServiceID != destinationID else { return }
+        viewModel.moveService(id: draggingServiceID, before: destinationID)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingServiceID = nil
+        return true
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+}
+
+private struct AIStatusServiceDropToEndDelegate: DropDelegate {
+    @Binding var draggingServiceID: String?
+    let viewModel: AIChatbotStatusViewModel
+
+    func dropEntered(info: DropInfo) {
+        guard let draggingServiceID else { return }
+        viewModel.moveServiceToEnd(id: draggingServiceID)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingServiceID = nil
+        return true
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
     }
 }

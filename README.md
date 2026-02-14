@@ -40,6 +40,8 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 💡 **Starter Prompt Chips** | New sessions include one-tap prompt suggestions that prefill the composer to help non-technical users get started quickly. |
 | ⏹️ **Stop Generation** | Cancel generation any time and keep the partial assistant response. |
 | 🧠 **Helpful Setup Gating** | Clear in-context guidance if no active model is selected or Ollama is unavailable. |
+| 🌐 **AI Service Monitor** | App → AI Status checks public status feeds for major chatbots (including Grok) and shows uptime + known issues in one place. |
+| ↕️ **Drag-Reorder AI Status** | Reorder AI Status cards with drag-and-drop, and Loom remembers your preferred order across refresh/relaunch. |
 | 🔁 **Model-Aware Context Switching** | If the active model changes for a session, the next turn uses user-only context to avoid old-model anchoring. |
 | 🔀 **In-Session Model Switcher** | Change the active model directly from the chat composer without leaving the current session. |
 | 🧩 **Model Picker** | View installed Ollama models with plain-language "good for" guidance plus maker/country and last-trained details, use streamlined actions (Set Active / Update / Delete), and keep model selection across launches until you change it. |
@@ -71,6 +73,8 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Auto-Correct + Spell Check** in the message field (uses your macOS Keyboard settings)
 - **Stop** to cancel streaming while keeping partial text
 - **Jump to Bottom** with the floating down-arrow when you scroll up in long chats
+- **Check AI Service Health** from **App → AI Status** for quick uptime and incident visibility
+- **Reorder AI Status Cards** by dragging service cards in **App → AI Status**
 - **Export Session** from toolbar or `⌘⇧E`
 - **Models** from sidebar for setup, diagnostics, and update checks in one place
 - **Reorder Installed Models** by dragging model cards in Model Library

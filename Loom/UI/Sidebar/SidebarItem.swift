@@ -14,7 +14,7 @@ nonisolated enum SidebarItem: String, Hashable, Identifiable, Sendable {
         case .sessions: "Sessions"
         case .models: "Models"
         case .info: "Info"
-        case .status: "Status"
+        case .status: "AI Status"
         case .settings: "Settings"
         }
     }
