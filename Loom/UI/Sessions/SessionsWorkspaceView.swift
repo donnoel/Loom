@@ -392,6 +392,7 @@ struct SessionDetailView: View {
 
     @State private var vm: SessionMessagesViewModel
     @State private var didInitialScroll: Bool = false
+    @State private var isBottomMarkerVisible: Bool = true
 
     init(
         session: Session,
@@ -445,51 +446,78 @@ struct SessionDetailView: View {
             }
 
             ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 8) {
-                        if !vm.isShowingFullHistory && vm.messages.count >= 200 {
-                            Button("Load Earlier") {
-                                loadEarlierAndPreservePosition(proxy)
+                ZStack(alignment: .bottom) {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 8) {
+                            if !vm.isShowingFullHistory && vm.messages.count >= 200 {
+                                Button("Load Earlier") {
+                                    loadEarlierAndPreservePosition(proxy)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                .padding(.bottom, 4)
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .padding(.bottom, 4)
-                        }
 
-                        if vm.messages.isEmpty {
-                            Text("AI can make mistakes.  Check important info.")
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 8)
-                                .id("bottom")
-                        } else {
-                            ForEach(vm.messages, id: \.id) { message in
-                                MessageRowView(
-                                    message: message,
-                                    isThinking: vm.isGenerating
-                                        && vm.generatingMessageID == message.id
-                                        && message.content.isEmpty,
-                                    onRegenerate: message.role == .assistant ? {
-                                        Task { await vm.retryLastReply() }
-                                    } : nil
-                                )
-                                .equatable()
+                            if vm.messages.isEmpty {
+                                Text("AI can make mistakes.  Check important info.")
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 8)
+                            } else {
+                                ForEach(vm.messages, id: \.id) { message in
+                                    MessageRowView(
+                                        message: message,
+                                        isThinking: vm.isGenerating
+                                            && vm.generatingMessageID == message.id
+                                            && message.content.isEmpty,
+                                        onRegenerate: message.role == .assistant ? {
+                                            Task { await vm.retryLastReply() }
+                                        } : nil
+                                    )
+                                    .equatable()
+                                }
                             }
 
                             Color.clear
                                 .frame(height: 1)
                                 .id("bottom")
+                                .onAppear {
+                                    setBottomMarkerVisibility(true)
+                                }
+                                .onDisappear {
+                                    setBottomMarkerVisibility(false)
+                                }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                    .task {
+                        await vm.load()
+                        if !didInitialScroll {
+                            didInitialScroll = true
+                            DispatchQueue.main.async {
+                                scrollToBottom(proxy)
+                            }
                         }
                     }
-                    .padding(.vertical, 8)
-                }
-                .task {
-                    await vm.load()
-                    if !didInitialScroll {
-                        didInitialScroll = true
-                        DispatchQueue.main.async {
+
+                    if !isBottomMarkerVisible && !vm.messages.isEmpty {
+                        Button {
                             scrollToBottom(proxy)
+                        } label: {
+                            Image(systemName: "arrow.down")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .padding(10)
+                                .background(.thickMaterial, in: Circle())
+                                .overlay(
+                                    Circle().stroke(Color.primary.opacity(0.14), lineWidth: 1)
+                                )
                         }
+                        .buttonStyle(.plain)
+                        .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 2)
+                        .padding(.bottom, 10)
+                        .accessibilityIdentifier("session.detail.jumpToBottom")
+                        .transition(.opacity.combined(with: .scale(scale: 0.9)))
                     }
                 }
 
@@ -561,6 +589,13 @@ struct SessionDetailView: View {
             proxy.scrollTo(last.id, anchor: .bottom)
         } else {
             proxy.scrollTo("bottom", anchor: .bottom)
+        }
+    }
+
+    private func setBottomMarkerVisibility(_ isVisible: Bool) {
+        guard isBottomMarkerVisible != isVisible else { return }
+        withAnimation(.easeInOut(duration: 0.16)) {
+            isBottomMarkerVisible = isVisible
         }
     }
 }

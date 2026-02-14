@@ -52,6 +52,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Type + Send** in the message field to start a local model response
 - **Auto-Correct + Spell Check** in the message field (uses your macOS Keyboard settings)
 - **Stop** to cancel streaming while keeping partial text
+- **Jump to Bottom** with the floating down-arrow when you scroll up in long chats
 - **Export Session** from toolbar or `⌘⇧E`
 - **Models** from sidebar for setup, diagnostics, and update checks in one place
 - **Add Model…** from Model Library to install curated models without leaving Loom
