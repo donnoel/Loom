@@ -494,22 +494,11 @@ struct RootView: View {
         let isSelected = selectedSidebarSelection == .destination(item)
 
         return Label(item.title, systemImage: item.systemImage)
-            .padding(.vertical, 3)
-            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityIdentifier("sidebar.\(item.id)")
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(LoomTheme.accentGradient(colorScheme).opacity(colorScheme == .dark ? 0.18 : 0.10))
-                }
-            }
-            .overlay {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.14), lineWidth: 1)
-                }
-            }
+            .loomSidebarItem(selected: isSelected)
             .tag(SidebarSelection.destination(item))
     }
 
@@ -537,21 +526,10 @@ struct RootView: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 6)
+        .padding(.vertical, 5)
+        .padding(.horizontal, 8)
         .accessibilityIdentifier("sidebar.session.\(session.id.uuidString)")
-        .background {
-            if isSelected {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(LoomTheme.accentGradient(colorScheme).opacity(colorScheme == .dark ? 0.18 : 0.10))
-            }
-        }
-        .overlay {
-            if isSelected {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.14), lineWidth: 1)
-            }
-        }
+        .loomSidebarItem(selected: isSelected)
     }
 
     private func createSession() async {

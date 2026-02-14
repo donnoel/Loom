@@ -29,7 +29,9 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 🗂️ **Session Workspace** | Create, rename, delete, and sort sessions by recent activity. |
 | 💾 **Disk-Backed Persistence** | Each session stores `metadata.json` + append-only `messages.jsonl`. |
 | ⚡ **Streaming Assistant Replies** | Assistant responses stream live into the UI as tokens arrive. |
+| 💬 **Animated Typing Pulse** | While Loom is generating, assistant placeholders show a pulsing typing indicator. |
 | ✍️ **Readable Chat Formatting** | Assistant text is normalized for paragraph/list readability when raw output arrives as a dense block, while keeping stable whitespace-preserving rendering during streaming to avoid visual "snap back." |
+| 🎨 **Bold Workspace Styling** | Chat bubbles use richer layered gradients and depth, and sidebar selection uses a stronger highlighted chrome for quick scanning. |
 | ⏹️ **Stop Generation** | Cancel generation any time and keep the partial assistant response. |
 | 🧠 **Helpful Setup Gating** | Clear in-context guidance if no active model is selected or Ollama is unavailable. |
 | 🔁 **Model-Aware Context Switching** | If the active model changes for a session, the next turn uses user-only context to avoid old-model anchoring. |

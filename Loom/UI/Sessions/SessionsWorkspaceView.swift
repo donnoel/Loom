@@ -585,6 +585,7 @@ struct SessionDetailView: View {
     }
 
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
+        setBottomMarkerVisibility(true)
         if let last = vm.messages.last {
             proxy.scrollTo(last.id, anchor: .bottom)
         } else {
@@ -693,12 +694,7 @@ private struct MessageRowView: View, Equatable {
 
             MessageBubbleChrome(role: message.role) {
                 if isThinking {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Thinking…")
-                            .foregroundStyle(.secondary)
-                    }
+                    TypingPulseView()
                 } else {
                     MessageContentView(
                         content: message.content,
@@ -731,6 +727,30 @@ private struct MessageRowView: View, Equatable {
             return colorScheme == .dark ? .white.opacity(0.90) : .accentColor
         case .assistant, .system, .tool:
             return .secondary
+        }
+    }
+}
+
+private struct TypingPulseView: View {
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.20)) { context in
+            let activeIndex = Int(context.date.timeIntervalSinceReferenceDate / 0.20) % 3
+
+            HStack(spacing: 8) {
+                HStack(spacing: 5) {
+                    ForEach(0..<3, id: \.self) { index in
+                        Circle()
+                            .fill(Color.secondary.opacity(index == activeIndex ? 0.92 : 0.34))
+                            .frame(width: 6.5, height: 6.5)
+                            .scaleEffect(index == activeIndex ? 1.22 : 0.84)
+                    }
+                }
+
+                Text("Thinking")
+                    .foregroundStyle(.secondary)
+            }
+            .animation(.easeInOut(duration: 0.16), value: activeIndex)
+            .padding(.vertical, 2)
         }
     }
 }
