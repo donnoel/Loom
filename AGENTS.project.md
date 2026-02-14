@@ -15,7 +15,7 @@ We have the V1 local chat spine in place:
 5) **Stop/cancel generation** keeps partial output and persists it
 6) **Multimodal chat controls** now include optional speech input/output and uploaded file context for supported models, with guardrails on attachment size/count/context budget and user-configurable voice quality controls (voice/rate preview)
 7) **Model Library UX** now supports drag-and-drop reordering of installed models with persisted order across refresh/relaunch
-8) **Session UX polish** now includes a softer airy-blue visual treatment, friendly empty-state onboarding, and starter prompt chips for non-technical users
+8) **Session UX polish** now includes a softer airy-blue visual treatment, a lighter liquid-glass composer, friendly empty-state onboarding, and starter prompt chips for non-technical users
 9) **In-session model switching** is available from the chat composer so users can change models without leaving their active session
 10) **Automatic session naming** now derives a new session title from the first user request when the title is still the default
 11) **AI service monitoring** now includes an App-level status screen (including Grok) that checks public chatbot status feeds, surfaces known incidents, and supports drag-and-drop card reordering with persisted order

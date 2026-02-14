@@ -117,23 +117,23 @@ nonisolated enum LoomTheme {
                 alignment: .trailing,
                 background: AnyShapeStyle(scheme == .dark ? darkUserBubble : lightUserBubble),
                 foreground: scheme == .dark ? .white : Color(red: 0.14, green: 0.23, blue: 0.39),
-                strokeOpacity: scheme == .dark ? 0.38 : 0.28,
-                cornerRadius: 19,
-                shadow: Color.black.opacity(scheme == .dark ? 0.24 : 0.08),
-                shadowRadius: scheme == .dark ? 12 : 7,
-                shadowYOffset: scheme == .dark ? 4 : 2
+                strokeOpacity: scheme == .dark ? 0.30 : 0.18,
+                cornerRadius: 21,
+                shadow: Color.black.opacity(scheme == .dark ? 0.14 : 0.05),
+                shadowRadius: scheme == .dark ? 8 : 5,
+                shadowYOffset: scheme == .dark ? 2 : 1
             )
 
         case .assistant:
             return (
                 alignment: .leading,
-                background: AnyShapeStyle(scheme == .dark ? darkAssistantBubble : lightAssistantBubble),
+                background: AnyShapeStyle(.ultraThinMaterial),
                 foreground: .primary,
-                strokeOpacity: scheme == .dark ? 0.30 : 0.20,
-                cornerRadius: 19,
-                shadow: Color.black.opacity(scheme == .dark ? 0.17 : 0.05),
-                shadowRadius: scheme == .dark ? 8 : 5,
-                shadowYOffset: scheme == .dark ? 3 : 2
+                strokeOpacity: scheme == .dark ? 0.22 : 0.14,
+                cornerRadius: 21,
+                shadow: Color.black.opacity(scheme == .dark ? 0.08 : 0.03),
+                shadowRadius: scheme == .dark ? 5 : 3,
+                shadowYOffset: 1
             )
 
         case .system, .tool:

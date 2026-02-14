@@ -407,6 +407,7 @@ struct SessionDetailView: View {
     let browseModels: () -> Void
     let openOrInstallOllama: () -> Void
     let onActivity: () async -> Void
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var vm: SessionMessagesViewModel
     @State private var didInitialScroll: Bool = false
@@ -568,7 +569,7 @@ struct SessionDetailView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 8) {
                         Menu {
                             if vm.availableModelTags.isEmpty {
@@ -602,12 +603,30 @@ struct SessionDetailView: View {
                                 }
                             }
                         } label: {
-                            Label(vm.activeModelSelectionLabel, systemImage: "cpu")
-                                .lineLimit(1)
-                                .frame(maxWidth: 260, alignment: .leading)
+                            HStack(spacing: 6) {
+                                Image(systemName: "cpu")
+                                    .font(.caption.weight(.semibold))
+                                Text(vm.activeModelSelectionLabel)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .frame(maxWidth: 280, alignment: .leading)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.72))
+                                    .overlay(
+                                        Capsule(style: .continuous)
+                                            .stroke(Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.10), lineWidth: 0.8)
+                                    )
+                            )
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
+                        .buttonStyle(.plain)
                         .accessibilityIdentifier("session.detail.modelPicker")
 
                         Spacer()
@@ -644,58 +663,72 @@ struct SessionDetailView: View {
                                     }
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 6)
-                                    .background(.quaternary.opacity(0.35), in: Capsule())
+                                    .background(
+                                        Capsule(style: .continuous)
+                                            .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.74))
+                                            .overlay(
+                                                Capsule(style: .continuous)
+                                                    .stroke(Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.10), lineWidth: 0.8)
+                                            )
+                                    )
                                 }
                             }
                             .padding(.horizontal, 1)
                         }
                     }
 
-                    HStack(alignment: .bottom, spacing: 8) {
+                    HStack(alignment: .bottom, spacing: 10) {
                         HStack(spacing: 6) {
-                            Button {
+                            composerUtilityButton(
+                                symbolName: "paperclip",
+                                helpText: vm.activeModelSupportsFileUploads ? "Attach files" : "Current model does not support file uploads",
+                                isActive: !vm.pendingAttachments.isEmpty,
+                                isDisabled: vm.isGenerating || !vm.activeModelSupportsFileUploads
+                            ) {
                                 isShowingFileImporter = true
-                            } label: {
-                                Image(systemName: "paperclip")
                             }
-                            .help(vm.activeModelSupportsFileUploads ? "Attach files" : "Current model does not support file uploads")
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .disabled(vm.isGenerating || !vm.activeModelSupportsFileUploads)
 
-                            Button {
+                            composerUtilityButton(
+                                symbolName: isDictating ? "waveform.circle.fill" : "mic",
+                                helpText: vm.activeModelSupportsSpeechInput ? "Dictate message" : "Current model does not support speech input",
+                                isActive: isDictating,
+                                isDisabled: vm.isGenerating || !vm.activeModelSupportsSpeechInput
+                            ) {
                                 toggleDictation()
-                            } label: {
-                                Image(systemName: isDictating ? "waveform.circle.fill" : "mic")
                             }
-                            .help(vm.activeModelSupportsSpeechInput ? "Dictate message" : "Current model does not support speech input")
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .disabled(vm.isGenerating || !vm.activeModelSupportsSpeechInput)
 
-                            Button {
+                            composerUtilityButton(
+                                symbolName: vm.isVoiceReplyEnabled ? "speaker.wave.2.fill" : "speaker.slash",
+                                helpText: vm.activeModelSupportsSpeechOutput ? "Read replies aloud" : "Current model does not support speech output",
+                                isActive: vm.isVoiceReplyEnabled,
+                                isDisabled: !vm.activeModelSupportsSpeechOutput
+                            ) {
                                 vm.isVoiceReplyEnabled.toggle()
                                 if !vm.isVoiceReplyEnabled {
                                     speechSynthesizer.stopSpeaking(at: .immediate)
                                 }
-                            } label: {
-                                Image(systemName: vm.isVoiceReplyEnabled ? "speaker.wave.2.fill" : "speaker.slash")
                             }
-                            .help(vm.activeModelSupportsSpeechOutput ? "Read replies aloud" : "Current model does not support speech output")
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .disabled(!vm.activeModelSupportsSpeechOutput)
                         }
 
                         TextField("Message", text: $vm.draft, axis: .vertical)
-                            .textFieldStyle(.roundedBorder)
-                            .lineLimit(2...6)
+                            .textFieldStyle(.plain)
+                            .lineLimit(2...8)
                             .focused($isDraftFieldFocused)
                             .accessibilityIdentifier("session.detail.messageField")
                             .onSubmit {
                                 guard !vm.isGenerating else { return }
                                 sendAndScroll(proxy)
                             }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color.white.opacity(0.80))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(Color.primary.opacity(colorScheme == .dark ? 0.22 : 0.10), lineWidth: 0.9)
+                                    )
+                            )
                             .frame(maxWidth: .infinity)
 
                         if vm.isGenerating {
@@ -703,25 +736,62 @@ struct SessionDetailView: View {
                                 vm.stopGenerating()
                                 stopDictationIfNeeded()
                             } label: {
-                                Label("Stop", systemImage: "stop.fill")
+                                Image(systemName: "stop.fill")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 34, height: 34)
+                                    .background(
+                                        Circle()
+                                            .fill(Color.red.opacity(colorScheme == .dark ? 0.84 : 0.92))
+                                    )
                             }
+                            .buttonStyle(.plain)
                             .accessibilityIdentifier("session.detail.stopButton")
-                            .buttonStyle(.bordered)
+                            .accessibilityLabel("Stop")
                         } else {
                             Button {
                                 sendAndScroll(proxy)
                             } label: {
-                                Label("Send", systemImage: "paperplane.fill")
+                                Image(systemName: "arrow.up")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(draftIsEmpty ? Color.secondary.opacity(0.65) : .white)
+                                    .frame(width: 34, height: 34)
+                                    .background(
+                                        Circle()
+                                            .fill(
+                                                draftIsEmpty
+                                                    ? AnyShapeStyle(Color.secondary.opacity(colorScheme == .dark ? 0.22 : 0.20))
+                                                    : AnyShapeStyle(LoomTheme.accentGradient(for: colorScheme))
+                                            )
+                                    )
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.08), lineWidth: draftIsEmpty ? 0.8 : 0)
+                                    )
                             }
                             .accessibilityIdentifier("session.detail.sendButton")
-                            .buttonStyle(.bordered)
-                            .tint(.accentColor)
-                            .disabled(vm.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .accessibilityLabel("Send")
+                            .buttonStyle(.plain)
+                            .disabled(draftIsEmpty)
                         }
                     }
                 }
-                .padding(8)
-                .loomCard(cornerRadius: 14)
+                .padding(12)
+                .background {
+                    let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    shape
+                        .fill(colorScheme == .dark ? .thinMaterial : .ultraThinMaterial)
+                        .overlay {
+                            shape.fill(LoomTheme.accentGradient(for: colorScheme).opacity(colorScheme == .dark ? 0.14 : 0.08))
+                        }
+                        .overlay {
+                            shape.strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.50), lineWidth: 0.8)
+                        }
+                        .overlay {
+                            shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.10), lineWidth: 1)
+                        }
+                }
+                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.18 : 0.07), radius: 10, x: 0, y: 4)
 
                 Spacer(minLength: 0)
             }
@@ -759,6 +829,45 @@ struct SessionDetailView: View {
             speechSynthesizer.stopSpeaking(at: .immediate)
             vm.stopGenerating()
         }
+    }
+
+    private var draftIsEmpty: Bool {
+        vm.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    @ViewBuilder
+    private func composerUtilityButton(
+        symbolName: String,
+        helpText: String,
+        isActive: Bool = false,
+        isDisabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: symbolName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(
+                    isDisabled
+                        ? Color.secondary.opacity(0.60)
+                        : (isActive ? Color.accentColor : Color.primary.opacity(0.82))
+                )
+                .frame(width: 30, height: 30)
+                .background(
+                    Circle()
+                        .fill(
+                            colorScheme == .dark
+                                ? Color.white.opacity(isActive ? 0.12 : 0.08)
+                                : Color.white.opacity(isActive ? 0.92 : 0.74)
+                        )
+                )
+                .overlay(
+                    Circle()
+                        .stroke(Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.10), lineWidth: 0.8)
+                )
+        }
+        .help(helpText)
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
     }
 
     private func sendAndScroll(_ proxy: ScrollViewProxy) {
