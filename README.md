@@ -31,7 +31,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | ⚡ **Streaming Assistant Replies** | Assistant responses stream live into the UI as tokens arrive. |
 | 🎙️ **Speech Input (Push-to-Talk)** | Use the mic button to dictate directly into the draft field with on-device speech recognition. |
 | 🔊 **Optional Voice Replies** | Toggle read-aloud mode so new assistant replies are spoken after generation completes. |
-| 📎 **File Upload Grounding** | Attach local text/PDF files and Loom injects extracted excerpts as context for the next turn. |
+| 📎 **File Upload Grounding** | Attach local text/PDF files and Loom injects extracted excerpts as context for the next turn, with size/count guardrails and automatic context-budget trimming. |
 | 🧭 **Capability-Aware Guidance** | Model cards and chat composer clearly show which models support speech input/output and file uploads. |
 | 💬 **Animated Typing Pulse** | While Loom is generating, assistant placeholders show a pulsing typing indicator. |
 | ✍️ **Readable Chat Formatting** | Assistant text is normalized for paragraph/list readability when raw output arrives as a dense block, while keeping stable whitespace-preserving rendering during streaming to avoid visual "snap back." |
@@ -57,6 +57,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Rename/Delete** from toolbar or session context menu
 - **Type + Send** in the message field to start a local model response
 - **Attach Files** with the paperclip button to add local text/PDF context
+  Limits: up to 8 files, max ~2 MB per text file, max ~5 MB per PDF, and excerpt trimming when total attachment context is too large.
 - **Dictate Message** with the mic button (when supported by the active model)
 - **Read Replies Aloud** with the speaker toggle (when supported by the active model)
 - **Auto-Correct + Spell Check** in the message field (uses your macOS Keyboard settings)
@@ -101,6 +102,7 @@ Chat interaction coordinator:
 - Supports cancellation and partial persistence
 - Supports retry/regenerate and model-switch-safe context behavior
 - Adds local attachment excerpts into request context for file-aware turns
+- Enforces attachment guardrails (file count, file size, and total context budget) with plain-language skip guidance
 - Exposes model capability gating for speech/file tools and inline guidance
 - Exposes inline banner state for guidance
 

@@ -177,12 +177,15 @@ private func cleanupSessionFolder(id: UUID) {
 }
 
 private func makeTemporaryTextFile(contents: String, fileName: String) throws -> URL {
+    try makeTemporaryFile(data: Data(contents.utf8), fileName: fileName)
+}
+
+private func makeTemporaryFile(data: Data, fileName: String) throws -> URL {
     let root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
     let folder = root.appendingPathComponent("loom-tests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
     let fileURL = folder.appendingPathComponent(fileName, isDirectory: false)
-    let data = Data(contents.utf8)
     try data.write(to: fileURL, options: [.atomic])
     return fileURL
 }
@@ -960,6 +963,64 @@ struct SessionMessagesViewModelCoverageTests {
 
     @Test
     @MainActor
+    func importAttachmentsShowsTooManyFilesGuidanceWhenLimitExceeded() async throws {
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Attachment Count Guard")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)),
+            chatClient: ScriptedChatClient([.complete(["unused"])])
+        )
+
+        var attachmentURLs: [URL] = []
+        for index in 1...10 {
+            let fileName = String(format: "bulk-%02d.txt", index)
+            let url = try makeTemporaryTextFile(contents: "Attachment \(index)", fileName: fileName)
+            attachmentURLs.append(url)
+        }
+        defer {
+            for url in attachmentURLs {
+                try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
+            }
+        }
+
+        await vm.importAttachments(from: attachmentURLs)
+
+        #expect(vm.pendingAttachments.count == 8)
+        #expect(vm.banner?.text.contains("too many files") == true)
+    }
+
+    @Test
+    @MainActor
+    func importAttachmentsRejectsOversizedPDFWithHelpfulMessage() async throws {
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Oversized PDF Guard")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)),
+            chatClient: ScriptedChatClient([.complete(["unused"])])
+        )
+
+        let oversizedPDF = try makeTemporaryFile(
+            data: Data(repeating: 0x20, count: 5_100_000),
+            fileName: "oversized.pdf"
+        )
+        defer { try? FileManager.default.removeItem(at: oversizedPDF.deletingLastPathComponent()) }
+
+        await vm.importAttachments(from: [oversizedPDF])
+
+        #expect(vm.pendingAttachments.isEmpty)
+        #expect(vm.banner?.text.contains("file is too large") == true)
+    }
+
+    @Test
+    @MainActor
     func sendDraftWithAttachedFileInjectsSystemContextForSupportedModel() async throws {
         clearModelSelectionPreference()
         defer { clearModelSelectionPreference() }
@@ -998,6 +1059,65 @@ struct SessionMessagesViewModelCoverageTests {
             #expect(systemMessages.count == 1)
             #expect(systemMessages.first?.content.contains("[field-notes.txt]") == true)
             #expect(systemMessages.first?.content.contains("calibration requires daily checks") == true)
+        }
+    }
+
+    @Test
+    @MainActor
+    func sendDraftWithLargeAttachmentsTrimsSystemContextToBudget() async throws {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        UserDefaults.standard.set("qwen2.5:7b", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Attachment Context Budget")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let firstURL = try makeTemporaryTextFile(
+            contents: String(repeating: "ALPHA ", count: 1_300),
+            fileName: "attachment-1.txt"
+        )
+        let secondURL = try makeTemporaryTextFile(
+            contents: String(repeating: "BRAVO ", count: 1_300),
+            fileName: "attachment-2.txt"
+        )
+        let thirdURL = try makeTemporaryTextFile(
+            contents: String(repeating: "CHARLIE ", count: 1_300),
+            fileName: "attachment-3.txt"
+        )
+        defer {
+            try? FileManager.default.removeItem(at: firstURL.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: secondURL.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: thirdURL.deletingLastPathComponent())
+        }
+
+        let chatClient = ScriptedChatClient([.complete(["Budgeted attachment context"])])
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)),
+            chatClient: chatClient
+        )
+
+        await vm.importAttachments(from: [firstURL, secondURL, thirdURL])
+        vm.draft = "Use all attachments"
+        await vm.sendDraft()
+        await waitUntil { !vm.isGenerating }
+
+        let requests = await chatClient.readRecordedRequests()
+        #expect(requests.count == 1)
+
+        if let request = requests.first {
+            let systemMessages = request.messages.filter { $0.role == .system }
+            #expect(systemMessages.count == 1)
+            #expect(systemMessages.first?.content.contains("[attachment-1.txt]") == true)
+            #expect(systemMessages.first?.content.contains("[attachment-2.txt]") == true)
+            #expect(systemMessages.first?.content.contains("[attachment-3.txt]") == false)
+            #expect(systemMessages.first?.content.contains("ALPHA") == true)
+            #expect(systemMessages.first?.content.contains("BRAVO") == true)
+            #expect(systemMessages.first?.content.contains("CHARLIE") == false)
+            #expect(systemMessages.first?.content.contains("trimmed attachment excerpts") == true)
         }
     }
 

@@ -37,6 +37,8 @@ final class SessionMessagesViewModel {
     private let catalog: ModelCatalog
     private let attachmentImporter: SessionAttachmentImporter
     private let streamUpdateInterval: Duration = .milliseconds(60)
+    private static let maxPendingAttachmentCount = 8
+    private static let maxAttachmentContextCharacters = 12_000
     private static let uiTestChatScenarioEnvironmentKey = "LOOM_UI_TEST_CHAT_STUB_SCENARIO"
     private static let uiTestActiveModelTagEnvironmentKey = "LOOM_UI_TEST_ACTIVE_MODEL_TAG"
     private static let uiTestChatScenarioDefaultsKey = "loom.uiTest.chatScenario"
@@ -173,9 +175,21 @@ final class SessionMessagesViewModel {
         guard !urls.isEmpty else { return }
 
         let result = await attachmentImporter.importFiles(at: urls)
+        var skippedMessages = result.skipped
+
         if !result.imported.isEmpty {
             var mergedByPath = Dictionary(uniqueKeysWithValues: pendingAttachments.map { ($0.sourcePath, $0) })
             for attachment in result.imported {
+                if mergedByPath[attachment.sourcePath] != nil {
+                    mergedByPath[attachment.sourcePath] = attachment
+                    continue
+                }
+
+                if mergedByPath.count >= Self.maxPendingAttachmentCount {
+                    skippedMessages.append("\(attachment.fileName) (too many files; keep up to \(Self.maxPendingAttachmentCount))")
+                    continue
+                }
+
                 mergedByPath[attachment.sourcePath] = attachment
             }
             pendingAttachments = mergedByPath.values.sorted { lhs, rhs in
@@ -183,9 +197,9 @@ final class SessionMessagesViewModel {
             }
         }
 
-        if !result.skipped.isEmpty {
-            let summary = result.skipped.prefix(2).joined(separator: ", ")
-            let skippedCount = result.skipped.count
+        if !skippedMessages.isEmpty {
+            let summary = skippedMessages.prefix(2).joined(separator: ", ")
+            let skippedCount = skippedMessages.count
             let suffix = skippedCount > 2 ? " and \(skippedCount - 2) more." : "."
             banner = BannerState(
                 text: "Some files couldn’t be added: \(summary)\(suffix)",
@@ -384,10 +398,36 @@ final class SessionMessagesViewModel {
         ]
         lines.append("")
 
+        var remainingCharacters = Self.maxAttachmentContextCharacters
+        var didTrimForBudget = false
+        var includedCount = 0
+
         for attachment in attachments {
+            guard remainingCharacters > 0 else {
+                didTrimForBudget = true
+                break
+            }
+
+            let excerpt = String(attachment.contentPreview.prefix(remainingCharacters))
+            guard excerpt.nonEmptyTrimmed != nil else { continue }
+
             lines.append("[\(attachment.fileName)]")
-            lines.append(attachment.contentPreview)
+            lines.append(excerpt)
             lines.append("")
+
+            includedCount += 1
+            if excerpt.count < attachment.contentPreview.count {
+                didTrimForBudget = true
+            }
+            remainingCharacters -= excerpt.count
+        }
+
+        if includedCount < attachments.count {
+            didTrimForBudget = true
+        }
+
+        if didTrimForBudget {
+            lines.append("Note: Loom trimmed attachment excerpts to fit this message.")
         }
 
         return ChatMessage(role: .system, content: lines.joined(separator: "\n"))
@@ -630,14 +670,23 @@ actor SessionAttachmentImporter {
         let skipped: [String]
     }
 
+    private static let maxFilesPerImport = 8
     private static let maxBytesPerTextFile = 2_000_000
+    private static let maxBytesPerPDFFile = 5_000_000
     private static let maxCharactersPerAttachment = 6_000
 
     func importFiles(at urls: [URL]) -> Result {
         var imported: [SessionMessagesViewModel.PendingAttachment] = []
         var skipped: [String] = []
+        let allowedURLs = Array(urls.prefix(Self.maxFilesPerImport))
 
-        for url in urls {
+        if urls.count > Self.maxFilesPerImport {
+            for url in urls.dropFirst(Self.maxFilesPerImport) {
+                skipped.append("\(url.lastPathComponent) (\(ImportError.tooManyFiles(maxFiles: Self.maxFilesPerImport).localizedDescription))")
+            }
+        }
+
+        for url in allowedURLs {
             do {
                 let text = try extractText(from: url)
                 let normalized = normalize(text)
@@ -671,7 +720,14 @@ actor SessionAttachmentImporter {
             }
         }
 
-        if url.pathExtension.lowercased() == "pdf" {
+        let isPDF = url.pathExtension.lowercased() == "pdf"
+        let maxBytes = isPDF ? Self.maxBytesPerPDFFile : Self.maxBytesPerTextFile
+
+        if let fileSize = fileSizeInBytes(for: url), fileSize > maxBytes {
+            throw ImportError.fileTooLarge(maxBytes: maxBytes)
+        }
+
+        if isPDF {
             guard let document = PDFDocument(url: url), let text = document.string else {
                 throw ImportError.unreadable
             }
@@ -679,8 +735,8 @@ actor SessionAttachmentImporter {
         }
 
         let data = try Data(contentsOf: url, options: [.mappedIfSafe])
-        if data.count > Self.maxBytesPerTextFile {
-            throw ImportError.fileTooLarge
+        if data.count > maxBytes {
+            throw ImportError.fileTooLarge(maxBytes: maxBytes)
         }
         if Self.isLikelyBinary(data) {
             throw ImportError.unsupportedType
@@ -702,6 +758,12 @@ actor SessionAttachmentImporter {
             .replacingOccurrences(of: "\t", with: " ")
     }
 
+    private func fileSizeInBytes(for url: URL) -> Int? {
+        let keys: Set<URLResourceKey> = [.fileSizeKey, .fileAllocatedSizeKey, .totalFileAllocatedSizeKey]
+        guard let values = try? url.resourceValues(forKeys: keys) else { return nil }
+        return values.fileSize ?? values.fileAllocatedSize ?? values.totalFileAllocatedSize
+    }
+
     nonisolated private static func isLikelyBinary(_ data: Data) -> Bool {
         guard !data.isEmpty else { return false }
         let sample = data.prefix(2_048)
@@ -719,15 +781,19 @@ actor SessionAttachmentImporter {
 
     private enum ImportError: LocalizedError {
         case unsupportedType
-        case fileTooLarge
+        case tooManyFiles(maxFiles: Int)
+        case fileTooLarge(maxBytes: Int)
         case unreadable
 
         var errorDescription: String? {
             switch self {
             case .unsupportedType:
                 return "unsupported format"
-            case .fileTooLarge:
-                return "file is too large"
+            case .tooManyFiles(let maxFiles):
+                return "too many files (keep up to \(maxFiles))"
+            case .fileTooLarge(let maxBytes):
+                let maxLabel = ByteCountFormatter.string(fromByteCount: Int64(maxBytes), countStyle: .file)
+                return "file is too large (max \(maxLabel))"
             case .unreadable:
                 return "couldn’t read text"
             }
