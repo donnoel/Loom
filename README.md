@@ -35,7 +35,8 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 🧭 **Capability-Aware Guidance** | Model cards and chat composer clearly show which models support speech input/output and file uploads. |
 | 💬 **Animated Typing Pulse** | While Loom is generating, assistant placeholders show a pulsing typing indicator. |
 | ✍️ **Readable Chat Formatting** | Assistant text is normalized for paragraph/list readability when raw output arrives as a dense block, while keeping stable whitespace-preserving rendering during streaming to avoid visual "snap back." |
-| 🎨 **Bold Workspace Styling** | Chat bubbles use richer layered gradients and depth, and sidebar selection uses a stronger highlighted chrome for quick scanning. |
+| 🎨 **Airy Workspace Styling** | The app uses a softer blue atmosphere with warmer sidebar highlights and gentler bubble depth for a calmer, friendlier feel. |
+| 💡 **Starter Prompt Chips** | New sessions include one-tap prompt suggestions that prefill the composer to help non-technical users get started quickly. |
 | ⏹️ **Stop Generation** | Cancel generation any time and keep the partial assistant response. |
 | 🧠 **Helpful Setup Gating** | Clear in-context guidance if no active model is selected or Ollama is unavailable. |
 | 🔁 **Model-Aware Context Switching** | If the active model changes for a session, the next turn uses user-only context to avoid old-model anchoring. |
@@ -57,6 +58,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Browse Sessions** directly in the sidebar (chat-list style)
 - **Rename/Delete** from toolbar or session context menu
 - **Type + Send** in the message field to start a local model response
+- **Tap Starter Prompts** in a new session to prefill a question instantly
 - **Attach Files** with the paperclip button to add local text/PDF context
   Limits: up to 8 files, max ~2 MB per text file, max ~5 MB per PDF, and excerpt trimming when total attachment context is too large.
 - **Dictate Message** with the mic button (when supported by the active model)

@@ -15,6 +15,7 @@ We have the V1 local chat spine in place:
 5) **Stop/cancel generation** keeps partial output and persists it
 6) **Multimodal chat controls** now include optional speech input/output and uploaded file context for supported models, with guardrails on attachment size/count/context budget and user-configurable voice quality controls (voice/rate preview)
 7) **Model Library UX** now supports drag-and-drop reordering of installed models with persisted order across refresh/relaunch
+8) **Session UX polish** now includes a softer airy-blue visual treatment, friendly empty-state onboarding, and starter prompt chips for non-technical users
 
 Current focus should be reliability, polish, and guardrails (not sweeping architecture rewrites).
 

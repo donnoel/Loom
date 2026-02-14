@@ -239,8 +239,22 @@ struct RootView: View {
 
             Rectangle()
                 .fill(LoomTheme.backgroundGradient(colorScheme))
-                .opacity(colorScheme == .dark ? 0.08 : 0.06)
+                .opacity(colorScheme == .dark ? 0.30 : 0.44)
                 .ignoresSafeArea()
+
+            Circle()
+                .fill(LoomTheme.accentGradient(colorScheme).opacity(colorScheme == .dark ? 0.24 : 0.20))
+                .frame(width: 520, height: 520)
+                .blur(radius: 120)
+                .offset(x: -290, y: -260)
+                .allowsHitTesting(false)
+
+            Circle()
+                .fill(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.25))
+                .frame(width: 420, height: 420)
+                .blur(radius: 110)
+                .offset(x: 320, y: -220)
+                .allowsHitTesting(false)
 
             NavigationSplitView {
                 sidebar

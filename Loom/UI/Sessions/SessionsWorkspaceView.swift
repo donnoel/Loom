@@ -395,6 +395,12 @@ struct SessionDetailView: View {
         .xml,
         .sourceCode
     ]
+    private static let starterPrompts: [String] = [
+        "Help me plan a simple dinner for tonight.",
+        "Write a friendly follow-up email.",
+        "Explain this in plain language.",
+        "Create a short to-do list for my day."
+    ]
 
     let session: Session
     let store: SessionStore
@@ -407,6 +413,7 @@ struct SessionDetailView: View {
     @State private var isBottomMarkerVisible: Bool = true
     @State private var isShowingFileImporter: Bool = false
     @State private var isDictating: Bool = false
+    @FocusState private var isDraftFieldFocused: Bool
     @AppStorage(LoomPreferenceKeys.voiceReplyVoiceIdentifier)
     private var voiceReplyVoiceIdentifier: String = ""
     @AppStorage(LoomPreferenceKeys.voiceReplyRate)
@@ -480,10 +487,7 @@ struct SessionDetailView: View {
                             }
 
                             if vm.messages.isEmpty {
-                                Text("AI can make mistakes.  Check important info.")
-                                    .foregroundStyle(.secondary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.vertical, 8)
+                                welcomeEmptyState
                             } else {
                                 ForEach(vm.messages, id: \.id) { message in
                                     MessageRowView(
@@ -496,6 +500,7 @@ struct SessionDetailView: View {
                                         } : nil
                                     )
                                     .equatable()
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
                                 }
                             }
 
@@ -510,6 +515,7 @@ struct SessionDetailView: View {
                                 }
                         }
                         .padding(.vertical, 8)
+                        .animation(.easeOut(duration: 0.22), value: vm.messages.map(\.id))
                     }
                     .task {
                         await vm.load()
@@ -620,6 +626,7 @@ struct SessionDetailView: View {
                         TextField("Message", text: $vm.draft, axis: .vertical)
                             .textFieldStyle(.roundedBorder)
                             .lineLimit(2...6)
+                            .focused($isDraftFieldFocused)
                             .accessibilityIdentifier("session.detail.messageField")
                             .onSubmit {
                                 guard !vm.isGenerating else { return }
@@ -787,6 +794,52 @@ struct SessionDetailView: View {
         speechSynthesizer.stopSpeaking(at: .immediate)
         speechSynthesizer.speak(utterance)
     }
+
+    private var welcomeEmptyState: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "sparkles")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Welcome to your new session")
+                        .font(.headline)
+                    Text("Ask Loom anything in everyday language. You can also attach files or use your mic.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Text("Try one of these:")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Self.starterPrompts, id: \.self) { prompt in
+                        StarterPromptChip(prompt: prompt) {
+                            applyStarterPrompt(prompt)
+                        }
+                    }
+                }
+                .padding(.horizontal, 1)
+            }
+
+            Text("AI can make mistakes. Check important info.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .loomCard(cornerRadius: 12)
+        .padding(.vertical, 6)
+    }
+
+    private func applyStarterPrompt(_ prompt: String) {
+        vm.draft = prompt
+        isDraftFieldFocused = true
+    }
 }
 
 @MainActor
@@ -919,6 +972,7 @@ private struct MessageRowView: View, Equatable {
     let message: ChatMessage
     let isThinking: Bool
     let onRegenerate: (() -> Void)?
+    @State private var isHovered: Bool = false
 
     static func == (lhs: MessageRowView, rhs: MessageRowView) -> Bool {
         lhs.message == rhs.message && lhs.isThinking == rhs.isThinking
@@ -945,6 +999,13 @@ private struct MessageRowView: View, Equatable {
         }
         .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
         .padding(.vertical, 4)
+        .scaleEffect(isHovered ? 1.006 : 1.0)
+        .offset(y: isHovered ? -1 : 0)
+        .animation(.easeInOut(duration: 0.14), value: isHovered)
+        .onHover { hovering in
+            guard message.role == .assistant || message.role == .user else { return }
+            isHovered = hovering
+        }
     }
 
     private var roleLabel: String {
@@ -979,6 +1040,37 @@ private struct MessageRowView: View, Equatable {
             return "session.message.system.bubble"
         case .tool:
             return "session.message.tool.bubble"
+        }
+    }
+}
+
+private struct StarterPromptChip: View {
+    let prompt: String
+    let onTap: () -> Void
+    @State private var isHovered: Bool = false
+
+    var body: some View {
+        Button(action: onTap) {
+            Text(prompt)
+                .font(.caption)
+                .multilineTextAlignment(.leading)
+                .lineLimit(2)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(Color.accentColor.opacity(isHovered ? 0.16 : 0.10))
+                        .overlay(
+                            Capsule(style: .continuous)
+                                .stroke(Color.primary.opacity(isHovered ? 0.18 : 0.10), lineWidth: 1)
+                        )
+                )
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(isHovered ? 1.02 : 1.0)
+        .animation(.easeInOut(duration: 0.14), value: isHovered)
+        .onHover { hovering in
+            isHovered = hovering
         }
     }
 }

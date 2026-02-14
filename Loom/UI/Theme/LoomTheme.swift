@@ -3,9 +3,9 @@ import SwiftUI
 nonisolated enum LoomTheme {
     private static let darkBackground = LinearGradient(
         colors: [
-            Color.accentColor.opacity(0.32),
-            Color(red: 0.34, green: 0.47, blue: 0.72).opacity(0.24),
-            Color(red: 0.10, green: 0.13, blue: 0.20).opacity(0.20)
+            Color(red: 0.09, green: 0.13, blue: 0.20).opacity(0.92),
+            Color(red: 0.13, green: 0.19, blue: 0.30).opacity(0.88),
+            Color(red: 0.07, green: 0.11, blue: 0.17).opacity(0.94)
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
@@ -13,9 +13,9 @@ nonisolated enum LoomTheme {
 
     private static let lightBackground = LinearGradient(
         colors: [
-            Color.accentColor.opacity(0.20),
-            Color(red: 0.62, green: 0.74, blue: 0.90).opacity(0.16),
-            Color(red: 0.94, green: 0.97, blue: 1.00).opacity(0.14)
+            Color(red: 0.98, green: 0.99, blue: 1.00).opacity(0.96),
+            Color(red: 0.93, green: 0.97, blue: 1.00).opacity(0.94),
+            Color(red: 0.87, green: 0.93, blue: 0.99).opacity(0.92)
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
@@ -23,8 +23,8 @@ nonisolated enum LoomTheme {
 
     private static let darkAccent = LinearGradient(
         colors: [
-            Color.accentColor.opacity(0.72),
-            Color(red: 0.42, green: 0.56, blue: 0.86).opacity(0.68)
+            Color(red: 0.44, green: 0.62, blue: 0.92).opacity(0.76),
+            Color(red: 0.33, green: 0.52, blue: 0.86).opacity(0.74)
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
@@ -32,8 +32,8 @@ nonisolated enum LoomTheme {
 
     private static let lightAccent = LinearGradient(
         colors: [
-            Color.accentColor.opacity(0.62),
-            Color(red: 0.56, green: 0.69, blue: 0.90).opacity(0.58)
+            Color(red: 0.56, green: 0.72, blue: 0.95).opacity(0.64),
+            Color(red: 0.46, green: 0.64, blue: 0.91).opacity(0.60)
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
@@ -41,9 +41,9 @@ nonisolated enum LoomTheme {
 
     private static let darkUserBubble = LinearGradient(
         colors: [
-            Color.accentColor.opacity(0.90),
-            Color(red: 0.39, green: 0.53, blue: 0.86).opacity(0.88),
-            Color(red: 0.25, green: 0.36, blue: 0.73).opacity(0.84)
+            Color(red: 0.43, green: 0.58, blue: 0.90).opacity(0.90),
+            Color(red: 0.34, green: 0.50, blue: 0.84).opacity(0.88),
+            Color(red: 0.27, green: 0.42, blue: 0.77).opacity(0.84)
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
@@ -51,8 +51,8 @@ nonisolated enum LoomTheme {
 
     private static let lightUserBubble = LinearGradient(
         colors: [
-            Color.accentColor.opacity(0.82),
-            Color(red: 0.64, green: 0.76, blue: 0.94).opacity(0.74)
+            Color(red: 0.76, green: 0.86, blue: 0.99).opacity(0.96),
+            Color(red: 0.67, green: 0.80, blue: 0.97).opacity(0.94)
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
@@ -60,8 +60,8 @@ nonisolated enum LoomTheme {
 
     private static let darkAssistantBubble = LinearGradient(
         colors: [
-            Color(red: 0.22, green: 0.25, blue: 0.34).opacity(0.92),
-            Color(red: 0.17, green: 0.20, blue: 0.30).opacity(0.90)
+            Color(red: 0.20, green: 0.25, blue: 0.34).opacity(0.92),
+            Color(red: 0.16, green: 0.21, blue: 0.31).opacity(0.90)
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
@@ -69,8 +69,8 @@ nonisolated enum LoomTheme {
 
     private static let lightAssistantBubble = LinearGradient(
         colors: [
-            Color.white.opacity(0.92),
-            Color(red: 0.93, green: 0.96, blue: 0.99).opacity(0.90)
+            Color.white.opacity(0.95),
+            Color(red: 0.95, green: 0.98, blue: 1.00).opacity(0.94)
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
@@ -116,12 +116,12 @@ nonisolated enum LoomTheme {
             return (
                 alignment: .trailing,
                 background: AnyShapeStyle(scheme == .dark ? darkUserBubble : lightUserBubble),
-                foreground: .white,
-                strokeOpacity: scheme == .dark ? 0.44 : 0.34,
-                cornerRadius: 17,
-                shadow: Color.black.opacity(scheme == .dark ? 0.28 : 0.10),
-                shadowRadius: scheme == .dark ? 14 : 9,
-                shadowYOffset: scheme == .dark ? 5 : 3
+                foreground: scheme == .dark ? .white : Color(red: 0.14, green: 0.23, blue: 0.39),
+                strokeOpacity: scheme == .dark ? 0.38 : 0.28,
+                cornerRadius: 19,
+                shadow: Color.black.opacity(scheme == .dark ? 0.24 : 0.08),
+                shadowRadius: scheme == .dark ? 12 : 7,
+                shadowYOffset: scheme == .dark ? 4 : 2
             )
 
         case .assistant:
@@ -129,10 +129,10 @@ nonisolated enum LoomTheme {
                 alignment: .leading,
                 background: AnyShapeStyle(scheme == .dark ? darkAssistantBubble : lightAssistantBubble),
                 foreground: .primary,
-                strokeOpacity: scheme == .dark ? 0.34 : 0.22,
-                cornerRadius: 17,
-                shadow: Color.black.opacity(scheme == .dark ? 0.20 : 0.06),
-                shadowRadius: scheme == .dark ? 10 : 6,
+                strokeOpacity: scheme == .dark ? 0.30 : 0.20,
+                cornerRadius: 19,
+                shadow: Color.black.opacity(scheme == .dark ? 0.17 : 0.05),
+                shadowRadius: scheme == .dark ? 8 : 5,
                 shadowYOffset: scheme == .dark ? 3 : 2
             )
 
@@ -218,20 +218,23 @@ private struct LoomSidebarItemModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
-        let selectedStrokeOpacity = colorScheme == .dark ? 0.28 : 0.16
-        let unselectedStrokeOpacity = colorScheme == .dark ? 0.12 : 0.08
+        let selectedStrokeOpacity = colorScheme == .dark ? 0.32 : 0.20
+        let unselectedStrokeOpacity = colorScheme == .dark ? 0.12 : 0.07
 
         content
             .background {
                 if selected {
                     shape
-                        .fill(LoomTheme.accentGradient(colorScheme).opacity(colorScheme == .dark ? 0.30 : 0.16))
+                        .fill(LoomTheme.accentGradient(colorScheme).opacity(colorScheme == .dark ? 0.33 : 0.20))
                         .overlay {
-                            shape.fill(Color.white.opacity(colorScheme == .dark ? 0.03 : 0.30))
+                            shape.fill(Color.white.opacity(colorScheme == .dark ? 0.04 : 0.34))
+                        }
+                        .overlay {
+                            shape.strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.45), lineWidth: 0.8)
                         }
                 } else {
                     shape
-                        .fill(Color.primary.opacity(colorScheme == .dark ? 0.05 : 0.025))
+                        .fill(Color.primary.opacity(colorScheme == .dark ? 0.045 : 0.020))
                 }
             }
             .overlay {
@@ -251,9 +254,9 @@ private struct LoomSidebarItemModifier: ViewModifier {
             }
             .shadow(
                 color: selected ? Color.black.opacity(colorScheme == .dark ? 0.24 : 0.10) : .clear,
-                radius: 10,
+                radius: 8,
                 x: 0,
-                y: 3
+                y: 2
             )
     }
 }
