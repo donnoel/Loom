@@ -411,6 +411,8 @@ struct SessionDetailView: View {
     @State private var vm: SessionMessagesViewModel
     @State private var didInitialScroll: Bool = false
     @State private var isBottomMarkerVisible: Bool = true
+    @State private var scrollViewportFrame: CGRect = .null
+    @State private var bottomMarkerFrame: CGRect = .null
     @State private var isShowingFileImporter: Bool = false
     @State private var isDictating: Bool = false
     @FocusState private var isDraftFieldFocused: Bool
@@ -507,15 +509,33 @@ struct SessionDetailView: View {
                             Color.clear
                                 .frame(height: 1)
                                 .id("bottom")
-                                .onAppear {
-                                    setBottomMarkerVisibility(true)
-                                }
-                                .onDisappear {
-                                    setBottomMarkerVisibility(false)
+                                .background(
+                                    GeometryReader { geometry in
+                                        Color.clear.preference(
+                                            key: SessionBottomMarkerFramePreferenceKey.self,
+                                            value: geometry.frame(in: .global)
+                                        )
+                                    }
+                                )
+                                .onPreferenceChange(SessionBottomMarkerFramePreferenceKey.self) { frame in
+                                    bottomMarkerFrame = frame
+                                    refreshJumpToBottomVisibility()
                                 }
                         }
                         .padding(.vertical, 8)
                         .animation(.easeOut(duration: 0.22), value: vm.messages.map(\.id))
+                    }
+                    .background(
+                        GeometryReader { geometry in
+                            Color.clear.preference(
+                                key: SessionScrollViewportFramePreferenceKey.self,
+                                value: geometry.frame(in: .global)
+                            )
+                        }
+                    )
+                    .onPreferenceChange(SessionScrollViewportFramePreferenceKey.self) { frame in
+                        scrollViewportFrame = frame
+                        refreshJumpToBottomVisibility()
                     }
                     .task {
                         await vm.load()
@@ -734,6 +754,22 @@ struct SessionDetailView: View {
         withAnimation(.easeInOut(duration: 0.16)) {
             isBottomMarkerVisible = isVisible
         }
+    }
+
+    private func refreshJumpToBottomVisibility() {
+        guard !vm.messages.isEmpty else {
+            setBottomMarkerVisibility(true)
+            return
+        }
+
+        guard !scrollViewportFrame.isNull, !bottomMarkerFrame.isNull else {
+            setBottomMarkerVisibility(false)
+            return
+        }
+
+        let overlap = scrollViewportFrame.intersection(bottomMarkerFrame)
+        let isBottomVisible = !overlap.isNull && overlap.height > 0
+        setBottomMarkerVisibility(isBottomVisible)
     }
 
     private func toggleDictation() {
@@ -1072,6 +1108,22 @@ private struct StarterPromptChip: View {
         .onHover { hovering in
             isHovered = hovering
         }
+    }
+}
+
+private struct SessionBottomMarkerFramePreferenceKey: PreferenceKey {
+    static var defaultValue: CGRect = .null
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
+private struct SessionScrollViewportFramePreferenceKey: PreferenceKey {
+    static var defaultValue: CGRect = .null
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
     }
 }
 
