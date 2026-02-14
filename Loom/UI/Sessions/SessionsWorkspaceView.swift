@@ -407,6 +407,10 @@ struct SessionDetailView: View {
     @State private var isBottomMarkerVisible: Bool = true
     @State private var isShowingFileImporter: Bool = false
     @State private var isDictating: Bool = false
+    @AppStorage(LoomPreferenceKeys.voiceReplyVoiceIdentifier)
+    private var voiceReplyVoiceIdentifier: String = ""
+    @AppStorage(LoomPreferenceKeys.voiceReplyRate)
+    private var voiceReplyRate: Double = VoiceReplyPreferences.defaultRate
     @State private var lastSpokenAssistantMessageID: UUID?
     @State private var speechInputController = SpeechInputController()
     @State private var speechSynthesizer = AVSpeechSynthesizer()
@@ -772,8 +776,13 @@ struct SessionDetailView: View {
         lastSpokenAssistantMessageID = latestAssistant.id
 
         let utterance = AVSpeechUtterance(string: latestAssistant.content)
-        utterance.rate = 0.46
-        utterance.voice = AVSpeechSynthesisVoice(language: Locale.current.identifier)
+        utterance.rate = Float(VoiceReplyPreferences.normalizedRate(voiceReplyRate))
+        if let configuredIdentifier = voiceReplyVoiceIdentifier.nonEmptyTrimmed,
+           let configuredVoice = AVSpeechSynthesisVoice(identifier: configuredIdentifier) {
+            utterance.voice = configuredVoice
+        } else {
+            utterance.voice = AVSpeechSynthesisVoice(language: Locale.current.identifier)
+        }
 
         speechSynthesizer.stopSpeaking(at: .immediate)
         speechSynthesizer.speak(utterance)

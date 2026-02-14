@@ -30,7 +30,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 💾 **Disk-Backed Persistence** | Each session stores `metadata.json` + append-only `messages.jsonl`. |
 | ⚡ **Streaming Assistant Replies** | Assistant responses stream live into the UI as tokens arrive. |
 | 🎙️ **Speech Input (Push-to-Talk)** | Use the mic button to dictate directly into the draft field with on-device speech recognition. |
-| 🔊 **Optional Voice Replies** | Toggle read-aloud mode so new assistant replies are spoken after generation completes. |
+| 🔊 **Optional Voice Replies** | Toggle read-aloud mode so new assistant replies are spoken after generation completes, using your chosen voice + speaking rate from Settings. |
 | 📎 **File Upload Grounding** | Attach local text/PDF files and Loom injects extracted excerpts as context for the next turn, with size/count guardrails and automatic context-budget trimming. |
 | 🧭 **Capability-Aware Guidance** | Model cards and chat composer clearly show which models support speech input/output and file uploads. |
 | 💬 **Animated Typing Pulse** | While Loom is generating, assistant placeholders show a pulsing typing indicator. |
@@ -60,6 +60,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
   Limits: up to 8 files, max ~2 MB per text file, max ~5 MB per PDF, and excerpt trimming when total attachment context is too large.
 - **Dictate Message** with the mic button (when supported by the active model)
 - **Read Replies Aloud** with the speaker toggle (when supported by the active model)
+- **Tune Voice Quality** in Settings with a voice picker, speaking-rate slider, and preview button
 - **Auto-Correct + Spell Check** in the message field (uses your macOS Keyboard settings)
 - **Stop** to cancel streaming while keeping partial text
 - **Jump to Bottom** with the floating down-arrow when you scroll up in long chats

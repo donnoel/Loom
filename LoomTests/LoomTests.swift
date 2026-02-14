@@ -274,6 +274,26 @@ struct StringTrimmingTests {
     }
 }
 
+struct VoiceReplyPreferencesTests {
+    @Test
+    func normalizedRateReturnsDefaultForInvalidValues() {
+        #expect(VoiceReplyPreferences.normalizedRate(.nan) == VoiceReplyPreferences.defaultRate)
+        #expect(VoiceReplyPreferences.normalizedRate(.infinity) == VoiceReplyPreferences.defaultRate)
+    }
+
+    @Test
+    func normalizedRateClampsToBounds() {
+        #expect(VoiceReplyPreferences.normalizedRate(0.1) == VoiceReplyPreferences.minRate)
+        #expect(VoiceReplyPreferences.normalizedRate(0.95) == VoiceReplyPreferences.maxRate)
+    }
+
+    @Test
+    func normalizedRateKeepsInRangeValues() {
+        #expect(VoiceReplyPreferences.normalizedRate(0.46) == 0.46)
+        #expect(VoiceReplyPreferences.normalizedRate(0.59) == 0.59)
+    }
+}
+
 struct ChatDisplayFormatterTests {
     @Test
     func formatAddsParagraphBreaksForShortPlainText() {

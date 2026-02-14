@@ -83,10 +83,24 @@ nonisolated enum LoomPreferenceKeys {
     static let statusAutoRefreshEnabled = "statusAutoRefreshEnabled"
     static let modelsAutoCheckEnabled = "modelsAutoCheckEnabled"
     static let voiceReplyEnabled = "voiceReplyEnabled"
+    static let voiceReplyVoiceIdentifier = "voiceReplyVoiceIdentifier"
+    static let voiceReplyRate = "voiceReplyRate"
     static let sessionLastStreamModelKeyPrefix = "sessionLastStreamModel."
 
     static func sessionLastStreamModelKey(for sessionID: UUID) -> String {
         "\(sessionLastStreamModelKeyPrefix)\(sessionID.uuidString)"
+    }
+}
+
+nonisolated enum VoiceReplyPreferences {
+    static let defaultRate: Double = 0.46
+    static let minRate: Double = 0.35
+    static let maxRate: Double = 0.60
+    static let previewText = "This is Loom. Adjust my voice and speaking speed until it sounds right to you."
+
+    static func normalizedRate(_ value: Double) -> Double {
+        guard value.isFinite else { return defaultRate }
+        return min(max(value, minRate), maxRate)
     }
 }
 
