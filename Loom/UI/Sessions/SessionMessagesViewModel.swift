@@ -1,9 +1,22 @@
 import Foundation
 import Observation
+import PDFKit
 
 @MainActor
 @Observable
 final class SessionMessagesViewModel {
+    struct PendingAttachment: Identifiable, Equatable, Sendable {
+        let id: UUID
+        let fileName: String
+        let sourcePath: String
+        let contentPreview: String
+        let originalCharacterCount: Int
+
+        var characterCountLabel: String {
+            "\(originalCharacterCount) chars"
+        }
+    }
+
     struct BannerState: Equatable {
         enum Action: Equatable {
             case browseModels
@@ -21,6 +34,8 @@ final class SessionMessagesViewModel {
     private let onActivity: (() async -> Void)?
     private let ollamaClient: any OllamaStatusProviding
     private let chatClient: any OllamaChatStreaming
+    private let catalog: ModelCatalog
+    private let attachmentImporter: SessionAttachmentImporter
     private let streamUpdateInterval: Duration = .milliseconds(60)
     private static let uiTestChatScenarioEnvironmentKey = "LOOM_UI_TEST_CHAT_STUB_SCENARIO"
     private static let uiTestActiveModelTagEnvironmentKey = "LOOM_UI_TEST_ACTIVE_MODEL_TAG"
@@ -33,6 +48,7 @@ final class SessionMessagesViewModel {
     var generatingMessageID: UUID?
     var banner: BannerState?
     private(set) var isShowingFullHistory: Bool = false
+    private(set) var pendingAttachments: [PendingAttachment] = []
     private var lastStreamModel: String?
     private var lastStreamContext: [ChatMessage]?
     private var lastStreamPlaceholderID: UUID?
@@ -43,11 +59,15 @@ final class SessionMessagesViewModel {
         sessionID: UUID,
         onActivity: (() async -> Void)? = nil,
         ollamaClient: OllamaClient = OllamaClient(),
-        chatClient: OllamaChatClient? = nil
+        chatClient: OllamaChatClient? = nil,
+        catalog: ModelCatalog = .load(),
+        attachmentImporter: SessionAttachmentImporter = SessionAttachmentImporter()
     ) {
         self.store = store
         self.sessionID = sessionID
         self.onActivity = onActivity
+        self.catalog = catalog
+        self.attachmentImporter = attachmentImporter
 
         if let scenario = Self.uiTestChatScenario() {
             let uiTestModelTag = Self.uiTestActiveModelTag()
@@ -66,14 +86,65 @@ final class SessionMessagesViewModel {
         sessionID: UUID,
         onActivity: (() async -> Void)? = nil,
         ollamaClient: any OllamaStatusProviding,
-        chatClient: any OllamaChatStreaming
+        chatClient: any OllamaChatStreaming,
+        catalog: ModelCatalog = .load(),
+        attachmentImporter: SessionAttachmentImporter = SessionAttachmentImporter()
     ) {
         self.store = store
         self.sessionID = sessionID
         self.onActivity = onActivity
         self.ollamaClient = ollamaClient
         self.chatClient = chatClient
+        self.catalog = catalog
+        self.attachmentImporter = attachmentImporter
         self.lastStreamModel = Self.storedLastStreamModel(for: sessionID)
+    }
+
+    var activeModelSupportsSpeechInput: Bool {
+        activeModelCapabilities.speechInput
+    }
+
+    var activeModelSupportsSpeechOutput: Bool {
+        activeModelCapabilities.speechOutput
+    }
+
+    var activeModelSupportsFileUploads: Bool {
+        activeModelCapabilities.fileUploads
+    }
+
+    var activeModelCapabilityNote: String? {
+        guard let activeModelTag = selectedActiveModelTag,
+              let model = catalog.byTag(activeModelTag) else {
+            return nil
+        }
+
+        let capabilities = model.resolvedCapabilities
+        var unavailable: [String] = []
+        if !capabilities.speechInput {
+            unavailable.append("speech input")
+        }
+        if !capabilities.speechOutput {
+            unavailable.append("speech output")
+        }
+        if !capabilities.fileUploads {
+            unavailable.append("file uploads")
+        }
+
+        guard !unavailable.isEmpty else { return nil }
+        let unavailableList = unavailable.joined(separator: ", ")
+        return "\(model.displayName) currently doesn’t support \(unavailableList)."
+    }
+
+    var isVoiceReplyEnabled: Bool {
+        get {
+            if let stored = UserDefaults.standard.object(forKey: LoomPreferenceKeys.voiceReplyEnabled) as? Bool {
+                return stored
+            }
+            return false
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: LoomPreferenceKeys.voiceReplyEnabled)
+        }
     }
 
     func load() async {
@@ -98,11 +169,52 @@ final class SessionMessagesViewModel {
         }
     }
 
+    func importAttachments(from urls: [URL]) async {
+        guard !urls.isEmpty else { return }
+
+        let result = await attachmentImporter.importFiles(at: urls)
+        if !result.imported.isEmpty {
+            var mergedByPath = Dictionary(uniqueKeysWithValues: pendingAttachments.map { ($0.sourcePath, $0) })
+            for attachment in result.imported {
+                mergedByPath[attachment.sourcePath] = attachment
+            }
+            pendingAttachments = mergedByPath.values.sorted { lhs, rhs in
+                lhs.fileName.localizedCaseInsensitiveCompare(rhs.fileName) == .orderedAscending
+            }
+        }
+
+        if !result.skipped.isEmpty {
+            let summary = result.skipped.prefix(2).joined(separator: ", ")
+            let skippedCount = result.skipped.count
+            let suffix = skippedCount > 2 ? " and \(skippedCount - 2) more." : "."
+            banner = BannerState(
+                text: "Some files couldn’t be added: \(summary)\(suffix)",
+                actionTitle: nil,
+                action: nil
+            )
+        } else if !result.imported.isEmpty {
+            banner = nil
+        }
+    }
+
+    func removeAttachment(id: UUID) {
+        pendingAttachments.removeAll { $0.id == id }
+    }
+
     func sendDraft() async {
         guard !isGenerating else { return }
 
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+
+        if !pendingAttachments.isEmpty && !activeModelSupportsFileUploads {
+            banner = BannerState(
+                text: "This model can’t use uploaded files yet. Choose one with file upload support.",
+                actionTitle: "Choose Model",
+                action: .browseModels
+            )
+            return
+        }
 
         guard let activeModel = selectedActiveModelTag else {
             banner = BannerState(
@@ -124,11 +236,13 @@ final class SessionMessagesViewModel {
         }
 
         let userMessage = ChatMessage(role: .user, content: text)
+        let attachmentsForThisTurn = pendingAttachments
 
         do {
             try await store.appendMessage(userMessage, sessionID: sessionID)
             messages.append(userMessage)
             draft = ""
+            pendingAttachments = []
             banner = nil
 
             if let onActivity {
@@ -149,11 +263,14 @@ final class SessionMessagesViewModel {
         generatingMessageID = assistantPlaceholder.id
         generatingMessageIndex = messages.index(before: messages.endIndex)
 
-        let context: [ChatMessage]
+        var context: [ChatMessage]
         if didSwitchModels(from: lastStreamModel, to: activeModel) {
             context = contextMessagesForModelSwitch(limit: 20)
         } else {
             context = contextMessages(excluding: assistantPlaceholder.id, limit: 20)
+        }
+        if let attachmentContext = attachmentContextMessage(for: attachmentsForThisTurn) {
+            context.append(attachmentContext)
         }
         lastStreamModel = activeModel
         persistLastStreamModel(activeModel)
@@ -233,6 +350,14 @@ final class SessionMessagesViewModel {
         UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag)?.nonEmptyTrimmed
     }
 
+    private var activeModelCapabilities: CatalogModelCapabilities {
+        guard let activeModelTag = selectedActiveModelTag,
+              let model = catalog.byTag(activeModelTag) else {
+            return .default
+        }
+        return model.resolvedCapabilities
+    }
+
     private func contextMessagesForModelSwitch(limit: Int) -> [ChatMessage] {
         guard limit > 0 else { return [] }
         let userOnlyMessages = messages.filter { $0.role == .user }
@@ -248,6 +373,24 @@ final class SessionMessagesViewModel {
             return false
         }
         return previousModel != currentModel
+    }
+
+    private func attachmentContextMessage(for attachments: [PendingAttachment]) -> ChatMessage? {
+        guard !attachments.isEmpty else { return nil }
+
+        var lines: [String] = [
+            "Use the attached local file excerpts as trusted context when relevant.",
+            "If you cite details from an attachment, name the file in your answer."
+        ]
+        lines.append("")
+
+        for attachment in attachments {
+            lines.append("[\(attachment.fileName)]")
+            lines.append(attachment.contentPreview)
+            lines.append("")
+        }
+
+        return ChatMessage(role: .system, content: lines.joined(separator: "\n"))
     }
 
     private func persistLastStreamModel(_ model: String) {
@@ -478,6 +621,117 @@ final class SessionMessagesViewModel {
         }
 
         return found
+    }
+}
+
+actor SessionAttachmentImporter {
+    struct Result: Sendable {
+        let imported: [SessionMessagesViewModel.PendingAttachment]
+        let skipped: [String]
+    }
+
+    private static let maxBytesPerTextFile = 2_000_000
+    private static let maxCharactersPerAttachment = 6_000
+
+    func importFiles(at urls: [URL]) -> Result {
+        var imported: [SessionMessagesViewModel.PendingAttachment] = []
+        var skipped: [String] = []
+
+        for url in urls {
+            do {
+                let text = try extractText(from: url)
+                let normalized = normalize(text)
+                guard let trimmed = normalized.nonEmptyTrimmed else {
+                    skipped.append("\(url.lastPathComponent) (empty text)")
+                    continue
+                }
+
+                let preview = String(trimmed.prefix(Self.maxCharactersPerAttachment))
+                let attachment = SessionMessagesViewModel.PendingAttachment(
+                    id: UUID(),
+                    fileName: url.lastPathComponent,
+                    sourcePath: url.path,
+                    contentPreview: preview,
+                    originalCharacterCount: trimmed.count
+                )
+                imported.append(attachment)
+            } catch {
+                skipped.append("\(url.lastPathComponent) (\(error.localizedDescription))")
+            }
+        }
+
+        return Result(imported: imported, skipped: skipped)
+    }
+
+    private func extractText(from url: URL) throws -> String {
+        let accessGranted = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessGranted {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        if url.pathExtension.lowercased() == "pdf" {
+            guard let document = PDFDocument(url: url), let text = document.string else {
+                throw ImportError.unreadable
+            }
+            return text
+        }
+
+        let data = try Data(contentsOf: url, options: [.mappedIfSafe])
+        if data.count > Self.maxBytesPerTextFile {
+            throw ImportError.fileTooLarge
+        }
+        if Self.isLikelyBinary(data) {
+            throw ImportError.unsupportedType
+        }
+
+        for encoding in [String.Encoding.utf8, .utf16, .utf16LittleEndian, .utf16BigEndian, .isoLatin1] {
+            if let decoded = String(data: data, encoding: encoding), decoded.nonEmptyTrimmed != nil {
+                return decoded
+            }
+        }
+
+        throw ImportError.unreadable
+    }
+
+    private func normalize(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .replacingOccurrences(of: "\t", with: " ")
+    }
+
+    nonisolated private static func isLikelyBinary(_ data: Data) -> Bool {
+        guard !data.isEmpty else { return false }
+        let sample = data.prefix(2_048)
+        guard !sample.isEmpty else { return false }
+
+        let controlCharacterCount = sample.reduce(into: 0) { count, byte in
+            let isControl = byte < 0x09 || (byte > 0x0D && byte < 0x20)
+            if isControl {
+                count += 1
+            }
+        }
+
+        return Double(controlCharacterCount) / Double(sample.count) > 0.12
+    }
+
+    private enum ImportError: LocalizedError {
+        case unsupportedType
+        case fileTooLarge
+        case unreadable
+
+        var errorDescription: String? {
+            switch self {
+            case .unsupportedType:
+                return "unsupported format"
+            case .fileTooLarge:
+                return "file is too large"
+            case .unreadable:
+                return "couldn’t read text"
+            }
+        }
     }
 }
 

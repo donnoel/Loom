@@ -13,6 +13,7 @@ We have the V1 local chat spine in place:
 3) **Local Ollama model selection + status** are integrated
 4) **Streaming assistant responses** are integrated end-to-end
 5) **Stop/cancel generation** keeps partial output and persists it
+6) **Multimodal chat controls** now include optional speech input/output and uploaded file context for supported models
 
 Current focus should be reliability, polish, and guardrails (not sweeping architecture rewrites).
 
@@ -85,6 +86,7 @@ Use plain language and actionable buttons.
 
 ## Near-term priorities
 - Strengthen automated tests for send/stream/cancel/failure persistence paths.
+- Harden multimodal paths (speech permissions, file parsing edge cases, capability messaging).
 - Improve message rendering polish (rich text/markdown-safe display).
 - Harden retry/recovery UX for transient local runtime failures.
 - Continue model management and trust-center roadmap items without compromising local-first behavior.

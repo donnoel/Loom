@@ -126,6 +126,11 @@ struct AddModelSheet: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
 
+                    Text(viewModel.catalogModelCapabilitiesText(for: model))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+
                     if let sizeText = viewModel.catalogSizeText(model: model) {
                         Text(sizeText)
                             .font(.caption)

@@ -253,6 +253,11 @@ struct ModelsView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
 
+                Text(viewModel.installedModelCapabilitiesText(for: model))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+
                 Text(viewModel.installedModelLastTrainedText(for: model))
                     .font(.caption)
                     .foregroundStyle(.secondary)

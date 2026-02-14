@@ -1,6 +1,18 @@
 import Foundation
 import OSLog
 
+nonisolated struct CatalogModelCapabilities: Codable, Equatable, Sendable {
+    let speechInput: Bool
+    let speechOutput: Bool
+    let fileUploads: Bool
+
+    static let `default` = CatalogModelCapabilities(
+        speechInput: true,
+        speechOutput: true,
+        fileUploads: true
+    )
+}
+
 nonisolated struct CatalogModel: Codable, Identifiable, Equatable, Sendable {
     let id: String
     let tag: String
@@ -14,6 +26,11 @@ nonisolated struct CatalogModel: Codable, Identifiable, Equatable, Sendable {
     let approxDiskBytes: Int64?
     let notes: String?
     let recommended: Bool
+    let capabilities: CatalogModelCapabilities?
+
+    var resolvedCapabilities: CatalogModelCapabilities {
+        capabilities ?? .default
+    }
 }
 
 nonisolated struct ModelCatalog: Equatable, Sendable {
@@ -63,7 +80,12 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             approxDownloadBytes: 4_700_000_000,
             approxDiskBytes: 5_200_000_000,
             notes: "Great default for most Macs.",
-            recommended: true
+            recommended: true,
+            capabilities: CatalogModelCapabilities(
+                speechInput: true,
+                speechOutput: true,
+                fileUploads: true
+            )
         ),
         CatalogModel(
             id: "qwen2.5:7b",
@@ -77,7 +99,12 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             approxDownloadBytes: 4_400_000_000,
             approxDiskBytes: 4_900_000_000,
             notes: "Good balance of speed and quality.",
-            recommended: true
+            recommended: true,
+            capabilities: CatalogModelCapabilities(
+                speechInput: true,
+                speechOutput: true,
+                fileUploads: true
+            )
         ),
         CatalogModel(
             id: "phi4:latest",
@@ -91,7 +118,12 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             approxDownloadBytes: 8_000_000_000,
             approxDiskBytes: 9_000_000_000,
             notes: "Needs more RAM than small 7-8B models.",
-            recommended: false
+            recommended: false,
+            capabilities: CatalogModelCapabilities(
+                speechInput: true,
+                speechOutput: true,
+                fileUploads: true
+            )
         ),
         CatalogModel(
             id: "mistral:7b",
@@ -105,7 +137,12 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             approxDownloadBytes: 4_100_000_000,
             approxDiskBytes: 4_600_000_000,
             notes: "Fast on older hardware.",
-            recommended: false
+            recommended: false,
+            capabilities: CatalogModelCapabilities(
+                speechInput: true,
+                speechOutput: false,
+                fileUploads: false
+            )
         ),
         CatalogModel(
             id: "gemma2:9b",
@@ -119,7 +156,12 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             approxDownloadBytes: 5_600_000_000,
             approxDiskBytes: 6_200_000_000,
             notes: "Solid quality with moderate resource use.",
-            recommended: false
+            recommended: false,
+            capabilities: CatalogModelCapabilities(
+                speechInput: true,
+                speechOutput: true,
+                fileUploads: true
+            )
         ),
         CatalogModel(
             id: "llama3.2:3b",
@@ -133,7 +175,12 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             approxDownloadBytes: 2_000_000_000,
             approxDiskBytes: 2_300_000_000,
             notes: "Best speed/resource option in this catalog.",
-            recommended: true
+            recommended: true,
+            capabilities: CatalogModelCapabilities(
+                speechInput: true,
+                speechOutput: false,
+                fileUploads: false
+            )
         )
     ]
 }

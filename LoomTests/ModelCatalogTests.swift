@@ -28,4 +28,19 @@ struct ModelCatalogTests {
         #expect(model?.country == "China")
         #expect(model?.lastTrained == "September 2024")
     }
+
+    @Test
+    func modelCapabilitiesLoadFromCatalog() {
+        let catalog = ModelCatalog.load()
+
+        let fullMultimodal = catalog.byTag("qwen2.5:7b")?.resolvedCapabilities
+        #expect(fullMultimodal?.speechInput == true)
+        #expect(fullMultimodal?.speechOutput == true)
+        #expect(fullMultimodal?.fileUploads == true)
+
+        let limited = catalog.byTag("llama3.2:3b")?.resolvedCapabilities
+        #expect(limited?.speechInput == true)
+        #expect(limited?.speechOutput == false)
+        #expect(limited?.fileUploads == false)
+    }
 }

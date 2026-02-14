@@ -190,6 +190,18 @@ final class ModelsViewModel {
         catalog.byTag(tag)
     }
 
+    func capabilities(for tag: String) -> CatalogModelCapabilities {
+        catalogModel(for: tag)?.resolvedCapabilities ?? .default
+    }
+
+    func installedModelCapabilitiesText(for model: OllamaModel) -> String {
+        capabilitiesText(for: capabilities(for: model.tag))
+    }
+
+    func catalogModelCapabilitiesText(for model: CatalogModel) -> String {
+        capabilitiesText(for: model.resolvedCapabilities)
+    }
+
     func installedModelCompanyCountryText(for model: OllamaModel) -> String {
         guard let catalogModel = catalogModel(for: model.tag) else {
             return "Maker and country details aren’t listed for this model."
@@ -557,6 +569,39 @@ final class ModelsViewModel {
         }
 
         return "\(value)B"
+    }
+
+    private func capabilitiesText(for capabilities: CatalogModelCapabilities) -> String {
+        var supported: [String] = []
+        var unavailable: [String] = []
+
+        if capabilities.speechInput {
+            supported.append("Speech Input")
+        } else {
+            unavailable.append("Speech Input")
+        }
+
+        if capabilities.speechOutput {
+            supported.append("Speech Output")
+        } else {
+            unavailable.append("Speech Output")
+        }
+
+        if capabilities.fileUploads {
+            supported.append("File Uploads")
+        } else {
+            unavailable.append("File Uploads")
+        }
+
+        var segments: [String] = []
+        if !supported.isEmpty {
+            segments.append("Supports: \(supported.joined(separator: ", "))")
+        }
+        if !unavailable.isEmpty {
+            segments.append("Unavailable: \(unavailable.joined(separator: ", "))")
+        }
+
+        return segments.joined(separator: " • ")
     }
 
     private static func ollamaAppURL() -> URL? {

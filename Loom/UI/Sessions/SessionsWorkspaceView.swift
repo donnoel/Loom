@@ -1,5 +1,7 @@
 import SwiftUI
 import AppKit
+import AVFoundation
+import Speech
 import UniformTypeIdentifiers
 import NaturalLanguage
 
@@ -384,6 +386,16 @@ private struct SessionsSidebarBanner: View {
 }
 
 struct SessionDetailView: View {
+    private static let attachmentTypes: [UTType] = [
+        .plainText,
+        .utf8PlainText,
+        .pdf,
+        .commaSeparatedText,
+        .json,
+        .xml,
+        .sourceCode
+    ]
+
     let session: Session
     let store: SessionStore
     let browseModels: () -> Void
@@ -393,6 +405,11 @@ struct SessionDetailView: View {
     @State private var vm: SessionMessagesViewModel
     @State private var didInitialScroll: Bool = false
     @State private var isBottomMarkerVisible: Bool = true
+    @State private var isShowingFileImporter: Bool = false
+    @State private var isDictating: Bool = false
+    @State private var lastSpokenAssistantMessageID: UUID?
+    @State private var speechInputController = SpeechInputController()
+    @State private var speechSynthesizer = AVSpeechSynthesizer()
 
     init(
         session: Session,
@@ -521,31 +538,107 @@ struct SessionDetailView: View {
                     }
                 }
 
-                HStack(alignment: .bottom, spacing: 8) {
-                    AutoCorrectingMessageField(text: $vm.draft, placeholder: "Message") {
-                        guard !vm.isGenerating else { return }
-                        sendAndScroll(proxy)
+                VStack(alignment: .leading, spacing: 8) {
+                    if let note = vm.activeModelCapabilityNote {
+                        Text(note)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .frame(maxWidth: .infinity)
 
-                    if vm.isGenerating {
-                        Button(role: .destructive) {
-                            vm.stopGenerating()
-                        } label: {
-                            Label("Stop", systemImage: "stop.fill")
+                    if !vm.pendingAttachments.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(vm.pendingAttachments) { attachment in
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "doc.text")
+                                            .foregroundStyle(.secondary)
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(attachment.fileName)
+                                                .font(.caption.weight(.semibold))
+                                                .lineLimit(1)
+                                            Text(attachment.characterCountLabel)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Button {
+                                            vm.removeAttachment(id: attachment.id)
+                                        } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 6)
+                                    .background(.quaternary.opacity(0.35), in: Capsule())
+                                }
+                            }
+                            .padding(.horizontal, 1)
                         }
-                        .accessibilityIdentifier("session.detail.stopButton")
-                        .buttonStyle(.bordered)
-                    } else {
-                        Button {
+                    }
+
+                    HStack(alignment: .bottom, spacing: 8) {
+                        HStack(spacing: 6) {
+                            Button {
+                                isShowingFileImporter = true
+                            } label: {
+                                Image(systemName: "paperclip")
+                            }
+                            .help(vm.activeModelSupportsFileUploads ? "Attach files" : "Current model does not support file uploads")
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(vm.isGenerating || !vm.activeModelSupportsFileUploads)
+
+                            Button {
+                                toggleDictation()
+                            } label: {
+                                Image(systemName: isDictating ? "waveform.circle.fill" : "mic")
+                            }
+                            .help(vm.activeModelSupportsSpeechInput ? "Dictate message" : "Current model does not support speech input")
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(vm.isGenerating || !vm.activeModelSupportsSpeechInput)
+
+                            Button {
+                                vm.isVoiceReplyEnabled.toggle()
+                                if !vm.isVoiceReplyEnabled {
+                                    speechSynthesizer.stopSpeaking(at: .immediate)
+                                }
+                            } label: {
+                                Image(systemName: vm.isVoiceReplyEnabled ? "speaker.wave.2.fill" : "speaker.slash")
+                            }
+                            .help(vm.activeModelSupportsSpeechOutput ? "Read replies aloud" : "Current model does not support speech output")
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .disabled(!vm.activeModelSupportsSpeechOutput)
+                        }
+
+                        AutoCorrectingMessageField(text: $vm.draft, placeholder: "Message") {
+                            guard !vm.isGenerating else { return }
                             sendAndScroll(proxy)
-                        } label: {
-                            Label("Send", systemImage: "paperplane.fill")
                         }
-                        .accessibilityIdentifier("session.detail.sendButton")
-                        .buttonStyle(.bordered)
-                        .tint(.accentColor)
-                        .disabled(vm.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .frame(maxWidth: .infinity)
+
+                        if vm.isGenerating {
+                            Button(role: .destructive) {
+                                vm.stopGenerating()
+                                stopDictationIfNeeded()
+                            } label: {
+                                Label("Stop", systemImage: "stop.fill")
+                            }
+                            .accessibilityIdentifier("session.detail.stopButton")
+                            .buttonStyle(.bordered)
+                        } else {
+                            Button {
+                                sendAndScroll(proxy)
+                            } label: {
+                                Label("Send", systemImage: "paperplane.fill")
+                            }
+                            .accessibilityIdentifier("session.detail.sendButton")
+                            .buttonStyle(.bordered)
+                            .tint(.accentColor)
+                            .disabled(vm.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
                     }
                 }
                 .padding(8)
@@ -556,7 +649,35 @@ struct SessionDetailView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 18)
         }
+        .fileImporter(
+            isPresented: $isShowingFileImporter,
+            allowedContentTypes: Self.attachmentTypes,
+            allowsMultipleSelection: true
+        ) { result in
+            switch result {
+            case .success(let urls):
+                Task { await vm.importAttachments(from: urls) }
+            case .failure:
+                vm.banner = SessionMessagesViewModel.BannerState(
+                    text: "Loom couldn’t open those files. Try again.",
+                    actionTitle: nil,
+                    action: nil
+                )
+            }
+        }
+        .onChange(of: vm.isGenerating) { _, isGenerating in
+            if !isGenerating {
+                speakLatestAssistantReplyIfNeeded()
+            }
+        }
+        .onChange(of: vm.activeModelSupportsSpeechOutput) { _, supportsSpeechOutput in
+            if !supportsSpeechOutput && vm.isVoiceReplyEnabled {
+                vm.isVoiceReplyEnabled = false
+            }
+        }
         .onDisappear {
+            stopDictationIfNeeded()
+            speechSynthesizer.stopSpeaking(at: .immediate)
             vm.stopGenerating()
         }
     }
@@ -597,6 +718,186 @@ struct SessionDetailView: View {
         guard isBottomMarkerVisible != isVisible else { return }
         withAnimation(.easeInOut(duration: 0.16)) {
             isBottomMarkerVisible = isVisible
+        }
+    }
+
+    private func toggleDictation() {
+        if isDictating {
+            stopDictationIfNeeded()
+            return
+        }
+
+        Task {
+            let started = await speechInputController.start(
+                initialDraft: vm.draft,
+                onTranscript: { transcript in
+                    vm.draft = transcript
+                },
+                onStateChange: { isRecording in
+                    isDictating = isRecording
+                },
+                onError: { message in
+                    vm.banner = SessionMessagesViewModel.BannerState(
+                        text: message,
+                        actionTitle: nil,
+                        action: nil
+                    )
+                }
+            )
+
+            if !started {
+                isDictating = false
+            }
+        }
+    }
+
+    private func stopDictationIfNeeded() {
+        speechInputController.stop()
+        isDictating = false
+    }
+
+    private func speakLatestAssistantReplyIfNeeded() {
+        guard vm.isVoiceReplyEnabled else { return }
+        guard vm.activeModelSupportsSpeechOutput else { return }
+
+        guard let latestAssistant = vm.messages.last(where: { message in
+            message.role == .assistant && !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }) else { return }
+
+        guard latestAssistant.id != lastSpokenAssistantMessageID else { return }
+        lastSpokenAssistantMessageID = latestAssistant.id
+
+        let utterance = AVSpeechUtterance(string: latestAssistant.content)
+        utterance.rate = 0.46
+        utterance.voice = AVSpeechSynthesisVoice(language: Locale.current.identifier)
+
+        speechSynthesizer.stopSpeaking(at: .immediate)
+        speechSynthesizer.speak(utterance)
+    }
+}
+
+@MainActor
+private final class SpeechInputController {
+    private let audioEngine = AVAudioEngine()
+    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var recognitionTask: SFSpeechRecognitionTask?
+    private var draftPrefix: String = ""
+
+    func start(
+        initialDraft: String,
+        onTranscript: @escaping (String) -> Void,
+        onStateChange: @escaping (Bool) -> Void,
+        onError: @escaping (String) -> Void
+    ) async -> Bool {
+        stop()
+
+        guard let recognizer = SFSpeechRecognizer(locale: Locale.current) else {
+            onError("Speech recognition isn’t available on this Mac.")
+            return false
+        }
+
+        guard recognizer.isAvailable else {
+            onError("Speech recognition isn’t available right now. Try again in a moment.")
+            return false
+        }
+
+        let speechAuthorized = await requestSpeechAuthorization()
+        guard speechAuthorized else {
+            onError("Enable Speech Recognition in System Settings to use dictation.")
+            return false
+        }
+
+        let microphoneAuthorized = await requestMicrophoneAuthorization()
+        guard microphoneAuthorized else {
+            onError("Enable microphone access in System Settings to use dictation.")
+            return false
+        }
+
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = true
+        recognitionRequest = request
+        draftPrefix = initialDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let inputNode = audioEngine.inputNode
+        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        inputNode.removeTap(onBus: 0)
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+            self?.recognitionRequest?.append(buffer)
+        }
+
+        audioEngine.prepare()
+
+        do {
+            try audioEngine.start()
+        } catch {
+            stop()
+            onError("Loom couldn’t start the microphone. Try again.")
+            return false
+        }
+
+        onStateChange(true)
+        recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+
+                if let result {
+                    let transcript = result.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let mergedDraft = merge(prefix: self.draftPrefix, transcript: transcript)
+                    onTranscript(mergedDraft)
+
+                    if result.isFinal {
+                        self.stop()
+                        onStateChange(false)
+                    }
+                }
+
+                if error != nil {
+                    self.stop()
+                    onStateChange(false)
+                    onError("Loom couldn’t transcribe audio right now. Try again.")
+                }
+            }
+        }
+
+        return true
+    }
+
+    func stop() {
+        recognitionTask?.cancel()
+        recognitionTask = nil
+
+        recognitionRequest?.endAudio()
+        recognitionRequest = nil
+
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
+        audioEngine.inputNode.removeTap(onBus: 0)
+    }
+
+    private func merge(prefix: String, transcript: String) -> String {
+        if prefix.isEmpty {
+            return transcript
+        }
+        if transcript.isEmpty {
+            return prefix
+        }
+        return "\(prefix) \(transcript)"
+    }
+
+    private func requestSpeechAuthorization() async -> Bool {
+        await withCheckedContinuation { continuation in
+            SFSpeechRecognizer.requestAuthorization { status in
+                continuation.resume(returning: status == .authorized)
+            }
+        }
+    }
+
+    private func requestMicrophoneAuthorization() async -> Bool {
+        await withCheckedContinuation { continuation in
+            AVCaptureDevice.requestAccess(for: .audio) { granted in
+                continuation.resume(returning: granted)
+            }
         }
     }
 }

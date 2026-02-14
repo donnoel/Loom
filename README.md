@@ -29,6 +29,10 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 🗂️ **Session Workspace** | Create, rename, delete, and sort sessions by recent activity. |
 | 💾 **Disk-Backed Persistence** | Each session stores `metadata.json` + append-only `messages.jsonl`. |
 | ⚡ **Streaming Assistant Replies** | Assistant responses stream live into the UI as tokens arrive. |
+| 🎙️ **Speech Input (Push-to-Talk)** | Use the mic button to dictate directly into the draft field with on-device speech recognition. |
+| 🔊 **Optional Voice Replies** | Toggle read-aloud mode so new assistant replies are spoken after generation completes. |
+| 📎 **File Upload Grounding** | Attach local text/PDF files and Loom injects extracted excerpts as context for the next turn. |
+| 🧭 **Capability-Aware Guidance** | Model cards and chat composer clearly show which models support speech input/output and file uploads. |
 | 💬 **Animated Typing Pulse** | While Loom is generating, assistant placeholders show a pulsing typing indicator. |
 | ✍️ **Readable Chat Formatting** | Assistant text is normalized for paragraph/list readability when raw output arrives as a dense block, while keeping stable whitespace-preserving rendering during streaming to avoid visual "snap back." |
 | 🎨 **Bold Workspace Styling** | Chat bubbles use richer layered gradients and depth, and sidebar selection uses a stronger highlighted chrome for quick scanning. |
@@ -52,6 +56,9 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Browse Sessions** directly in the sidebar (chat-list style)
 - **Rename/Delete** from toolbar or session context menu
 - **Type + Send** in the message field to start a local model response
+- **Attach Files** with the paperclip button to add local text/PDF context
+- **Dictate Message** with the mic button (when supported by the active model)
+- **Read Replies Aloud** with the speaker toggle (when supported by the active model)
 - **Auto-Correct + Spell Check** in the message field (uses your macOS Keyboard settings)
 - **Stop** to cancel streaming while keeping partial text
 - **Jump to Bottom** with the floating down-arrow when you scroll up in long chats
@@ -93,6 +100,8 @@ Chat interaction coordinator:
 - Inserts assistant placeholder and updates content while streaming
 - Supports cancellation and partial persistence
 - Supports retry/regenerate and model-switch-safe context behavior
+- Adds local attachment excerpts into request context for file-aware turns
+- Exposes model capability gating for speech/file tools and inline guidance
 - Exposes inline banner state for guidance
 
 ### **Root UI (SwiftUI + NavigationSplitView)**

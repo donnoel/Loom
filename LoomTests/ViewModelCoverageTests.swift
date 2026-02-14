@@ -176,6 +176,17 @@ private func cleanupSessionFolder(id: UUID) {
     try? FileManager.default.removeItem(at: folder)
 }
 
+private func makeTemporaryTextFile(contents: String, fileName: String) throws -> URL {
+    let root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+    let folder = root.appendingPathComponent("loom-tests-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+    let fileURL = folder.appendingPathComponent(fileName, isDirectory: false)
+    let data = Data(contents.utf8)
+    try data.write(to: fileURL, options: [.atomic])
+    return fileURL
+}
+
 @MainActor
 private func waitUntil(
     timeout: Duration = .seconds(2),
@@ -891,6 +902,103 @@ struct SessionMessagesViewModelCoverageTests {
         #expect(vm.banner?.text == "That model is still loading. Try again in a moment.")
         #expect(vm.banner?.actionTitle == "Retry")
         #expect(vm.banner?.action == .retryLastReply)
+    }
+
+    @Test
+    @MainActor
+    func sendDraftWithAttachedFileShowsGuidanceWhenModelDoesNotSupportUploads() async throws {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Attachment Capability Guard")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let attachmentURL = try makeTemporaryTextFile(contents: "Private project notes.", fileName: "notes.txt")
+        defer { try? FileManager.default.removeItem(at: attachmentURL.deletingLastPathComponent()) }
+
+        let chatClient = ScriptedChatClient([.complete(["unused"])])
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)),
+            chatClient: chatClient,
+            catalog: ModelCatalog(all: [
+                CatalogModel(
+                    id: "llama3",
+                    tag: "llama3",
+                    displayName: "Llama 3",
+                    vendor: "Meta",
+                    country: nil,
+                    lastTrained: nil,
+                    summary: "Test model",
+                    bestAt: ["Chat"],
+                    approxDownloadBytes: nil,
+                    approxDiskBytes: nil,
+                    notes: nil,
+                    recommended: true,
+                    capabilities: CatalogModelCapabilities(
+                        speechInput: true,
+                        speechOutput: true,
+                        fileUploads: false
+                    )
+                )
+            ])
+        )
+
+        await vm.importAttachments(from: [attachmentURL])
+        vm.draft = "Summarize this file"
+        await vm.sendDraft()
+
+        #expect(vm.banner?.text == "This model can’t use uploaded files yet. Choose one with file upload support.")
+        #expect(vm.banner?.action == .browseModels)
+        #expect(vm.messages.isEmpty)
+        #expect((await chatClient.readRecordedRequests()).isEmpty)
+    }
+
+    @Test
+    @MainActor
+    func sendDraftWithAttachedFileInjectsSystemContextForSupportedModel() async throws {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        UserDefaults.standard.set("qwen2.5:7b", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Attachment Context")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let attachmentURL = try makeTemporaryTextFile(
+            contents: "Weather station calibration requires daily checks.",
+            fileName: "field-notes.txt"
+        )
+        defer { try? FileManager.default.removeItem(at: attachmentURL.deletingLastPathComponent()) }
+
+        let chatClient = ScriptedChatClient([.complete(["Loaded attachment context"])])
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)),
+            chatClient: chatClient
+        )
+
+        await vm.importAttachments(from: [attachmentURL])
+        vm.draft = "What does the file say?"
+        await vm.sendDraft()
+        await waitUntil { !vm.isGenerating }
+
+        let requests = await chatClient.readRecordedRequests()
+        #expect(requests.count == 1)
+        #expect(vm.pendingAttachments.isEmpty)
+
+        if let request = requests.first {
+            let systemMessages = request.messages.filter { $0.role == .system }
+            #expect(systemMessages.count == 1)
+            #expect(systemMessages.first?.content.contains("[field-notes.txt]") == true)
+            #expect(systemMessages.first?.content.contains("calibration requires daily checks") == true)
+        }
     }
 
     @Test

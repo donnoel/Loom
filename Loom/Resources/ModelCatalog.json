@@ -11,7 +11,12 @@
     "approxDownloadBytes": 4700000000,
     "approxDiskBytes": 5200000000,
     "notes": "Great default for most Macs.",
-    "recommended": true
+    "recommended": true,
+    "capabilities": {
+      "speechInput": true,
+      "speechOutput": true,
+      "fileUploads": true
+    }
   },
   {
     "id": "qwen2.5:7b",
@@ -25,7 +30,12 @@
     "approxDownloadBytes": 4400000000,
     "approxDiskBytes": 4900000000,
     "notes": "Good balance of speed and quality.",
-    "recommended": true
+    "recommended": true,
+    "capabilities": {
+      "speechInput": true,
+      "speechOutput": true,
+      "fileUploads": true
+    }
   },
   {
     "id": "phi4:latest",
@@ -39,7 +49,12 @@
     "approxDownloadBytes": 8000000000,
     "approxDiskBytes": 9000000000,
     "notes": "Needs more RAM than small 7-8B models.",
-    "recommended": false
+    "recommended": false,
+    "capabilities": {
+      "speechInput": true,
+      "speechOutput": true,
+      "fileUploads": true
+    }
   },
   {
     "id": "mistral:7b",
@@ -53,7 +68,12 @@
     "approxDownloadBytes": 4100000000,
     "approxDiskBytes": 4600000000,
     "notes": "Fast on older hardware.",
-    "recommended": false
+    "recommended": false,
+    "capabilities": {
+      "speechInput": true,
+      "speechOutput": false,
+      "fileUploads": false
+    }
   },
   {
     "id": "gemma2:9b",
@@ -67,7 +87,12 @@
     "approxDownloadBytes": 5600000000,
     "approxDiskBytes": 6200000000,
     "notes": "Solid quality with moderate resource use.",
-    "recommended": false
+    "recommended": false,
+    "capabilities": {
+      "speechInput": true,
+      "speechOutput": true,
+      "fileUploads": true
+    }
   },
   {
     "id": "llama3.2:3b",
@@ -81,6 +106,11 @@
     "approxDownloadBytes": 2000000000,
     "approxDiskBytes": 2300000000,
     "notes": "Best speed/resource option in this catalog.",
-    "recommended": true
+    "recommended": true,
+    "capabilities": {
+      "speechInput": true,
+      "speechOutput": false,
+      "fileUploads": false
+    }
   }
 ]
