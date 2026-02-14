@@ -701,7 +701,7 @@ struct SessionDetailView: View {
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)
                             .frame(minHeight: 32)
-                            .frame(maxWidth: 260, alignment: .leading)
+                            .fixedSize(horizontal: true, vertical: false)
                             .background(
                                 Capsule(style: .continuous)
                                     .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.48))
