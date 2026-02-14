@@ -143,13 +143,42 @@ final class ModelsViewModel {
 
         do {
             let listedModels = try await client.listModels()
-            models = listedModels
+            models = applyPreferredModelOrder(to: listedModels)
+            persistModelOrder()
             pruneUpdateCheckState()
         } catch {
             log.error("Failed to load models: \(String(describing: error), privacy: .public)")
             models = []
             pruneUpdateCheckState()
         }
+    }
+
+    func moveInstalledModel(tag: String, before destinationTag: String) {
+        guard let sourceIndex = models.firstIndex(where: { $0.tag == tag }),
+              let destinationIndex = models.firstIndex(where: { $0.tag == destinationTag }),
+              sourceIndex != destinationIndex else { return }
+
+        var reordered = models
+        let movedModel = reordered.remove(at: sourceIndex)
+        let insertionIndex = sourceIndex < destinationIndex ? (destinationIndex - 1) : destinationIndex
+        reordered.insert(movedModel, at: insertionIndex)
+
+        guard reordered != models else { return }
+        models = reordered
+        persistModelOrder()
+    }
+
+    func moveInstalledModelToEnd(tag: String) {
+        guard let sourceIndex = models.firstIndex(where: { $0.tag == tag }),
+              sourceIndex < models.count - 1 else { return }
+
+        var reordered = models
+        let movedModel = reordered.remove(at: sourceIndex)
+        reordered.append(movedModel)
+
+        guard reordered != models else { return }
+        models = reordered
+        persistModelOrder()
     }
 
     func setActiveModel(tag: String) {
@@ -551,6 +580,48 @@ final class ModelsViewModel {
         if let updatingTag, !installedTags.contains(updatingTag) {
             self.updatingTag = nil
         }
+    }
+
+    private func applyPreferredModelOrder(to listedModels: [OllamaModel]) -> [OllamaModel] {
+        let preferredTags = storedModelOrder
+        guard !preferredTags.isEmpty else { return listedModels }
+
+        var preferredRank: [String: Int] = [:]
+        for (index, tag) in preferredTags.enumerated() where preferredRank[tag] == nil {
+            preferredRank[tag] = index
+        }
+
+        var fallbackOrder: [String: Int] = [:]
+        for (index, model) in listedModels.enumerated() where fallbackOrder[model.tag] == nil {
+            fallbackOrder[model.tag] = index
+        }
+
+        return listedModels.sorted { lhs, rhs in
+            let lhsRank = preferredRank[lhs.tag]
+            let rhsRank = preferredRank[rhs.tag]
+
+            switch (lhsRank, rhsRank) {
+            case let (left?, right?):
+                return left < right
+            case (_?, nil):
+                return true
+            case (nil, _?):
+                return false
+            case (nil, nil):
+                return (fallbackOrder[lhs.tag] ?? 0) < (fallbackOrder[rhs.tag] ?? 0)
+            }
+        }
+    }
+
+    private var storedModelOrder: [String] {
+        guard let stored = UserDefaults.standard.array(forKey: LoomPreferenceKeys.modelLibraryOrder) as? [String] else {
+            return []
+        }
+        return stored.compactMap(\.nonEmptyTrimmed)
+    }
+
+    private func persistModelOrder() {
+        UserDefaults.standard.set(models.map(\.tag), forKey: LoomPreferenceKeys.modelLibraryOrder)
     }
 
     private static func parameterSizeFromTag(_ tag: String) -> String? {

@@ -209,6 +209,11 @@ private func clearModelSelectionPreference() {
 }
 
 @MainActor
+private func clearModelLibraryOrderPreference() {
+    UserDefaults.standard.removeObject(forKey: LoomPreferenceKeys.modelLibraryOrder)
+}
+
+@MainActor
 private func sendDraftWithModelRetry(
     _ viewModel: SessionMessagesViewModel,
     draft: String,
@@ -301,6 +306,61 @@ struct StatusViewModelCoverageTests {
         await vm.refresh()
 
         #expect(vm.models.count == 2)
+    }
+
+    @Test
+    @MainActor
+    func moveInstalledModelPersistsOrderAcrossRefreshes() async {
+        clearModelLibraryOrderPreference()
+        defer { clearModelLibraryOrderPreference() }
+
+        let alpha = "alpha:latest"
+        let bravo = "bravo:latest"
+        let charlie = "charlie:latest"
+        let listedModels = [
+            OllamaModel(tag: alpha),
+            OllamaModel(tag: bravo),
+            OllamaModel(tag: charlie)
+        ]
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            modelsResult: .success(listedModels)
+        )
+
+        let vm = ModelsViewModel(client: client)
+        await vm.refresh()
+        vm.moveInstalledModel(tag: charlie, before: alpha)
+
+        #expect(vm.models.map(\.tag) == [charlie, alpha, bravo])
+        #expect((UserDefaults.standard.array(forKey: LoomPreferenceKeys.modelLibraryOrder) as? [String]) == [charlie, alpha, bravo])
+
+        let reloadedVM = ModelsViewModel(client: client)
+        await reloadedVM.refresh()
+
+        #expect(reloadedVM.models.map(\.tag) == [charlie, alpha, bravo])
+    }
+
+    @Test
+    @MainActor
+    func refreshAppliesStoredOrderAndPrunesMissingTags() async {
+        clearModelLibraryOrderPreference()
+        defer { clearModelLibraryOrderPreference() }
+
+        UserDefaults.standard.set(
+            ["missing:latest", "phi4:latest", "llama3:latest"],
+            forKey: LoomPreferenceKeys.modelLibraryOrder
+        )
+
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            modelsResult: .success([OllamaModel(tag: "llama3:latest"), OllamaModel(tag: "phi4:latest")])
+        )
+        let vm = ModelsViewModel(client: client)
+
+        await vm.refresh()
+
+        #expect(vm.models.map(\.tag) == ["phi4:latest", "llama3:latest"])
+        #expect((UserDefaults.standard.array(forKey: LoomPreferenceKeys.modelLibraryOrder) as? [String]) == ["phi4:latest", "llama3:latest"])
     }
 
     @Test
@@ -449,7 +509,9 @@ struct StatusViewModelCoverageTests {
 
         await vm.checkForUpdates()
 
-        #expect(await client.readPulledModelNames() == [firstTag, secondTag])
+        let pulled = await client.readPulledModelNames()
+        #expect(Set(pulled) == Set([firstTag, secondTag]))
+        #expect(pulled.count == 2)
         #expect(vm.lastUpdateCheckAt != nil)
         #expect(vm.isModelCurrent(tag: firstTag))
         #expect(vm.isModelCurrent(tag: secondTag))

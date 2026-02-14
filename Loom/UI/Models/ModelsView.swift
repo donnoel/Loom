@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ModelsView: View {
     let onModelSelectionChanged: () async -> Void
@@ -8,6 +9,7 @@ struct ModelsView: View {
     @State private var isShowingServeHelp: Bool = false
     @State private var isShowingAddModelSheet: Bool = false
     @State private var didCopyCommand: Bool = false
+    @State private var draggingModelTag: String?
 
     init(onModelSelectionChanged: @escaping () async -> Void) {
         self.onModelSelectionChanged = onModelSelectionChanged
@@ -221,8 +223,18 @@ struct ModelsView: View {
             } else if !viewModel.models.isEmpty {
                 VStack(spacing: 8) {
                     ForEach(viewModel.models) { model in
-                        modelRow(model)
+                        draggableModelRow(model)
                     }
+
+                    Color.clear
+                        .frame(height: 14)
+                        .onDrop(
+                            of: [UTType.plainText],
+                            delegate: InstalledModelDropToEndDelegate(
+                                draggingModelTag: $draggingModelTag,
+                                viewModel: viewModel
+                            )
+                        )
                 }
             } else {
                 Text("Start Ollama to load models.")
@@ -232,11 +244,32 @@ struct ModelsView: View {
         }
     }
 
+    private func draggableModelRow(_ model: OllamaModel) -> some View {
+        modelRow(model)
+            .onDrag {
+                draggingModelTag = model.tag
+                return NSItemProvider(object: model.tag as NSString)
+            }
+            .onDrop(
+                of: [UTType.plainText],
+                delegate: InstalledModelDropDelegate(
+                    destinationTag: model.tag,
+                    draggingModelTag: $draggingModelTag,
+                    viewModel: viewModel
+                )
+            )
+    }
+
     private func modelRow(_ model: OllamaModel) -> some View {
         let catalogModel = viewModel.catalogModel(for: model.tag)
         let isActiveModel = model.tag == viewModel.activeModelTag
 
         return HStack(spacing: 12) {
+            Image(systemName: "line.3.horizontal")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary.opacity(0.8))
+                .help("Drag to reorder")
+
             VStack(alignment: .leading, spacing: 5) {
                 Text(catalogModel?.displayName ?? model.tag)
                     .font(.body)
@@ -498,5 +531,45 @@ struct ModelsView: View {
                 }
             }
         )
+    }
+}
+
+private struct InstalledModelDropDelegate: DropDelegate {
+    let destinationTag: String
+    @Binding var draggingModelTag: String?
+    let viewModel: ModelsViewModel
+
+    func dropEntered(info: DropInfo) {
+        guard let draggingModelTag,
+              draggingModelTag != destinationTag else { return }
+        viewModel.moveInstalledModel(tag: draggingModelTag, before: destinationTag)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingModelTag = nil
+        return true
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+}
+
+private struct InstalledModelDropToEndDelegate: DropDelegate {
+    @Binding var draggingModelTag: String?
+    let viewModel: ModelsViewModel
+
+    func dropEntered(info: DropInfo) {
+        guard let draggingModelTag else { return }
+        viewModel.moveInstalledModelToEnd(tag: draggingModelTag)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggingModelTag = nil
+        return true
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
     }
 }

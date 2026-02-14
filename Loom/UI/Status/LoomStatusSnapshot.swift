@@ -82,6 +82,7 @@ nonisolated enum LoomPreferenceKeys {
     static let activeModelTag = "activeModelTag"
     static let statusAutoRefreshEnabled = "statusAutoRefreshEnabled"
     static let modelsAutoCheckEnabled = "modelsAutoCheckEnabled"
+    static let modelLibraryOrder = "modelLibraryOrder"
     static let voiceReplyEnabled = "voiceReplyEnabled"
     static let voiceReplyVoiceIdentifier = "voiceReplyVoiceIdentifier"
     static let voiceReplyRate = "voiceReplyRate"
