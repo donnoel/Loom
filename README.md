@@ -27,6 +27,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | Feature | Description |
 |--------|-------------|
 | 🗂️ **Session Workspace** | Create, rename, delete, and sort sessions by recent activity. |
+| 🏷️ **Auto Session Titles** | New sessions are renamed from your first prompt so conversations are easier to scan later. |
 | 💾 **Disk-Backed Persistence** | Each session stores `metadata.json` + append-only `messages.jsonl`. |
 | ⚡ **Streaming Assistant Replies** | Assistant responses stream live into the UI as tokens arrive. |
 | 🎙️ **Speech Input (Push-to-Talk)** | Use the mic button to dictate directly into the draft field with on-device speech recognition. |
@@ -56,6 +57,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 ## 🎛 Controls
 
 - **Create Session** with the `+` toolbar button
+- **Auto-Name New Sessions** by sending your first message (title is derived from the opening request)
 - **Browse Sessions** directly in the sidebar (chat-list style)
 - **Rename/Delete** from toolbar or session context menu
 - **Type + Send** in the message field to start a local model response

@@ -123,7 +123,7 @@ struct SessionsWorkspaceView: View {
                     browseModels: browseModels,
                     openOrInstallOllama: openOrInstallOllama,
                     onActivity: {
-                        vm.touchSession(id: session.id)
+                        await vm.touchSession(id: session.id)
                     }
                 )
                 .id(session.id)

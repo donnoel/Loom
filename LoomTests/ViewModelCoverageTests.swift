@@ -1494,4 +1494,25 @@ struct RootViewModelCoverageTests {
         let firstFolder = try LoomPaths.sessionFolder(for: first.id)
         #expect(!FileManager.default.fileExists(atPath: firstFolder.path))
     }
+
+    @Test
+    @MainActor
+    func touchSessionRefreshesInMemoryTitleFromStore() async throws {
+        let store = SessionStore()
+        let session = try await store.createSession(title: Session.Metadata.defaultTitle)
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let vm = RootViewModel(store: store)
+        await vm.load()
+        #expect(vm.session(for: session.id)?.metadata.title == Session.Metadata.defaultTitle)
+
+        try await store.appendMessage(
+            ChatMessage(role: .user, content: "Plan my weekend trip", createdAt: Date()),
+            sessionID: session.id
+        )
+
+        await vm.touchSession(id: session.id)
+
+        #expect(vm.session(for: session.id)?.metadata.title == "Plan my weekend trip")
+    }
 }

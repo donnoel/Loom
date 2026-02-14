@@ -101,6 +101,18 @@ actor SessionStore {
         return session
     }
 
+    func loadSession(id: UUID) throws -> Session? {
+        do {
+            let metadata = try loadMetadata(for: id)
+            return Session(id: id, metadata: metadata)
+        } catch {
+            if Self.isMissingFileError(error) {
+                return nil
+            }
+            throw error
+        }
+    }
+
     func updateMetadata(_ metadata: Session.Metadata, for id: UUID) throws {
         let spID = signposter.makeSignpostID()
         let state = signposter.beginInterval("updateMetadata", id: spID)
@@ -162,6 +174,7 @@ actor SessionStore {
         if !FileManager.default.fileExists(atPath: url.path) {
             FileManager.default.createFile(atPath: url.path, contents: nil)
         }
+        let isFirstAppendedMessage = isMessageFileEmpty(at: url)
 
         var data = try messageEncoder.encode(message)
         data.append(0x0A) // newline
@@ -175,6 +188,12 @@ actor SessionStore {
         // Keep session ordering in sync with latest activity.
         do {
             var metadata = try loadMetadata(for: sessionID)
+            if isFirstAppendedMessage,
+               message.role == .user,
+               Self.isDefaultSessionTitle(metadata.title),
+               let autoTitle = Self.suggestedSessionTitle(from: message.content) {
+                metadata.title = autoTitle
+            }
             metadata.updatedAt = max(metadata.updatedAt, Date())
             try writeMetadata(metadata, for: sessionID, touchUpdatedAt: false)
         } catch {
@@ -298,6 +317,52 @@ actor SessionStore {
         let metaURL = try LoomPaths.sessionMetadataURL(for: id)
         let data = try Data(contentsOf: metaURL)
         return try decoder.decode(Session.Metadata.self, from: data)
+    }
+
+    private func isMessageFileEmpty(at url: URL) -> Bool {
+        guard let values = try? url.resourceValues(forKeys: [.fileSizeKey]),
+              let fileSize = values.fileSize else {
+            return false
+        }
+        return fileSize == 0
+    }
+
+    private nonisolated static func isDefaultSessionTitle(_ title: String) -> Bool {
+        title.trimmingCharacters(in: .whitespacesAndNewlines) == Session.Metadata.defaultTitle
+    }
+
+    private nonisolated static func suggestedSessionTitle(from request: String) -> String? {
+        let normalized = request
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        guard let firstLine = normalized
+            .split(whereSeparator: \.isNewline)
+            .first
+            .map(String.init)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !firstLine.isEmpty else {
+            return nil
+        }
+
+        let collapsed = firstLine
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !collapsed.isEmpty else {
+            return nil
+        }
+
+        let maximumLength = 72
+        guard collapsed.count > maximumLength else {
+            return collapsed
+        }
+
+        var truncated = String(collapsed.prefix(maximumLength))
+        if let lastSpace = truncated.lastIndex(of: " "),
+           truncated.distance(from: truncated.startIndex, to: lastSpace) >= 24 {
+            truncated = String(truncated[..<lastSpace])
+        }
+        return truncated + "..."
     }
 
     private nonisolated static func isMissingFileError(_ error: Error) -> Bool {

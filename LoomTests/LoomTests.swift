@@ -77,6 +77,47 @@ struct SessionStoreTests {
     }
 
     @Test
+    func firstUserMessageAutoTitlesNewSession() async throws {
+        let store = SessionStore()
+        let session = try await store.createSession(title: Session.Metadata.defaultTitle)
+        defer { cleanupSessionFolder(id: session.id) }
+
+        try await store.appendMessage(
+            ChatMessage(
+                role: .user,
+                content: "  Help me plan a two-week budget meal prep.\nInclude a grocery list.  ",
+                createdAt: fixedDate("2026-01-01T00:00:00Z")
+            ),
+            sessionID: session.id
+        )
+
+        let metadataURL = try LoomPaths.sessionMetadataURL(for: session.id)
+        let metadata = try decodeMetadata(at: metadataURL)
+        #expect(metadata.title == "Help me plan a two-week budget meal prep.")
+    }
+
+    @Test
+    func firstUserMessageDoesNotOverrideCustomSessionTitle() async throws {
+        let store = SessionStore()
+        let customTitle = "Project Phoenix"
+        let session = try await store.createSession(title: customTitle)
+        defer { cleanupSessionFolder(id: session.id) }
+
+        try await store.appendMessage(
+            ChatMessage(
+                role: .user,
+                content: "Tell me how to launch a product.",
+                createdAt: fixedDate("2026-01-01T00:00:00Z")
+            ),
+            sessionID: session.id
+        )
+
+        let metadataURL = try LoomPaths.sessionMetadataURL(for: session.id)
+        let metadata = try decodeMetadata(at: metadataURL)
+        #expect(metadata.title == customTitle)
+    }
+
+    @Test
     func loadMessagesSkipsMalformedJSONLLines() async throws {
         let store = SessionStore()
         let session = try await store.createSession(title: "Malformed \(UUID().uuidString)")

@@ -59,7 +59,7 @@ final class RootViewModel {
 
     func newSession() async {
         do {
-            let created = try await store.createSession(title: "New Session")
+            let created = try await store.createSession(title: Session.Metadata.defaultTitle)
             await load()
             selectedSessionID = created.id
         } catch {
@@ -94,9 +94,20 @@ final class RootViewModel {
         return sessions.first(where: { $0.id == id })
     }
     
-    func touchSession(id: Session.ID) {
+    func touchSession(id: Session.ID) async {
         guard let idx = sessions.firstIndex(where: { $0.id == id }) else { return }
-        sessions[idx].metadata.updatedAt = Date()
+
+        do {
+            if let refreshed = try await store.loadSession(id: id) {
+                sessions[idx].metadata = refreshed.metadata
+            } else {
+                sessions[idx].metadata.updatedAt = Date()
+            }
+        } catch {
+            log.error("Failed to refresh session \(id.uuidString, privacy: .public): \(String(describing: error), privacy: .public)")
+            sessions[idx].metadata.updatedAt = Date()
+        }
+
         sessions = sortSessions(sessions)
     }
     

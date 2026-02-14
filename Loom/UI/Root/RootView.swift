@@ -426,7 +426,7 @@ struct RootView: View {
                     statusViewModel.openOrInstallOllama()
                 },
                 onActivity: {
-                    sessionsViewModel.touchSession(id: session.id)
+                    await sessionsViewModel.touchSession(id: session.id)
                 }
             )
             .id(session.id)
