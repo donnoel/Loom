@@ -978,7 +978,6 @@ private struct MessageRowView: View, Equatable {
     let message: ChatMessage
     let isThinking: Bool
     let onRegenerate: (() -> Void)?
-    @Environment(\.colorScheme) private var colorScheme
 
     static func == (lhs: MessageRowView, rhs: MessageRowView) -> Bool {
         lhs.message == rhs.message && lhs.isThinking == rhs.isThinking
@@ -988,11 +987,6 @@ private struct MessageRowView: View, Equatable {
         let isUser = message.role == .user
 
         VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
-            Text(roleLabel)
-                .font(.caption)
-                .fontWeight(isUser ? .semibold : .regular)
-                .foregroundStyle(roleLabelColor)
-
             MessageBubbleChrome(role: message.role) {
                 if isThinking {
                     TypingPulseView()
@@ -1004,6 +998,8 @@ private struct MessageRowView: View, Equatable {
                     )
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(roleLabel): \(accessibilityMessageText)")
         }
         .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
         .padding(.vertical, 4)
@@ -1022,13 +1018,13 @@ private struct MessageRowView: View, Equatable {
         }
     }
 
-    private var roleLabelColor: Color {
-        switch message.role {
-        case .user:
-            return colorScheme == .dark ? .white.opacity(0.90) : .accentColor
-        case .assistant, .system, .tool:
-            return .secondary
+    private var accessibilityMessageText: String {
+        if isThinking {
+            return "Thinking"
         }
+
+        let trimmed = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Empty message" : trimmed
     }
 }
 
