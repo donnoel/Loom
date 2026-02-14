@@ -613,11 +613,15 @@ struct SessionDetailView: View {
                             .disabled(!vm.activeModelSupportsSpeechOutput)
                         }
 
-                        AutoCorrectingMessageField(text: $vm.draft, placeholder: "Message") {
-                            guard !vm.isGenerating else { return }
-                            sendAndScroll(proxy)
-                        }
-                        .frame(maxWidth: .infinity)
+                        TextField("Message", text: $vm.draft, axis: .vertical)
+                            .textFieldStyle(.roundedBorder)
+                            .lineLimit(2...6)
+                            .accessibilityIdentifier("session.detail.messageField")
+                            .onSubmit {
+                                guard !vm.isGenerating else { return }
+                                sendAndScroll(proxy)
+                            }
+                            .frame(maxWidth: .infinity)
 
                         if vm.isGenerating {
                             Button(role: .destructive) {
@@ -898,78 +902,6 @@ private final class SpeechInputController {
             AVCaptureDevice.requestAccess(for: .audio) { granted in
                 continuation.resume(returning: granted)
             }
-        }
-    }
-}
-
-private struct AutoCorrectingMessageField: NSViewRepresentable {
-    @Binding var text: String
-    let placeholder: String
-    let onSubmit: () -> Void
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text, onSubmit: onSubmit)
-    }
-
-    func makeNSView(context: Context) -> NSTextField {
-        let field = NSTextField(string: text)
-        field.placeholderString = placeholder
-        field.delegate = context.coordinator
-        field.bezelStyle = .roundedBezel
-        field.isBezeled = true
-        field.isEditable = true
-        field.isSelectable = true
-        field.setAccessibilityIdentifier("session.detail.messageField")
-        return field
-    }
-
-    func updateNSView(_ nsView: NSTextField, context: Context) {
-        if nsView.stringValue != text {
-            nsView.stringValue = text
-        }
-    }
-
-    final class Coordinator: NSObject, NSTextFieldDelegate {
-        @Binding private var text: String
-        private let onSubmit: () -> Void
-
-        init(text: Binding<String>, onSubmit: @escaping () -> Void) {
-            _text = text
-            self.onSubmit = onSubmit
-        }
-
-        func controlTextDidBeginEditing(_ obj: Notification) {
-            guard let textField = obj.object as? NSTextField,
-                  let editor = textField.currentEditor() as? NSTextView else { return }
-            configureCorrections(for: editor)
-        }
-
-        func controlTextDidChange(_ obj: Notification) {
-            guard let textField = obj.object as? NSTextField else { return }
-            text = textField.stringValue
-
-            if let editor = textField.currentEditor() as? NSTextView {
-                configureCorrections(for: editor)
-            }
-        }
-
-        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-            configureCorrections(for: textView)
-
-            if commandSelector == #selector(NSResponder.insertNewline(_:))
-                || commandSelector == #selector(NSResponder.insertLineBreak(_:)) {
-                guard !textView.hasMarkedText() else { return false }
-                onSubmit()
-                return true
-            }
-
-            return false
-        }
-
-        private func configureCorrections(for textView: NSTextView) {
-            textView.isContinuousSpellCheckingEnabled = true
-            textView.isAutomaticSpellingCorrectionEnabled = true
-            textView.isAutomaticTextReplacementEnabled = true
         }
     }
 }
