@@ -63,17 +63,23 @@ final class LoomUITests: XCTestCase {
 
         clickButton("session.detail.sendButton", app: app)
 
+        let typingState = element("session.message.assistant.typing", app: app)
         let stopButton = button("session.detail.stopButton", app: app)
-        if !stopButton.waitForExistence(timeout: Self.mediumTimeout) {
-            throw XCTSkip("Streaming UI unavailable in this environment.")
+        let sawStreamingState = stopButton.waitForExistence(timeout: Self.shortTimeout)
+            || typingState.waitForExistence(timeout: Self.shortTimeout)
+
+        if sawStreamingState {
+            XCTAssertTrue(waitForNotExists(stopButton, timeout: Self.longTimeout))
+            XCTAssertTrue(waitForNotExists(typingState, timeout: Self.longTimeout))
         }
-        XCTAssertTrue(waitForNotExists(stopButton, timeout: Self.longTimeout))
+
         XCTAssertTrue(
-            waitForStaticTextContaining(
+            waitForAssistantBubbleContaining(
                 "Hello from stub response",
                 app: app,
-                timeout: Self.mediumTimeout
-            )
+                timeout: Self.longTimeout
+            ),
+            "Expected completed assistant bubble content."
         )
     }
 
@@ -89,18 +95,21 @@ final class LoomUITests: XCTestCase {
 
         clickButton("session.detail.sendButton", app: app)
 
+        let typingState = element("session.message.assistant.typing", app: app)
         let stopButton = button("session.detail.stopButton", app: app)
-        if !stopButton.waitForExistence(timeout: Self.mediumTimeout) {
-            throw XCTSkip("Streaming UI unavailable in this environment.")
-        }
+        let sawStreamingState = stopButton.waitForExistence(timeout: Self.longTimeout)
+            || typingState.waitForExistence(timeout: Self.longTimeout)
+        XCTAssertTrue(sawStreamingState, "Expected assistant streaming state to appear.")
 
-        if !waitForStaticTextContaining("partial", app: app, timeout: Self.mediumTimeout) {
-            throw XCTSkip("Partial stream content did not appear in time.")
-        }
+        XCTAssertTrue(
+            waitForAssistantBubbleContaining("partial", app: app, timeout: Self.longTimeout),
+            "Expected partial assistant content before cancel."
+        )
 
         stopButton.click()
         XCTAssertTrue(waitForNotExists(stopButton, timeout: Self.mediumTimeout))
-        XCTAssertTrue(waitForStaticTextContaining("partial", app: app, timeout: Self.mediumTimeout))
+        XCTAssertTrue(waitForNotExists(typingState, timeout: Self.mediumTimeout))
+        XCTAssertTrue(waitForAssistantBubbleContaining("partial", app: app, timeout: Self.mediumTimeout))
 
         app.terminate()
 
@@ -109,7 +118,7 @@ final class LoomUITests: XCTestCase {
             activeModelTag: "ui-test-model",
             chatScenario: .cancelablePartial
         )
-        XCTAssertTrue(waitForStaticTextContaining("partial", app: relaunched, timeout: Self.longTimeout))
+        XCTAssertTrue(waitForAssistantBubbleContaining("partial", app: relaunched, timeout: Self.longTimeout))
     }
 
     @MainActor
@@ -263,13 +272,15 @@ final class LoomUITests: XCTestCase {
     }
 
     @MainActor
-    private func waitForStaticTextContaining(
+    private func waitForAssistantBubbleContaining(
         _ text: String,
         app: XCUIApplication,
         timeout: TimeInterval
     ) -> Bool {
-        let query = app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] %@", text))
-        return query.firstMatch.waitForExistence(timeout: timeout)
+        let bubbleQuery = app.descendants(matching: .any)
+            .matching(identifier: "session.message.assistant.bubble")
+            .containing(NSPredicate(format: "label CONTAINS[c] %@", text))
+        return bubbleQuery.firstMatch.waitForExistence(timeout: timeout)
     }
 
     @MainActor

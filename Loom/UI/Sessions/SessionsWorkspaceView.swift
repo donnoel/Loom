@@ -941,6 +941,7 @@ private struct MessageRowView: View, Equatable {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(roleLabel): \(accessibilityMessageText)")
+            .accessibilityIdentifier(accessibilityIdentifier)
         }
         .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
         .padding(.vertical, 4)
@@ -967,6 +968,19 @@ private struct MessageRowView: View, Equatable {
         let trimmed = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "Empty message" : trimmed
     }
+
+    private var accessibilityIdentifier: String {
+        switch message.role {
+        case .assistant:
+            return isThinking ? "session.message.assistant.typing" : "session.message.assistant.bubble"
+        case .user:
+            return "session.message.user.bubble"
+        case .system:
+            return "session.message.system.bubble"
+        case .tool:
+            return "session.message.tool.bubble"
+        }
+    }
 }
 
 private struct TypingPulseView: View {
@@ -989,6 +1003,7 @@ private struct TypingPulseView: View {
             }
             .animation(.easeInOut(duration: 0.16), value: activeIndex)
             .padding(.vertical, 2)
+            .accessibilityIdentifier("session.message.assistant.typingPulse")
         }
     }
 }
