@@ -29,9 +29,10 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 🗂️ **Session Workspace** | Create, rename, delete, and sort sessions by recent activity. |
 | 💾 **Disk-Backed Persistence** | Each session stores `metadata.json` + append-only `messages.jsonl`. |
 | ⚡ **Streaming Assistant Replies** | Assistant responses stream live into the UI as tokens arrive. |
-| ✍️ **Readable Chat Formatting** | Assistant text is auto-formatted into human-readable paragraphs and list-friendly markdown when raw output arrives as a dense block, while preserving plain-text line breaks when markdown structure is absent. |
+| ✍️ **Readable Chat Formatting** | Assistant text is normalized for paragraph/list readability when raw output arrives as a dense block, while keeping stable whitespace-preserving rendering during streaming to avoid visual "snap back." |
 | ⏹️ **Stop Generation** | Cancel generation any time and keep the partial assistant response. |
 | 🧠 **Helpful Setup Gating** | Clear in-context guidance if no active model is selected or Ollama is unavailable. |
+| 🔁 **Model-Aware Context Switching** | If the active model changes for a session, the next turn uses user-only context to avoid old-model anchoring. |
 | 🧩 **Model Picker** | View installed Ollama models with plain-language "good for" guidance plus maker/country and last-trained details, use streamlined actions (Set Active / Update / Delete), and keep model selection across launches until you change it. |
 | ℹ️ **System Info Sheet** | Open **App → Info** in the sidebar to see a plain-language walkthrough of how Loom, Ollama, and local models work together, with official source links per company. |
 | 📥 **In-App Model Install** | Use **Add Model…** to browse a curated catalog, review friendly model summaries, and install with live progress + cancel support. |
@@ -88,6 +89,7 @@ Chat interaction coordinator:
 - Applies model + reachability gating before send
 - Inserts assistant placeholder and updates content while streaming
 - Supports cancellation and partial persistence
+- Supports retry/regenerate and model-switch-safe context behavior
 - Exposes inline banner state for guidance
 
 ### **Root UI (SwiftUI + NavigationSplitView)**
@@ -130,6 +132,8 @@ Loom/
 │   └── Ollama/
 │       ├── OllamaClient.swift
 │       └── OllamaChatClient.swift
+├── Models/
+│   └── ModelCatalog.swift
 ├── UI/
 │   ├── Root/
 │   ├── Sessions/
@@ -139,9 +143,11 @@ Loom/
 │   └── Sidebar/
 ├── Utilities/
 │   └── FileSystem/
-│       └── LoomPaths.swift
+│       ├── LoomPaths.swift
+│       └── DiskSpace.swift
 └── Resources/
-    └── Assets.xcassets/
+    ├── Assets.xcassets/
+    └── ModelCatalog.json
 ```
 
 Also included:
@@ -152,11 +158,23 @@ Also included:
 
 ## 🧪 Tests
 
-`LoomTests` currently includes coverage for streaming parser behavior in `OllamaChatClient`:
-- Delta chunk parsing
-- Done chunk parsing
-- Error chunk parsing
-- Whitespace/empty line handling
+`LoomTests` includes focused coverage across persistence, formatting, services, and view models:
+- `SessionStore` create/update/delete + append/load JSONL behavior
+- `ChatDisplayFormatter` dense-text paragraph/list normalization behavior
+- `ModelCatalog` loading and curated model lookups
+- `DiskSpaceSnapshot` probe-path ordering/deduplication rules
+- `SessionMessagesViewModel` send/stream/cancel/retry/failure/model-switch context flows
+- `ModelsViewModel` refresh/install/update/delete and safety rails
+- `RootViewModel` load/rename/pin/tags/delete flows
+- `OllamaChatClient` stream-line parsing and transport-level stream error mapping
+- `OllamaClient` diagnosis/list/delete/pull network-path behavior via mocked transport
+
+`LoomUITests` covers key end-to-end desktop flows:
+- Sidebar navigation
+- Session create/delete
+- Setup guidance when no model is active
+- Streaming reply path
+- Stop generation with relaunch verification
 
 ---
 
