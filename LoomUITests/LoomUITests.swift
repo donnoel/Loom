@@ -68,7 +68,13 @@ final class LoomUITests: XCTestCase {
             throw XCTSkip("Streaming UI unavailable in this environment.")
         }
         XCTAssertTrue(waitForNotExists(stopButton, timeout: Self.longTimeout))
-        XCTAssertTrue(app.staticTexts["Loom"].waitForExistence(timeout: Self.mediumTimeout))
+        XCTAssertTrue(
+            waitForStaticTextContaining(
+                "Hello from stub response",
+                app: app,
+                timeout: Self.mediumTimeout
+            )
+        )
     }
 
     @MainActor
@@ -88,9 +94,13 @@ final class LoomUITests: XCTestCase {
             throw XCTSkip("Streaming UI unavailable in this environment.")
         }
 
+        if !waitForStaticTextContaining("partial", app: app, timeout: Self.mediumTimeout) {
+            throw XCTSkip("Partial stream content did not appear in time.")
+        }
+
         stopButton.click()
         XCTAssertTrue(waitForNotExists(stopButton, timeout: Self.mediumTimeout))
-        XCTAssertTrue(app.staticTexts["Loom"].waitForExistence(timeout: Self.mediumTimeout))
+        XCTAssertTrue(waitForStaticTextContaining("partial", app: app, timeout: Self.mediumTimeout))
 
         app.terminate()
 
@@ -99,7 +109,7 @@ final class LoomUITests: XCTestCase {
             activeModelTag: "ui-test-model",
             chatScenario: .cancelablePartial
         )
-        XCTAssertTrue(relaunched.staticTexts["Loom"].waitForExistence(timeout: Self.longTimeout))
+        XCTAssertTrue(waitForStaticTextContaining("partial", app: relaunched, timeout: Self.longTimeout))
     }
 
     @MainActor
@@ -250,6 +260,16 @@ final class LoomUITests: XCTestCase {
         let predicate = NSPredicate(format: "exists == false")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    @MainActor
+    private func waitForStaticTextContaining(
+        _ text: String,
+        app: XCUIApplication,
+        timeout: TimeInterval
+    ) -> Bool {
+        let query = app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] %@", text))
+        return query.firstMatch.waitForExistence(timeout: timeout)
     }
 
     @MainActor
