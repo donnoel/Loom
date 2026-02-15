@@ -52,6 +52,7 @@ final class SessionMessagesViewModel {
     private(set) var isShowingFullHistory: Bool = false
     private(set) var pendingAttachments: [PendingAttachment] = []
     private(set) var availableModelTags: [String] = []
+    private var isPreparingGeneration: Bool = false
     private var activeModelTagStorage: String?
     private var lastStreamModel: String?
     private var lastStreamContext: [ChatMessage]?
@@ -274,7 +275,9 @@ final class SessionMessagesViewModel {
     }
 
     func sendDraft() async {
-        guard !isGenerating else { return }
+        guard !isGenerating, !isPreparingGeneration else { return }
+        isPreparingGeneration = true
+        defer { isPreparingGeneration = false }
         synchronizeActiveModelSelectionFromPreferences()
 
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -362,7 +365,9 @@ final class SessionMessagesViewModel {
     }
 
     func retryLastReply() async {
-        guard !isGenerating else { return }
+        guard !isGenerating, !isPreparingGeneration else { return }
+        isPreparingGeneration = true
+        defer { isPreparingGeneration = false }
         synchronizeActiveModelSelectionFromPreferences()
         guard let context = lastStreamContext else {
             banner = BannerState(

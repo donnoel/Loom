@@ -1424,9 +1424,11 @@ nonisolated enum ChatDisplayFormatter {
     private static let boldInlineLabelRegex = makeRegex("\\*\\*[A-Z][^*]{1,80}:\\*\\*")
     private static let denseLabelBoundaryRegex = makeRegex("(?<=[a-z0-9\\):])(?=[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:)")
     private static let spacedLabelBoundaryRegex = makeRegex("(?<!\\d\\.)(?<=[\\.:;\\)0-9])\\s+(?=[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:)")
-    private static let labelValueBoundaryRegex = makeRegex("(?m)([A-Z][A-Za-z ]{2,80}:)\\s*(?=[0-9A-Za-z])")
+    private static let lowerWordBeforeLabelRegex = makeRegex("\\b([a-z][a-z0-9]{2,})\\s+(?=[A-Z][A-Za-z]{2,}(?: [A-Za-z]{1,}){0,6}:)")
+    private static let labelValueBoundaryRegex = makeRegex("(?m)([A-Z][A-Za-z ]{2,80}:)[ \\t]*(?=[0-9A-Za-z])")
+    private static let shortLabelValueDoubleBreakRegex = makeRegex("(?m)([A-Z][A-Za-z ]{2,80}:)\\n\\n([0-9A-Za-z][^\\n]{0,40})(?=\\n\\n[A-Z][A-Za-z ]{2,80}:)")
     private static let denseBoldLabelBoundaryRegex = makeRegex("(?<=\\S)(?=\\*\\*[A-Z][^*]{1,80}:\\*\\*)")
-    private static let boldLabelValueBoundaryRegex = makeRegex("(\\*\\*[^*]{1,80}:\\*\\*)\\s*(?=[0-9A-Za-z])")
+    private static let boldLabelValueBoundaryRegex = makeRegex("(\\*\\*[^*]{1,80}:\\*\\*)[ \\t]*(?=[0-9A-Za-z])")
     private static let denseCollapsedWordRegex = makeRegex("([a-z]{4,})([A-Z][a-z]{3,})")
     private static let numberedAfterColonRegex = makeRegex("(:)\\s*(\\d+\\.\\s+)")
     private static let bulletAfterColonRegex = makeRegex("(:)\\s*(-\\s+)")
@@ -1563,10 +1565,12 @@ nonisolated enum ChatDisplayFormatter {
 
         var working = regexReplace(denseLabelBoundaryRegex, in: text, with: "\n\n")
         working = regexReplace(spacedLabelBoundaryRegex, in: working, with: "\n\n")
+        working = regexReplace(lowerWordBeforeLabelRegex, in: working, with: "$1\n\n")
         working = regexReplace(labelValueBoundaryRegex, in: working, with: "$1\n")
         working = regexReplace(denseBoldLabelBoundaryRegex, in: working, with: "\n\n")
         working = regexReplace(boldLabelValueBoundaryRegex, in: working, with: "$1\n")
         working = regexReplace(denseCollapsedWordRegex, in: working, with: "$1 $2")
+        working = regexReplace(shortLabelValueDoubleBreakRegex, in: working, with: "$1\n$2")
         return working
     }
 
@@ -1587,6 +1591,10 @@ nonisolated enum ChatDisplayFormatter {
     private static func forceParagraphizeDensePlainText(_ text: String) -> String {
         guard !text.contains("```") else { return text }
         guard text.count >= 140 else { return text }
+        // Keep explicit label-heavy structure intact once we've already split it.
+        if matchCount(inlineLabelRegex, in: text) >= 2 || matchCount(boldInlineLabelRegex, in: text) >= 1 {
+            return text
+        }
         if hasStructuredMarkdownLayout(text) {
             return text
         }

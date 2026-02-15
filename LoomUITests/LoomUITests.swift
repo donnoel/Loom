@@ -15,7 +15,6 @@ final class LoomUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    @MainActor
     func testSidebarNavigationShowsCoreScreens() throws {
         let app = launchApp()
         XCTAssertTrue(createSessionAndWaitForDetail(app: app))
@@ -28,7 +27,6 @@ final class LoomUITests: XCTestCase {
         XCTAssertTrue(element("root.detail.settings", app: app).waitForExistence(timeout: Self.mediumTimeout))
     }
 
-    @MainActor
     func testCreateAndDeleteSessionFromToolbar() throws {
         let app = launchApp()
 
@@ -39,7 +37,6 @@ final class LoomUITests: XCTestCase {
         deleteButton.click()
     }
 
-    @MainActor
     func testSendWithoutModelShowsSetupGuidance() throws {
         let app = launchApp()
         XCTAssertTrue(createSessionAndWaitForDetail(app: app))
@@ -51,7 +48,6 @@ final class LoomUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Choose a model to chat with."].waitForExistence(timeout: Self.mediumTimeout))
     }
 
-    @MainActor
     func testSendStreamsAssistantReply() throws {
         let app = launchApp(
             activeModelTag: "ui-test-model",
@@ -83,7 +79,6 @@ final class LoomUITests: XCTestCase {
         )
     }
 
-    @MainActor
     func testStopGenerationKeepsPartialReplyAfterRelaunch() throws {
         let app = launchApp(
             activeModelTag: "ui-test-model",
@@ -121,7 +116,6 @@ final class LoomUITests: XCTestCase {
         XCTAssertTrue(waitForAssistantBubbleContaining("partial", app: relaunched, timeout: Self.longTimeout))
     }
 
-    @MainActor
     private func launchApp(
         resetStorage: Bool = true,
         activeModelTag: String? = nil,
@@ -142,7 +136,6 @@ final class LoomUITests: XCTestCase {
         return app
     }
 
-    @MainActor
     private func tapSidebarItem(identifier: String, title: String, app: XCUIApplication) {
         ensureSidebarVisible(app: app)
 
@@ -169,21 +162,18 @@ final class LoomUITests: XCTestCase {
         XCTFail("Missing sidebar item: \(title)")
     }
 
-    @MainActor
     private func button(_ identifier: String, app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .button)
             .matching(identifier: identifier)
             .firstMatch
     }
 
-    @MainActor
     private func element(_ identifier: String, app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any)
             .matching(identifier: identifier)
             .firstMatch
     }
 
-    @MainActor
     private func ensureSidebarVisible(app: XCUIApplication) {
         let modelsSidebarItemByTitle = app.outlines.staticTexts["Models"].firstMatch
         if modelsSidebarItemByTitle.waitForExistence(timeout: 1) {
@@ -194,7 +184,6 @@ final class LoomUITests: XCTestCase {
         _ = modelsSidebarItemByTitle.waitForExistence(timeout: Self.shortTimeout)
     }
 
-    @MainActor
     private func createSessionAndWaitForDetail(app: XCUIApplication) -> Bool {
         if waitForSessionDetailReady(app: app, timeout: Self.shortTimeout) {
             return true
@@ -218,7 +207,6 @@ final class LoomUITests: XCTestCase {
         return waitForSessionDetailReady(app: app, timeout: Self.mediumTimeout)
     }
 
-    @MainActor
     private func clickButton(_ identifier: String, app: XCUIApplication) {
         let toolbarCandidates = app.toolbars.buttons.matching(identifier: identifier)
         let toolbarElements = toolbarCandidates.allElementsBoundByIndex
@@ -238,7 +226,6 @@ final class LoomUITests: XCTestCase {
         (hittableCandidate ?? firstCandidate).click()
     }
 
-    @MainActor
     private func typeMessage(_ text: String, app: XCUIApplication) {
         let messageField = element("session.detail.messageField", app: app)
         XCTAssertTrue(messageField.waitForExistence(timeout: Self.mediumTimeout))
@@ -257,21 +244,18 @@ final class LoomUITests: XCTestCase {
         XCTFail("Message entry did not enable send button.")
     }
 
-    @MainActor
     private func waitForEnabled(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
         let predicate = NSPredicate(format: "exists == true AND enabled == true")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
 
-    @MainActor
     private func waitForNotExists(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
         let predicate = NSPredicate(format: "exists == false")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
 
-    @MainActor
     private func waitForAssistantBubbleContaining(
         _ text: String,
         app: XCUIApplication,
@@ -283,7 +267,6 @@ final class LoomUITests: XCTestCase {
         return bubbleQuery.firstMatch.waitForExistence(timeout: timeout)
     }
 
-    @MainActor
     private func waitForSessionDetailReady(app: XCUIApplication, timeout: TimeInterval) -> Bool {
         let detailMarker = element("sessions.detail", app: app)
         let messageField = element("session.detail.messageField", app: app)

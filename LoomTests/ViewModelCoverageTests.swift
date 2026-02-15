@@ -8,6 +8,7 @@ private enum StubFailure: Error, Sendable {
 
 private actor StubOllamaClient: OllamaStatusProviding {
     var diagnosis: OllamaDiagnosis
+    var diagnosisDelay: Duration?
     var modelsResult: Result<[OllamaModel], StubFailure>
     var deleteResult: Result<Void, StubFailure>
     var pullResult: Result<Void, StubFailure>
@@ -21,6 +22,7 @@ private actor StubOllamaClient: OllamaStatusProviding {
 
     init(
         diagnosis: OllamaDiagnosis,
+        diagnosisDelay: Duration? = nil,
         modelsResult: Result<[OllamaModel], StubFailure> = .success([]),
         deleteResult: Result<Void, StubFailure> = .success(()),
         pullResult: Result<Void, StubFailure> = .success(()),
@@ -31,6 +33,7 @@ private actor StubOllamaClient: OllamaStatusProviding {
         pullCompletionDelay: Duration? = nil
     ) {
         self.diagnosis = diagnosis
+        self.diagnosisDelay = diagnosisDelay
         self.modelsResult = modelsResult
         self.deleteResult = deleteResult
         self.pullResult = pullResult
@@ -42,7 +45,10 @@ private actor StubOllamaClient: OllamaStatusProviding {
     }
 
     func diagnose() async -> OllamaDiagnosis {
-        diagnosis
+        if let diagnosisDelay {
+            try? await Task.sleep(for: diagnosisDelay)
+        }
+        return diagnosis
     }
 
     func listModels() async throws -> [OllamaModel] {
@@ -993,6 +999,48 @@ struct SessionMessagesViewModelCoverageTests {
 
     @Test
     @MainActor
+    func sendDraftConcurrentCallsSubmitOnlyOnce() async throws {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Concurrent Send")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let chatClient = ScriptedChatClient([.complete(["Hi"])])
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(
+                diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+                diagnosisDelay: .milliseconds(120)
+            ),
+            chatClient: chatClient
+        )
+
+        vm.draft = "Hello"
+
+        async let firstSend: Void = vm.sendDraft()
+        async let secondSend: Void = vm.sendDraft()
+        _ = await (firstSend, secondSend)
+        await waitUntil { !vm.isGenerating }
+
+        #expect(vm.messages.count == 2)
+        #expect(vm.messages.filter { $0.role == .user }.count == 1)
+        #expect(vm.messages.filter { $0.role == .assistant }.count == 1)
+
+        let requests = await chatClient.readRecordedRequests()
+        #expect(requests.count == 1)
+
+        let persisted = try await store.loadMessages(sessionID: session.id)
+        #expect(persisted.count == 2)
+        #expect(persisted.filter { $0.role == .user }.count == 1)
+    }
+
+    @Test
+    @MainActor
     func stopGeneratingPersistsPartialAssistantContent() async throws {
         clearModelSelectionPreference()
         defer { clearModelSelectionPreference() }
@@ -1020,6 +1068,49 @@ struct SessionMessagesViewModelCoverageTests {
         if persisted.count == 2 {
             #expect(persisted[1].content == "Partial")
         }
+    }
+
+    @Test
+    @MainActor
+    func retryLastReplyConcurrentCallsSubmitOnlyOnce() async throws {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Concurrent Retry")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let chatClient = ScriptedChatClient([
+            .fail(["Partial"], .serverError("Connection lost.")),
+            .complete(["Recovered"])
+        ])
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(
+                diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+                diagnosisDelay: .milliseconds(120)
+            ),
+            chatClient: chatClient
+        )
+
+        await sendDraftWithModelRetry(vm, draft: "Hello")
+        await waitUntil { !vm.isGenerating }
+        #expect(vm.banner?.action == .retryLastReply)
+
+        async let firstRetry: Void = vm.retryLastReply()
+        async let secondRetry: Void = vm.retryLastReply()
+        _ = await (firstRetry, secondRetry)
+        await waitUntil { !vm.isGenerating }
+
+        #expect(vm.banner == nil)
+        #expect(vm.messages.count == 2)
+        #expect(vm.messages.last?.content == "Recovered")
+
+        let requests = await chatClient.readRecordedRequests()
+        #expect(requests.count == 2)
     }
 
     @Test

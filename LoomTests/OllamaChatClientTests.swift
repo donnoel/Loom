@@ -11,41 +11,37 @@ private struct MockHTTPResponse: Sendable {
 private typealias MockHTTPHandler = @Sendable (URLRequest) throws -> MockHTTPResponse
 
 private actor MockURLProtocolState {
-    private var handler: MockHTTPHandler?
-    private var requests: [URLRequest] = []
+    private var handlers: [String: MockHTTPHandler] = [:]
+    private var requestsByToken: [String: [URLRequest]] = [:]
 
-    func setHandler(_ handler: @escaping MockHTTPHandler) {
-        self.handler = handler
+    func configure(token: String, handler: @escaping MockHTTPHandler) {
+        handlers[token] = handler
+        requestsByToken[token] = []
     }
 
-    func currentHandler() -> MockHTTPHandler? {
-        handler
+    func currentHandler(for token: String) -> MockHTTPHandler? {
+        handlers[token]
     }
 
-    func record(_ request: URLRequest) {
-        requests.append(request)
+    func record(_ request: URLRequest, token: String) {
+        requestsByToken[token, default: []].append(request)
     }
 
-    func recordedRequests() -> [URLRequest] {
-        requests
-    }
-
-    func reset() {
-        handler = nil
-        requests.removeAll(keepingCapacity: false)
+    func recordedRequests(for token: String) -> [URLRequest] {
+        requestsByToken[token] ?? []
     }
 }
 
 private final class MockURLProtocol: URLProtocol {
     private static let state = MockURLProtocolState()
+    static let tokenHeader = "X-Loom-Mock-Token"
 
-    static func configure(handler: @escaping MockHTTPHandler) async {
-        await state.reset()
-        await state.setHandler(handler)
+    static func configure(token: String, handler: @escaping MockHTTPHandler) async {
+        await state.configure(token: token, handler: handler)
     }
 
-    static func recordedRequests() async -> [URLRequest] {
-        await state.recordedRequests()
+    static func recordedRequests(token: String) async -> [URLRequest] {
+        await state.recordedRequests(for: token)
     }
 
     override class func canInit(with request: URLRequest) -> Bool {
@@ -58,10 +54,14 @@ private final class MockURLProtocol: URLProtocol {
 
     override func startLoading() {
         Task {
-            await Self.state.record(request)
-
             do {
-                guard let handler = await Self.state.currentHandler() else {
+                guard let token = request.value(forHTTPHeaderField: Self.tokenHeader) else {
+                    throw URLError(.unsupportedURL)
+                }
+
+                await Self.state.record(request, token: token)
+
+                guard let handler = await Self.state.currentHandler(for: token) else {
                     throw URLError(.unsupportedURL)
                 }
 
@@ -120,10 +120,11 @@ private final class LockedPullProgresses: @unchecked Sendable {
     }
 }
 
-private func mockedSession() -> URLSession {
+private func mockedSession(token: String) -> URLSession {
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [MockURLProtocol.self]
     configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+    configuration.httpAdditionalHeaders = [MockURLProtocol.tokenHeader: token]
     return URLSession(configuration: configuration)
 }
 
@@ -146,12 +147,13 @@ private func textResponse(statusCode: Int, body: String) -> MockHTTPResponse {
 private func makeClients(
     installed: Bool = true,
     handler: @escaping MockHTTPHandler
-) async -> (OllamaClient, OllamaChatClient) {
-    await MockURLProtocol.configure(handler: handler)
-    let session = mockedSession()
+) async -> (OllamaClient, OllamaChatClient, String) {
+    let token = UUID().uuidString
+    await MockURLProtocol.configure(token: token, handler: handler)
+    let session = mockedSession(token: token)
     let ollamaClient = OllamaClient(session: session, installedDetector: { installed })
     let chatClient = OllamaChatClient(ollamaClient: ollamaClient, session: session)
-    return (ollamaClient, chatClient)
+    return (ollamaClient, chatClient, token)
 }
 
 struct OllamaChatClientTests {
@@ -228,7 +230,7 @@ struct OllamaChatClientTests {
 struct OllamaChatClientTransportTests {
     @Test
     func streamChatRejectsEmptyModelBeforeNetworkCall() async {
-        let (_, chatClient) = await makeClients { _ in
+        let (_, chatClient, token) = await makeClients { _ in
             jsonResponse(statusCode: 200, body: #"{"version":"0.7.0"}"#)
         }
 
@@ -246,13 +248,13 @@ struct OllamaChatClientTransportTests {
             Issue.record("Unexpected non-stream error: \(String(describing: error))")
         }
 
-        let requests = await MockURLProtocol.recordedRequests()
+        let requests = await MockURLProtocol.recordedRequests(token: token)
         #expect(requests.isEmpty)
     }
 
     @Test
     func streamChatYieldsDeltasUntilDone() async throws {
-        let (_, chatClient) = await makeClients { request in
+        let (_, chatClient, _) = await makeClients { request in
             switch request.url?.path {
             case "/api/version":
                 return jsonResponse(statusCode: 200, body: #"{"version":"0.7.0"}"#)
@@ -278,7 +280,7 @@ struct OllamaChatClientTransportTests {
 
     @Test
     func streamChatThrowsOllamaUnavailableWhenNoReachableBaseURL() async {
-        let (_, chatClient) = await makeClients(installed: true) { request in
+        let (_, chatClient, _) = await makeClients(installed: true) { request in
             if request.url?.path == "/api/version" {
                 return textResponse(statusCode: 503, body: "down")
             }
@@ -302,7 +304,7 @@ struct OllamaChatClientTransportTests {
 
     @Test
     func streamChatMapsServerErrorFromHTTPBody() async {
-        let (_, chatClient) = await makeClients { request in
+        let (_, chatClient, _) = await makeClients { request in
             switch request.url?.path {
             case "/api/version":
                 return jsonResponse(statusCode: 200, body: #"{"version":"0.7.0"}"#)
@@ -330,7 +332,7 @@ struct OllamaChatClientTransportTests {
 
     @Test
     func streamChatFallsBackToHTTPStatusErrorWithoutServerMessage() async {
-        let (_, chatClient) = await makeClients { request in
+        let (_, chatClient, _) = await makeClients { request in
             switch request.url?.path {
             case "/api/version":
                 return jsonResponse(statusCode: 200, body: #"{"version":"0.7.0"}"#)
@@ -358,7 +360,7 @@ struct OllamaChatClientTransportTests {
 
     @Test
     func streamChatThrowsServerErrorWhenChunkCarriesErrorField() async {
-        let (_, chatClient) = await makeClients { request in
+        let (_, chatClient, _) = await makeClients { request in
             switch request.url?.path {
             case "/api/version":
                 return jsonResponse(statusCode: 200, body: #"{"version":"0.7.0"}"#)
@@ -389,7 +391,7 @@ struct OllamaChatClientTransportTests {
 
     @Test
     func streamChatThrowsBadResponseWhenStreamEndsWithoutDoneChunk() async {
-        let (_, chatClient) = await makeClients { request in
+        let (_, chatClient, _) = await makeClients { request in
             switch request.url?.path {
             case "/api/version":
                 return jsonResponse(statusCode: 200, body: #"{"version":"0.7.0"}"#)
@@ -423,7 +425,7 @@ struct OllamaChatClientTransportTests {
 struct OllamaClientNetworkTests {
     @Test
     func diagnoseCachesLastReachableBaseURL() async {
-        let (client, _) = await makeClients { request in
+        let (client, _, token) = await makeClients { request in
             if request.url?.path == "/api/version" {
                 return jsonResponse(statusCode: 200, body: #"{"version":"0.7.0"}"#)
             }
@@ -437,7 +439,7 @@ struct OllamaClientNetworkTests {
         #expect(second.isRunning)
         #expect(first.reachableBaseURL == second.reachableBaseURL)
 
-        let versionRequests = await MockURLProtocol.recordedRequests()
+        let versionRequests = await MockURLProtocol.recordedRequests(token: token)
             .filter { $0.url?.path == "/api/version" }
         #expect(versionRequests.count == 2)
         #expect(Set(versionRequests.compactMap { $0.url?.host }) == Set(["localhost"]))
@@ -445,7 +447,7 @@ struct OllamaClientNetworkTests {
 
     @Test
     func listModelsSortsByTagAndParsesMetadata() async throws {
-        let (client, _) = await makeClients { request in
+        let (client, _, _) = await makeClients { request in
             switch request.url?.path {
             case "/api/version":
                 return jsonResponse(statusCode: 200, body: #"{"version":"0.7.0"}"#)
@@ -486,7 +488,7 @@ struct OllamaClientNetworkTests {
 
     @Test
     func deleteModelRejectsEmptyNameBeforeNetworkCall() async {
-        let (client, _) = await makeClients { _ in
+        let (client, _, token) = await makeClients { _ in
             jsonResponse(statusCode: 200, body: #"{"version":"0.7.0"}"#)
         }
 
@@ -504,13 +506,13 @@ struct OllamaClientNetworkTests {
             Issue.record("Unexpected non-delete error: \(String(describing: error))")
         }
 
-        let requests = await MockURLProtocol.recordedRequests()
+        let requests = await MockURLProtocol.recordedRequests(token: token)
         #expect(requests.isEmpty)
     }
 
     @Test
     func deleteModelPropagatesHTTPStatusAndSnippet() async {
-        let (client, _) = await makeClients { request in
+        let (client, _, _) = await makeClients { request in
             switch request.url?.path {
             case "/api/version":
                 return jsonResponse(statusCode: 200, body: #"{"version":"0.7.0"}"#)
@@ -539,7 +541,7 @@ struct OllamaClientNetworkTests {
 
     @Test
     func pullModelReportsProgressFromStreamingChunks() async throws {
-        let (client, _) = await makeClients { request in
+        let (client, _, _) = await makeClients { request in
             switch request.url?.path {
             case "/api/version":
                 return jsonResponse(statusCode: 200, body: #"{"version":"0.7.0"}"#)
@@ -569,7 +571,7 @@ struct OllamaClientNetworkTests {
 
     @Test
     func pullModelRejectsEmptyNameBeforeNetworkCall() async {
-        let (client, _) = await makeClients { _ in
+        let (client, _, token) = await makeClients { _ in
             jsonResponse(statusCode: 200, body: #"{"version":"0.7.0"}"#)
         }
 
@@ -587,13 +589,13 @@ struct OllamaClientNetworkTests {
             Issue.record("Unexpected non-pull error: \(String(describing: error))")
         }
 
-        let requests = await MockURLProtocol.recordedRequests()
+        let requests = await MockURLProtocol.recordedRequests(token: token)
         #expect(requests.isEmpty)
     }
 
     @Test
     func pullModelThrowsServerErrorWhenChunkContainsErrorField() async {
-        let (client, _) = await makeClients { request in
+        let (client, _, _) = await makeClients { request in
             switch request.url?.path {
             case "/api/version":
                 return jsonResponse(statusCode: 200, body: #"{"version":"0.7.0"}"#)
