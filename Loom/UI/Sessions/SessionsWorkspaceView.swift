@@ -333,10 +333,10 @@ struct SessionDetailView: View {
                             .frame(maxWidth: 220, alignment: .leading)
                             .background(
                                 Capsule(style: .continuous)
-                                    .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.white.opacity(0.40))
+                                    .fill(colorScheme == .dark ? Color.white.opacity(0.03) : Color.white.opacity(0.32))
                                     .overlay(
                                         Capsule(style: .continuous)
-                                            .stroke(LoomTheme.surfaceBorder(colorScheme).opacity(0.86), lineWidth: 0.9)
+                                            .stroke(LoomTheme.surfaceBorder(colorScheme).opacity(0.70), lineWidth: 0.75)
                                     )
                             )
                         }
@@ -387,10 +387,10 @@ struct SessionDetailView: View {
                             .frame(minHeight: 32)
                             .background(
                                 Capsule(style: .continuous)
-                                    .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.white.opacity(0.40))
+                                    .fill(colorScheme == .dark ? Color.white.opacity(0.03) : Color.white.opacity(0.32))
                                     .overlay(
                                         Capsule(style: .continuous)
-                                            .stroke(LoomTheme.surfaceBorder(colorScheme).opacity(0.86), lineWidth: 0.9)
+                                            .stroke(LoomTheme.surfaceBorder(colorScheme).opacity(0.70), lineWidth: 0.75)
                                     )
                             )
                         }
@@ -452,13 +452,13 @@ struct SessionDetailView: View {
                     .background {
                         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
                         shape
-                            .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.white.opacity(0.40))
+                            .fill(colorScheme == .dark ? Color.white.opacity(0.03) : Color.white.opacity(0.30))
                             .overlay {
                                 shape.strokeBorder(
                                     isDraftFieldFocused
                                         ? LoomTheme.activeInputBorder(colorScheme)
                                         : LoomTheme.surfaceBorder(colorScheme),
-                                    lineWidth: isDraftFieldFocused ? 1.15 : 0.9
+                                    lineWidth: isDraftFieldFocused ? 1.0 : 0.75
                                 )
                             }
                     }
@@ -487,27 +487,27 @@ struct SessionDetailView: View {
                     .accessibilityIdentifier("session.detail.contextBudget")
 
                 }
-                .padding(.top, 16)
+                .padding(.top, 15)
                 .padding(.horizontal, 18)
-                .padding(.bottom, 16)
+                .padding(.bottom, 15)
                 .frame(maxWidth: 760)
-                .frame(minHeight: 148)
+                .frame(minHeight: 138)
                 .frame(maxWidth: .infinity)
                 .background {
                     let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
                     shape
                         .fill(
                             colorScheme == .dark
-                                ? AnyShapeStyle(.ultraThinMaterial)
-                                : AnyShapeStyle(Color.white.opacity(0.80))
+                                ? AnyShapeStyle(Color.white.opacity(0.02))
+                                : AnyShapeStyle(Color.white.opacity(0.78))
                         )
                         .overlay {
                             shape.fill(
                                 LinearGradient(
                                     colors: [
-                                        Color.white.opacity(colorScheme == .dark ? 0.12 : 0.22),
+                                        Color.white.opacity(colorScheme == .dark ? 0.14 : 0.20),
                                         Color.clear,
-                                        Color.white.opacity(colorScheme == .dark ? 0.03 : 0.07)
+                                        Color.white.opacity(colorScheme == .dark ? 0.02 : 0.06)
                                     ],
                                     startPoint: .top,
                                     endPoint: .bottom
@@ -515,23 +515,26 @@ struct SessionDetailView: View {
                             )
                         }
                         .overlay {
-                            shape.strokeBorder(LoomTheme.surfaceBorder(colorScheme).opacity(0.86), lineWidth: 0.9)
+                            shape.fill(LoomTheme.accentGradient(colorScheme).opacity(colorScheme == .dark ? 0.12 : 0.06))
+                        }
+                        .overlay {
+                            shape.strokeBorder(LoomTheme.surfaceBorder(colorScheme).opacity(0.64), lineWidth: 0.75)
                         }
                         .overlay {
                             if isDraftFieldFocused {
                                 shape.strokeBorder(
-                                    LoomTheme.focusRing(colorScheme).opacity(colorScheme == .dark ? 0.62 : 0.84),
-                                    lineWidth: 1.25
+                                    LoomTheme.focusRing(colorScheme).opacity(colorScheme == .dark ? 0.50 : 0.78),
+                                    lineWidth: 1.05
                                 )
                             } else if isComposerHovered {
                                 shape.strokeBorder(
-                                    Color.white.opacity(colorScheme == .dark ? 0.12 : 0.22),
-                                    lineWidth: 0.8
+                                    Color.white.opacity(colorScheme == .dark ? 0.09 : 0.18),
+                                    lineWidth: 0.65
                                 )
                             }
                         }
                 }
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.14 : 0.06), radius: 8, x: 0, y: 3)
+                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.09 : 0.04), radius: 6, x: 0, y: 2)
                 .onHover { hovering in
                     withAnimation(.easeOut(duration: 0.16)) {
                         isComposerHovered = hovering

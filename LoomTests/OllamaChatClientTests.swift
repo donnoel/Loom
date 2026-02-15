@@ -621,3 +621,47 @@ struct OllamaClientNetworkTests {
         }
     }
 }
+
+@Suite(.serialized)
+struct SessionStoreTailReadTests {
+    @Test
+    func loadRecentMessagesReadsAcrossMultipleChunksAndReturnsLastNInOrder() async throws {
+        // Arrange: force SessionStore to write into a temp root via LoomPaths.sessionsRoot() override.
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LoomTests", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+
+        setenv("LOOM_SESSIONS_ROOT", tempRoot.path, 1)
+        defer {
+            unsetenv("LOOM_SESSIONS_ROOT")
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Tail Read Test")
+
+        // Write enough messages to exceed the 64KB tail-read chunk size (and then some).
+        let totalMessages = 2500
+        let payload = String(repeating: "x", count: 64)
+        for i in 0..<totalMessages {
+            let message = ChatMessage(role: .user, content: "msg \(i) \(payload)")
+            try await store.appendMessage(message, sessionID: session.id)
+        }
+
+        // Act
+        let limit = 50
+        let recent = try await store.loadRecentMessages(sessionID: session.id, limit: limit)
+
+        // Assert: last N messages, in order.
+        #expect(recent.count == limit)
+        #expect(recent.first?.content.hasPrefix("msg \(totalMessages - limit)") == true)
+        #expect(recent.last?.content.hasPrefix("msg \(totalMessages - 1)") == true)
+
+        // Ensure strictly increasing sequence for the expected range.
+        for (offset, message) in recent.enumerated() {
+            let expectedIndex = totalMessages - limit + offset
+            #expect(message.content.hasPrefix("msg \(expectedIndex)") == true)
+        }
+    }
+}

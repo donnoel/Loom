@@ -42,7 +42,7 @@ private struct AppInfoView: View {
             CompanyCitation(
                 company: "Ollama",
                 role: "Local runtime that loads and runs models on your Mac.",
-                url: URL(string: "https://www.llama.com")!
+                url: URL(string: "https://www.ollama.com")!
             )
         ]
 

@@ -239,7 +239,8 @@ actor SessionStore {
         // Read from the end in chunks until we have enough newline boundaries.
         let chunkSize: Int64 = 64 * 1024
         var cursor: Int64 = endOffsetI64
-        var buffer = Data()
+        var chunks: [Data] = []
+        chunks.reserveCapacity(32)
         var newlineCount = 0
 
         while cursor > 0 && newlineCount <= limit {
@@ -250,8 +251,8 @@ actor SessionStore {
 
             if chunk.isEmpty { break }
 
-            // Prepend chunk to buffer (we're reading backwards).
-            buffer.insert(contentsOf: chunk, at: 0)
+            // Collect chunks while reading backwards; assemble once at the end to avoid O(n^2) prepends.
+            chunks.append(chunk)
 
             // Count newlines incrementally to avoid rescanning the whole buffer each loop.
             let chunkNewlines = chunk.reduce(into: 0) { acc, byte in
@@ -262,6 +263,9 @@ actor SessionStore {
             // If the file is small, avoid looping too much.
             if cursor == 0 { break }
         }
+
+        // Assemble buffer in forward order.
+        let buffer = Data(chunks.reversed().joined())
 
         // Split and decode only the last `limit` lines.
         let lines = buffer.split(separator: 0x0A)
