@@ -150,7 +150,7 @@ nonisolated enum LoomTheme {
         static var monospacedBody: Font { .system(.body, design: .monospaced) }
         static var monospacedFootnote: Font { .system(.footnote, design: .monospaced) }
         static var chatBubbleChip: Font { .callout }
-        static var chatBubbleBody: Font { .system(size: 16, weight: .regular, design: .default) }
+        static var chatBubbleBody: Font { .system(size: 14, weight: .regular, design: .default) }
     }
 
     static func bubblePalette(
@@ -242,16 +242,17 @@ private struct LoomBubbleModifier: ViewModifier {
     func body(content: Content) -> some View {
         let palette = LoomTheme.bubblePalette(role: role, scheme: colorScheme)
         let isChipRole = role == .system || role == .tool
+        let bubbleMaxWidth: CGFloat = role == .user ? 420 : 760
         let bubbleShape = RoundedRectangle(cornerRadius: palette.cornerRadius, style: .continuous)
 
         content
             .foregroundStyle(palette.foreground)
             .font(isChipRole ? LoomTheme.Typography.chatBubbleChip : LoomTheme.Typography.chatBubbleBody)
-            .lineSpacing(isChipRole ? 1 : 9)
+            .lineSpacing(isChipRole ? 1 : 5)
             .multilineTextAlignment(.leading)
             .contentShape(RoundedRectangle(cornerRadius: palette.cornerRadius, style: .continuous))
-            .padding(.horizontal, isChipRole ? 10 : 22)
-            .padding(.vertical, isChipRole ? 6 : 16)
+            .padding(.horizontal, isChipRole ? 10 : 16)
+            .padding(.vertical, isChipRole ? 6 : 11)
             .background {
                 bubbleShape
                     .fill(palette.background)
@@ -268,7 +269,7 @@ private struct LoomBubbleModifier: ViewModifier {
                     }
             }
             .shadow(color: palette.shadow, radius: palette.shadowRadius, x: 0, y: palette.shadowYOffset)
-            .frame(maxWidth: 760, alignment: palette.alignment)
+            .frame(maxWidth: bubbleMaxWidth, alignment: palette.alignment)
     }
 }
 

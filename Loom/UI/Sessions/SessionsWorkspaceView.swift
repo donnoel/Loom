@@ -487,7 +487,7 @@ struct SessionDetailView: View {
                     .accessibilityIdentifier("session.detail.contextBudget")
 
                 }
-                .padding(.top, 14)
+                .padding(.top, 24)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 14)
                 .frame(maxWidth: 760)
@@ -1107,7 +1107,6 @@ private struct MessageContentView: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .textSelection(.enabled)
         .contextMenu {
             Button("Copy") {
@@ -1145,7 +1144,6 @@ private struct MarkdownTextBlockView: View {
                 Text(markdown)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
