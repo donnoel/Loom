@@ -192,7 +192,7 @@ struct SessionDetailView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 12) {
                     if !vm.pendingAttachments.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
@@ -249,8 +249,8 @@ struct SessionDetailView: View {
                             sendAndScroll(proxy)
                         }
                         .padding(.horizontal, 10)
-                        .padding(.top, 6)
-                        .padding(.bottom, 8)
+                        .padding(.top, 8)
+                        .padding(.bottom, 10)
 
                     HStack(alignment: .center, spacing: 8) {
                         HStack(spacing: 4) {
@@ -333,10 +333,10 @@ struct SessionDetailView: View {
                             .frame(maxWidth: 220, alignment: .leading)
                             .background(
                                 Capsule(style: .continuous)
-                                    .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.48))
+                                    .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.white.opacity(0.40))
                                     .overlay(
                                         Capsule(style: .continuous)
-                                            .stroke(LoomTheme.surfaceBorder(colorScheme), lineWidth: 1)
+                                            .stroke(LoomTheme.surfaceBorder(colorScheme).opacity(0.86), lineWidth: 0.9)
                                     )
                             )
                         }
@@ -387,10 +387,10 @@ struct SessionDetailView: View {
                             .frame(minHeight: 32)
                             .background(
                                 Capsule(style: .continuous)
-                                    .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.48))
+                                    .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.white.opacity(0.40))
                                     .overlay(
                                         Capsule(style: .continuous)
-                                            .stroke(LoomTheme.surfaceBorder(colorScheme), lineWidth: 1)
+                                            .stroke(LoomTheme.surfaceBorder(colorScheme).opacity(0.86), lineWidth: 0.9)
                                     )
                             )
                         }
@@ -452,19 +452,19 @@ struct SessionDetailView: View {
                     .background {
                         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
                         shape
-                            .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.46))
+                            .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.white.opacity(0.40))
                             .overlay {
                                 shape.strokeBorder(
                                     isDraftFieldFocused
                                         ? LoomTheme.activeInputBorder(colorScheme)
                                         : LoomTheme.surfaceBorder(colorScheme),
-                                    lineWidth: isDraftFieldFocused ? 1.4 : 1
+                                    lineWidth: isDraftFieldFocused ? 1.15 : 0.9
                                 )
                             }
                     }
                     .animation(.easeOut(duration: 0.16), value: isDraftFieldFocused)
 
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 8) {
                             Label(vm.contextBudgetSnapshot.label, systemImage: "gauge.medium")
                             Spacer(minLength: 8)
@@ -487,9 +487,9 @@ struct SessionDetailView: View {
                     .accessibilityIdentifier("session.detail.contextBudget")
 
                 }
-                .padding(.top, 14)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 14)
+                .padding(.top, 16)
+                .padding(.horizontal, 18)
+                .padding(.bottom, 16)
                 .frame(maxWidth: 760)
                 .frame(minHeight: 148)
                 .frame(maxWidth: .infinity)
@@ -498,15 +498,16 @@ struct SessionDetailView: View {
                     shape
                         .fill(
                             colorScheme == .dark
-                                ? Color(red: 0.04, green: 0.06, blue: 0.13).opacity(0.72)
-                                : Color.white.opacity(0.84)
+                                ? AnyShapeStyle(.ultraThinMaterial)
+                                : AnyShapeStyle(Color.white.opacity(0.80))
                         )
                         .overlay {
                             shape.fill(
                                 LinearGradient(
                                     colors: [
-                                        Color.white.opacity(colorScheme == .dark ? 0.06 : 0.24),
-                                        Color.clear
+                                        Color.white.opacity(colorScheme == .dark ? 0.12 : 0.22),
+                                        Color.clear,
+                                        Color.white.opacity(colorScheme == .dark ? 0.03 : 0.07)
                                     ],
                                     startPoint: .top,
                                     endPoint: .bottom
@@ -514,17 +515,23 @@ struct SessionDetailView: View {
                             )
                         }
                         .overlay {
-                            shape.strokeBorder(LoomTheme.surfaceBorder(colorScheme), lineWidth: 1)
+                            shape.strokeBorder(LoomTheme.surfaceBorder(colorScheme).opacity(0.86), lineWidth: 0.9)
                         }
                         .overlay {
                             if isDraftFieldFocused {
-                                shape.strokeBorder(LoomTheme.focusRing(colorScheme), lineWidth: 2)
+                                shape.strokeBorder(
+                                    LoomTheme.focusRing(colorScheme).opacity(colorScheme == .dark ? 0.62 : 0.84),
+                                    lineWidth: 1.25
+                                )
                             } else if isComposerHovered {
-                                shape.strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.18 : 0.28), lineWidth: 1)
+                                shape.strokeBorder(
+                                    Color.white.opacity(colorScheme == .dark ? 0.12 : 0.22),
+                                    lineWidth: 0.8
+                                )
                             }
                         }
                 }
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.28 : 0.10), radius: 12, x: 0, y: 5)
+                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.14 : 0.06), radius: 8, x: 0, y: 3)
                 .onHover { hovering in
                     withAnimation(.easeOut(duration: 0.16)) {
                         isComposerHovered = hovering
@@ -1024,13 +1031,13 @@ private struct ComposerUtilityIconButton: View {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(
                             colorScheme == .dark
-                                ? Color.white.opacity(isActive ? 0.12 : 0.03)
-                                : Color.white.opacity(isActive ? 0.50 : 0.24)
+                                ? Color.white.opacity(isActive ? 0.09 : 0.02)
+                                : Color.white.opacity(isActive ? 0.42 : 0.16)
                         )
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(LoomTheme.surfaceBorder(colorScheme), lineWidth: 1)
+                        .stroke(LoomTheme.surfaceBorder(colorScheme).opacity(0.84), lineWidth: 0.85)
                 )
         }
         .help(helpText)
