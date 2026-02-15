@@ -15,7 +15,7 @@ struct StatusView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Loom Ready")
-                            .font(.title2.weight(.semibold))
+                            .font(LoomTheme.Typography.pageTitle)
                         Text(viewModel.snapshot.readiness.label)
                             .foregroundStyle(.secondary)
                     }
@@ -69,10 +69,10 @@ struct LoomStatusPopoverView: View {
                 Image(systemName: viewModel.snapshot.readiness.symbolName)
                     .foregroundStyle(viewModel.snapshot.readiness.tintColor)
                 Text("Loom Ready")
-                    .font(.headline)
+                    .font(LoomTheme.Typography.sectionTitle)
                 Spacer()
                 Text(viewModel.snapshot.readiness.label)
-                    .font(.caption.weight(.semibold))
+                    .font(LoomTheme.Typography.captionStrong)
                     .foregroundStyle(viewModel.snapshot.readiness.tintColor)
             }
 
@@ -130,7 +130,7 @@ struct LoomStatusLinesView: View {
 
             if let warning = snapshot.lowDiskSpaceWarning {
                 Text(warning)
-                    .font(.footnote.weight(.semibold))
+                    .font(LoomTheme.Typography.footnoteStrong)
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -147,7 +147,7 @@ struct LoomStatusLinesView: View {
             Spacer()
             Text(value)
         }
-        .font(.subheadline)
+        .font(LoomTheme.Typography.body)
     }
 
     private var diskSummaryText: String {
@@ -222,7 +222,7 @@ struct AIChatbotStatusView: View {
     private var headerCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Top AI Chatbot Monitor")
-                .font(.title3.weight(.semibold))
+                .font(LoomTheme.Typography.pageHero)
             Text("Loom checks official public status feeds for major chatbot services. Refresh any time to see live uptime and known issues.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -236,7 +236,7 @@ struct AIChatbotStatusView: View {
 
                 if let lastRefreshAt = viewModel.lastRefreshAt {
                     Text("Last checked \(Self.timestampFormatter.string(from: lastRefreshAt))")
-                        .font(.caption)
+                        .font(LoomTheme.Typography.caption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -271,12 +271,12 @@ struct AIChatbotStatusView: View {
                     .help("Drag to reorder")
 
                 Text(service.name)
-                    .font(.headline)
+                    .font(LoomTheme.Typography.sectionTitle)
 
                 Spacer()
 
                 Label(service.state.label, systemImage: service.state.symbolName)
-                    .font(.caption.weight(.semibold))
+                    .font(LoomTheme.Typography.captionStrong)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(service.state.tintColor.opacity(0.12), in: Capsule())
@@ -284,22 +284,22 @@ struct AIChatbotStatusView: View {
             }
 
             Text(service.summary)
-                .font(.subheadline)
+                .font(LoomTheme.Typography.body)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             if service.knownIssues.isEmpty {
                 Text("Known issues: none reported right now.")
-                    .font(.caption)
+                    .font(LoomTheme.Typography.caption)
                     .foregroundStyle(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Known issues:")
-                        .font(.caption.weight(.semibold))
+                        .font(LoomTheme.Typography.captionStrong)
                         .foregroundStyle(.secondary)
                     ForEach(service.knownIssues, id: \.self) { issue in
                         Text("• \(issue)")
-                            .font(.caption)
+                            .font(LoomTheme.Typography.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -308,9 +308,9 @@ struct AIChatbotStatusView: View {
 
             HStack(spacing: 12) {
                 Link("Open status page", destination: service.statusPageURL)
-                    .font(.caption)
+                    .font(LoomTheme.Typography.caption)
                 Link("Open service", destination: service.homepageURL)
-                    .font(.caption)
+                    .font(LoomTheme.Typography.caption)
             }
         }
         .padding(14)

@@ -133,6 +133,26 @@ nonisolated enum LoomTheme {
         .system(.title, design: .default).weight(.semibold)
     }
 
+    nonisolated enum Typography {
+        static var pageTitle: Font { .title2.weight(.semibold) }
+        static var pageHero: Font { .title3.weight(.semibold) }
+        static var sectionTitle: Font { .headline }
+        static var body: Font { .subheadline }
+        static var bodyStrong: Font { .subheadline.weight(.semibold) }
+        static var bodyRegular: Font { .body }
+        static var caption: Font { .caption }
+        static var captionStrong: Font { .caption.weight(.semibold) }
+        static var captionTiny: Font { .caption2 }
+        static var captionTinyStrong: Font { .caption2.weight(.semibold) }
+        static var footnote: Font { .footnote }
+        static var footnoteStrong: Font { .footnote.weight(.semibold) }
+        static var monospacedCaption: Font { .caption.monospaced() }
+        static var monospacedBody: Font { .system(.body, design: .monospaced) }
+        static var monospacedFootnote: Font { .system(.footnote, design: .monospaced) }
+        static var chatBubbleChip: Font { .callout }
+        static var chatBubbleBody: Font { .system(size: 16, weight: .regular, design: .default) }
+    }
+
     static func bubblePalette(
         role: ChatMessage.Role,
         scheme: ColorScheme
@@ -226,7 +246,7 @@ private struct LoomBubbleModifier: ViewModifier {
 
         content
             .foregroundStyle(palette.foreground)
-            .font(isChipRole ? .callout : .system(size: 19, weight: .regular, design: .default))
+            .font(isChipRole ? LoomTheme.Typography.chatBubbleChip : LoomTheme.Typography.chatBubbleBody)
             .lineSpacing(isChipRole ? 1 : 9)
             .multilineTextAlignment(.leading)
             .contentShape(RoundedRectangle(cornerRadius: palette.cornerRadius, style: .continuous))

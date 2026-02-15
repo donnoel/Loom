@@ -55,11 +55,11 @@ struct AddModelSheet: View {
     private func modelsSection(title: String, models: [CatalogModel]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.headline)
+                .font(LoomTheme.Typography.sectionTitle)
 
             if models.isEmpty {
                 Text(emptyStateText(for: title))
-                    .font(.subheadline)
+                    .font(LoomTheme.Typography.body)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 8)
             } else {
@@ -75,9 +75,9 @@ struct AddModelSheet: View {
     private var diskSpaceCard: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Disk")
-                .font(.headline)
+                .font(LoomTheme.Typography.sectionTitle)
             Text(viewModel.diskFreeSpaceText)
-                .font(.subheadline)
+                .font(LoomTheme.Typography.body)
                 .foregroundStyle(.secondary)
         }
         .padding(12)
@@ -89,7 +89,7 @@ struct AddModelSheet: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
             Text(message)
-                .font(.subheadline)
+                .font(LoomTheme.Typography.body)
                 .foregroundStyle(.primary)
             Spacer()
         }
@@ -102,38 +102,38 @@ struct AddModelSheet: View {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(model.displayName)
-                        .font(.headline)
+                        .font(LoomTheme.Typography.bodyStrong)
 
                     HStack(spacing: 8) {
                         Text(model.vendor)
-                            .font(.caption)
+                            .font(LoomTheme.Typography.caption)
                             .foregroundStyle(.secondary)
 
                         Text(model.tag)
-                            .font(.caption.monospaced())
+                            .font(LoomTheme.Typography.monospacedCaption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
                     }
 
                     Text(model.summary)
-                        .font(.subheadline)
+                        .font(LoomTheme.Typography.body)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
 
                     Text("Best at: \(model.bestAt.joined(separator: ", "))")
-                        .font(.caption)
+                        .font(LoomTheme.Typography.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
 
                     Text(viewModel.catalogModelCapabilitiesText(for: model))
-                        .font(.caption)
+                        .font(LoomTheme.Typography.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
 
                     if let sizeText = viewModel.catalogSizeText(model: model) {
                         Text(sizeText)
-                            .font(.caption)
+                            .font(LoomTheme.Typography.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -145,7 +145,7 @@ struct AddModelSheet: View {
 
             if let notes = model.notes?.nonEmptyTrimmed {
                 Text(notes)
-                    .font(.caption)
+                    .font(LoomTheme.Typography.caption)
                     .foregroundStyle(.secondary)
             }
         }
@@ -157,7 +157,7 @@ struct AddModelSheet: View {
     private func installControl(for model: CatalogModel) -> some View {
         if viewModel.isModelInstalled(tag: model.tag) {
             Text("Installed")
-                .font(.caption.weight(.semibold))
+                .font(LoomTheme.Typography.captionStrong)
                 .foregroundStyle(.green)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -173,7 +173,7 @@ struct AddModelSheet: View {
                 }
 
                 Text(viewModel.pullProgress(for: model.tag)?.status ?? "Installing…")
-                    .font(.caption)
+                    .font(LoomTheme.Typography.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
 
@@ -181,7 +181,7 @@ struct AddModelSheet: View {
                     viewModel.cancelInstall()
                 }
                 .buttonStyle(.borderless)
-                .font(.caption)
+                .font(LoomTheme.Typography.caption)
             }
             .frame(minWidth: 120, alignment: .trailing)
         } else {

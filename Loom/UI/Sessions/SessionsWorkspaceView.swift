@@ -144,10 +144,10 @@ struct SessionsWorkspaceView: View {
         .sheet(isPresented: $isShowingTagsEditor, onDismiss: resetTagsEditorState) {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Edit Tags")
-                    .font(.headline)
+                    .font(LoomTheme.Typography.sectionTitle)
 
                 Text("Use commas to separate tags.")
-                    .font(.subheadline)
+                    .font(LoomTheme.Typography.body)
                     .foregroundStyle(.secondary)
 
                 TextField("design, roadmap, notes", text: $tagsDraft, axis: .vertical)
@@ -180,18 +180,18 @@ struct SessionsWorkspaceView: View {
             if editingSessionID == session.id {
                 TextField("", text: $draftTitle)
                     .textFieldStyle(.plain)
-                    .font(.headline)
+                    .font(LoomTheme.Typography.sectionTitle)
                     .accessibilityIdentifier("sessions.renameField")
                     .focused($focusedRenameID, equals: session.id)
                     .onSubmit { commitRenameIfNeeded() }
                     .onExitCommand { cancelRename() }
             } else {
                 Text(session.metadata.title)
-                    .font(.headline)
+                    .font(LoomTheme.Typography.sectionTitle)
             }
 
             Text(session.metadata.updatedAt, style: .date)
-                .font(.caption)
+                .font(LoomTheme.Typography.caption)
                 .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
@@ -356,7 +356,7 @@ private struct SessionsSidebarBanner: View {
                 .foregroundStyle(.secondary)
 
             Text(text)
-                .font(.subheadline)
+                .font(LoomTheme.Typography.body)
                 .foregroundStyle(.primary)
 
             Spacer()
@@ -449,7 +449,7 @@ struct SessionDetailView: View {
                     .padding(.bottom, 4)
 
                 Text("Updated \(session.metadata.updatedAt.formatted(date: .abbreviated, time: .omitted))")
-                    .font(.caption)
+                    .font(LoomTheme.Typography.caption)
                     .foregroundStyle(LoomTheme.textSecondary(colorScheme))
             }
             .frame(maxWidth: .infinity, alignment: .center)
@@ -573,10 +573,10 @@ struct SessionDetailView: View {
                                             .foregroundStyle(.secondary)
                                         VStack(alignment: .leading, spacing: 1) {
                                             Text(attachment.fileName)
-                                                .font(.caption.weight(.semibold))
+                                                .font(LoomTheme.Typography.captionStrong)
                                                 .lineLimit(1)
                                             Text(attachment.characterCountLabel)
-                                                .font(.caption2)
+                                                .font(LoomTheme.Typography.captionTiny)
                                                 .foregroundStyle(.secondary)
                                         }
                                         Button {
@@ -694,10 +694,10 @@ struct SessionDetailView: View {
                                     .truncationMode(.middle)
                                     .foregroundStyle(LoomTheme.textPrimary(colorScheme))
                                 Image(systemName: "chevron.up.chevron.down")
-                                    .font(.caption2.weight(.semibold))
+                                    .font(LoomTheme.Typography.captionTinyStrong)
                                     .foregroundStyle(LoomTheme.textSecondary(colorScheme))
                             }
-                            .font(.subheadline.weight(.semibold))
+                            .font(LoomTheme.Typography.bodyStrong)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)
                             .frame(minHeight: 32)
@@ -1009,15 +1009,15 @@ struct SessionDetailView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Welcome to your new session")
-                        .font(.headline)
+                        .font(LoomTheme.Typography.sectionTitle)
                     Text("Ask Loom anything in everyday language. You can also attach files or use your mic.")
-                        .font(.subheadline)
+                        .font(LoomTheme.Typography.body)
                         .foregroundStyle(.secondary)
                 }
             }
 
             Text("Try one of these:")
-                .font(.caption.weight(.semibold))
+                .font(LoomTheme.Typography.captionStrong)
                 .foregroundStyle(.secondary)
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -1032,7 +1032,7 @@ struct SessionDetailView: View {
             }
 
             Text("AI can make mistakes. Check important info.")
-                .font(.caption)
+                .font(LoomTheme.Typography.caption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1258,7 +1258,7 @@ private struct StarterPromptChip: View {
     var body: some View {
         Button(action: onTap) {
             Text(prompt)
-                .font(.caption)
+                .font(LoomTheme.Typography.caption)
                 .multilineTextAlignment(.leading)
                 .lineLimit(2)
                 .padding(.horizontal, 10)

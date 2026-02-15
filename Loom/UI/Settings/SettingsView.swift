@@ -63,7 +63,7 @@ struct SettingsView: View {
     private var introCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Settings")
-                .font(.title3.weight(.semibold))
+                .font(LoomTheme.Typography.pageHero)
 
             Text("Control how Loom stays up to date and where your local session data is stored.")
                 .foregroundStyle(.secondary)
@@ -83,13 +83,13 @@ struct SettingsView: View {
     private var automationCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Automation")
-                .font(.headline)
+                .font(LoomTheme.Typography.sectionTitle)
 
             Toggle("Refresh status automatically", isOn: $statusAutoRefreshEnabled)
             Toggle("Check model availability automatically", isOn: $modelsAutoCheckEnabled)
 
             Text("Turn these off if you prefer manual refresh while troubleshooting.")
-                .font(.caption)
+                .font(LoomTheme.Typography.caption)
                 .foregroundStyle(.secondary)
         }
         .padding(16)
@@ -100,15 +100,15 @@ struct SettingsView: View {
     private var localDataCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Local Data & Privacy")
-                .font(.headline)
+                .font(LoomTheme.Typography.sectionTitle)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Sessions folder")
-                    .font(.caption)
+                    .font(LoomTheme.Typography.caption)
                     .foregroundStyle(.secondary)
 
                 Text(sessionsRootURL?.path ?? "Unavailable")
-                    .font(.system(.footnote, design: .monospaced))
+                    .font(LoomTheme.Typography.monospacedFootnote)
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
             }
@@ -129,11 +129,11 @@ struct SettingsView: View {
     private var voiceRepliesCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Voice Replies")
-                .font(.headline)
+                .font(LoomTheme.Typography.sectionTitle)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Voice")
-                    .font(.caption)
+                    .font(LoomTheme.Typography.caption)
                     .foregroundStyle(.secondary)
 
                 Picker("Voice", selection: selectedVoiceIdentifier) {
@@ -151,7 +151,7 @@ struct SettingsView: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Rate: \(normalizedVoiceReplyRate.wrappedValue, specifier: "%.2f")")
-                    .font(.caption)
+                    .font(LoomTheme.Typography.caption)
                     .foregroundStyle(.secondary)
 
                 Slider(
@@ -169,7 +169,7 @@ struct SettingsView: View {
             .accessibilityIdentifier("settings.previewVoice")
 
             Text("Choose the voice and speed Loom uses when reading assistant replies aloud.")
-                .font(.caption)
+                .font(LoomTheme.Typography.caption)
                 .foregroundStyle(.secondary)
         }
         .padding(16)
@@ -180,10 +180,10 @@ struct SettingsView: View {
     private var dangerCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Danger Zone")
-                .font(.headline)
+                .font(LoomTheme.Typography.sectionTitle)
 
             Text("Delete all sessions from this Mac. This cannot be undone.")
-                .font(.subheadline)
+                .font(LoomTheme.Typography.body)
                 .foregroundStyle(.secondary)
 
             Button("Delete All Sessions…", role: .destructive) {

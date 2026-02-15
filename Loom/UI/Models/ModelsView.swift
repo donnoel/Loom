@@ -98,7 +98,7 @@ struct ModelsView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Model Library")
-                        .font(.title3.weight(.semibold))
+                        .font(LoomTheme.Typography.pageHero)
                     Text(snapshot.readiness.label)
                         .foregroundStyle(.secondary)
                 }
@@ -109,7 +109,7 @@ struct ModelsView: View {
 
             if let lastUpdateCheckAt = viewModel.lastUpdateCheckAt {
                 Text("Last update check: \(lastUpdateCheckAt.formatted(date: .abbreviated, time: .shortened))")
-                    .font(.caption)
+                    .font(LoomTheme.Typography.caption)
                     .foregroundStyle(.secondary)
             }
 
@@ -148,7 +148,7 @@ struct ModelsView: View {
     private var statusDetailsCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Status")
-                .font(.headline)
+                .font(LoomTheme.Typography.sectionTitle)
             LoomStatusLinesView(snapshot: viewModel.statusSnapshot)
         }
     }
@@ -158,7 +158,7 @@ struct ModelsView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
             Text(message)
-                .font(.subheadline)
+                .font(LoomTheme.Typography.body)
                 .foregroundStyle(.primary)
             Spacer()
         }
@@ -169,10 +169,10 @@ struct ModelsView: View {
     private var addModelCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Add a model")
-                .font(.headline)
+                .font(LoomTheme.Typography.sectionTitle)
 
             Text("Browse recommended models with friendly descriptions and install them in Loom.")
-                .font(.subheadline)
+                .font(LoomTheme.Typography.body)
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 10) {
@@ -184,7 +184,7 @@ struct ModelsView: View {
 
                 if !viewModel.isRunning {
                     Text("Start Ollama to install models.")
-                        .font(.footnote)
+                        .font(LoomTheme.Typography.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -199,13 +199,13 @@ struct ModelsView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Installed models")
-                    .font(.headline)
+                    .font(LoomTheme.Typography.sectionTitle)
 
                 Spacer()
 
                 if !viewModel.models.isEmpty {
                     Text("Total space used: \(viewModel.totalInstalledSizeText)")
-                        .font(.subheadline)
+                        .font(LoomTheme.Typography.body)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -272,27 +272,27 @@ struct ModelsView: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(catalogModel?.displayName ?? model.tag)
-                    .font(.body)
+                    .font(LoomTheme.Typography.bodyRegular)
                     .lineLimit(1)
                     .truncationMode(.middle)
 
                 Text(viewModel.installedModelCompanyCountryText(for: model))
-                    .font(.caption)
+                    .font(LoomTheme.Typography.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
 
                 Text(viewModel.installedModelBestForText(for: model))
-                    .font(.caption)
+                    .font(LoomTheme.Typography.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
 
                 Text(viewModel.installedModelCapabilitiesText(for: model))
-                    .font(.caption)
+                    .font(LoomTheme.Typography.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
 
                 Text(viewModel.installedModelLastTrainedText(for: model))
-                    .font(.caption)
+                    .font(LoomTheme.Typography.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
 
@@ -305,12 +305,12 @@ struct ModelsView: View {
                         Text("Parameters \(parameterSize)")
                     }
                 }
-                .font(.caption)
+                .font(LoomTheme.Typography.caption)
                 .foregroundStyle(.secondary)
 
                 if let modifiedAt = model.modifiedAt {
                     Text("Updated \(modifiedAt.formatted(date: .abbreviated, time: .omitted))")
-                        .font(.caption)
+                        .font(LoomTheme.Typography.caption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -399,7 +399,7 @@ struct ModelsView: View {
 
     private var privacyFooter: some View {
         Text("Models and chats stay on this Mac.")
-            .font(.footnote)
+            .font(LoomTheme.Typography.footnote)
             .foregroundStyle(.secondary)
             .padding(.top, 4)
     }
@@ -450,13 +450,13 @@ struct ModelsView: View {
     private var serveHelpSheet: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Start Ollama from Terminal")
-                .font(.title3.weight(.semibold))
+                .font(LoomTheme.Typography.pageHero)
             Text("If you installed Ollama with Homebrew, run this command:")
                 .foregroundStyle(.secondary)
 
             HStack {
                 Text("ollama serve")
-                    .font(.system(.body, design: .monospaced))
+                    .font(LoomTheme.Typography.monospacedBody)
                     .padding(.vertical, 6)
                     .padding(.horizontal, 10)
                     .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))

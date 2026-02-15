@@ -101,7 +101,7 @@ private struct AppInfoView: View {
     private var introCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("How Loom works")
-                .font(.title3.weight(.semibold))
+                .font(LoomTheme.Typography.pageHero)
 
             Text("Loom is the chat workspace you see. Ollama is the local engine that does the heavy lifting. Models are the brains made by different AI companies.")
                 .foregroundStyle(.secondary)
@@ -121,7 +121,7 @@ private struct AppInfoView: View {
     private var flowCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("What Happens When You Send A Message")
-                .font(.headline)
+                .font(LoomTheme.Typography.sectionTitle)
 
             flowStep(
                 icon: "1.circle.fill",
@@ -157,9 +157,9 @@ private struct AppInfoView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(LoomTheme.Typography.bodyStrong)
                 Text(detail)
-                    .font(.subheadline)
+                    .font(LoomTheme.Typography.body)
                     .foregroundStyle(.secondary)
             }
         }
@@ -168,7 +168,7 @@ private struct AppInfoView: View {
     private var modelsCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Model Makers In Loom")
-                .font(.headline)
+                .font(LoomTheme.Typography.sectionTitle)
 
             Text("Current model providers in this catalog: \(modelVendorListText).")
                 .foregroundStyle(.secondary)
@@ -184,21 +184,21 @@ private struct AppInfoView: View {
     private var citationsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Citations")
-                .font(.headline)
+                .font(LoomTheme.Typography.sectionTitle)
 
             Text("Official references for each company involved in this stack:")
-                .font(.subheadline)
+                .font(LoomTheme.Typography.body)
                 .foregroundStyle(.secondary)
 
             ForEach(citations) { citation in
                 VStack(alignment: .leading, spacing: 3) {
                     Text(citation.company)
-                        .font(.subheadline.weight(.semibold))
+                        .font(LoomTheme.Typography.bodyStrong)
                     Text(citation.role)
-                        .font(.caption)
+                        .font(LoomTheme.Typography.caption)
                         .foregroundStyle(.secondary)
                     Link(citation.url.absoluteString, destination: citation.url)
-                        .font(.caption.monospaced())
+                        .font(LoomTheme.Typography.monospacedCaption)
                 }
             }
         }
@@ -336,7 +336,7 @@ struct RootView: View {
             Section("Sessions") {
                 if sessionsViewModel.filteredSessions.isEmpty {
                     Text("No sessions yet")
-                        .font(.subheadline)
+                        .font(LoomTheme.Typography.body)
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 4)
                 } else {
@@ -474,7 +474,7 @@ struct RootView: View {
     private var renameSheet: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Rename Session")
-                .font(.headline)
+                .font(LoomTheme.Typography.sectionTitle)
 
             TextField("Session title", text: $renameDraft)
                 .textFieldStyle(.roundedBorder)
@@ -519,19 +519,19 @@ struct RootView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(session.metadata.title)
-                        .font(.headline)
+                        .font(LoomTheme.Typography.sectionTitle)
                         .foregroundStyle(LoomTheme.textPrimary(colorScheme))
                         .lineLimit(1)
 
                     if session.metadata.isPinned {
                         Image(systemName: "pin.fill")
-                            .font(.caption2)
+                            .font(LoomTheme.Typography.captionTiny)
                             .foregroundStyle(LoomTheme.textSecondary(colorScheme))
                     }
                 }
 
                 Text(session.metadata.updatedAt, style: .date)
-                    .font(.caption)
+                    .font(LoomTheme.Typography.caption)
                     .foregroundStyle(LoomTheme.textMuted(colorScheme))
             }
 
@@ -688,12 +688,12 @@ struct RootView: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: statusViewModel.snapshot.readiness.symbolName)
-                    .font(.caption.bold())
+                    .font(LoomTheme.Typography.captionStrong)
                     .foregroundStyle(statusViewModel.snapshot.readiness.tintColor)
                 Text("Loom")
-                    .font(.subheadline.weight(.semibold))
+                    .font(LoomTheme.Typography.bodyStrong)
                 Text(statusViewModel.snapshot.readiness.label)
-                    .font(.caption.weight(.semibold))
+                    .font(LoomTheme.Typography.captionStrong)
                     .foregroundStyle(statusViewModel.snapshot.readiness.tintColor)
             }
             .padding(.horizontal, 10)
