@@ -19,6 +19,8 @@ We have the V1 local chat spine in place:
 9) **In-session model switching** is available from the chat composer so users can change models without leaving their active session
 10) **Automatic session naming** now derives a new session title from the first user request when the title is still the default
 11) **AI service monitoring** now includes an App-level status screen (including Grok) that checks public chatbot status feeds, surfaces known incidents, and supports drag-and-drop card reordering with persisted order
+12) **Composer context controls** now let users choose concise/balanced/extended history and off/compact/full file context with a visible token-budget indicator
+13) **Trust Center** now provides a local-only panel for sessions-data location, local storage footprint, attachment retention footprint, and recent local runtime health history
 
 Current focus should be reliability, polish, and guardrails (not sweeping architecture rewrites).
 
@@ -53,7 +55,7 @@ When user sends a message:
 Additional expectations:
 - Keep the user draft intact if send fails.
 - Throttle/coalesce streaming UI updates (currently ~50ms).
-- Keep context bounded (currently last 20 messages).
+- Keep context bounded by the selected composer policy (history/file context levels + budget indicator).
 - If active model changes for a session (including after leaving and returning), use user-only context for the next turn to avoid old-model anchoring.
 - Avoid full message-list reload per token.
 

@@ -79,6 +79,20 @@ final class LoomUITests: XCTestCase {
         )
     }
 
+    func testLongModelLabelKeepsSendButtonHittable() throws {
+        let app = launchApp(
+            activeModelTag: "llama-3.2-ultra-long-model-name-for-ui-layout-verification-1234567890",
+            chatScenario: .streamSuccess
+        )
+        XCTAssertTrue(createSessionAndWaitForDetail(app: app))
+
+        typeMessage("layout-check", app: app)
+
+        let sendButton = button("session.detail.sendButton", app: app)
+        XCTAssertTrue(waitForEnabled(sendButton, timeout: Self.mediumTimeout))
+        XCTAssertTrue(sendButton.isHittable)
+    }
+
     func testStopGenerationKeepsPartialReplyAfterRelaunch() throws {
         let app = launchApp(
             activeModelTag: "ui-test-model",

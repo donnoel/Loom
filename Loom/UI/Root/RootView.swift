@@ -371,6 +371,7 @@ struct RootView: View {
             Section("App") {
                 destinationSidebarRow(.info)
                 destinationSidebarRow(.status)
+                destinationSidebarRow(.trust)
                 destinationSidebarRow(.settings)
             }
         }
@@ -402,6 +403,10 @@ struct RootView: View {
             SettingsView(store: store)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("root.detail.settings")
+        case .destination(.trust):
+            TrustCenterView()
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("root.detail.trust")
         case .destination(.sessions):
             currentSessionDetail
         case .session:

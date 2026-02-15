@@ -5,6 +5,7 @@ nonisolated enum SidebarItem: String, Hashable, Identifiable, Sendable {
     case models
     case info
     case status
+    case trust
     case settings
 
     var id: String { rawValue }
@@ -15,6 +16,7 @@ nonisolated enum SidebarItem: String, Hashable, Identifiable, Sendable {
         case .models: "Models"
         case .info: "Info"
         case .status: "AI Status"
+        case .trust: "Trust Center"
         case .settings: "Settings"
         }
     }
@@ -25,6 +27,7 @@ nonisolated enum SidebarItem: String, Hashable, Identifiable, Sendable {
         case .models: "cube.box"
         case .info: "info.circle"
         case .status: "waveform.path.ecg"
+        case .trust: "lock.shield"
         case .settings: "gearshape"
         }
     }

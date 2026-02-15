@@ -262,6 +262,12 @@ private func clearModelLibraryOrderPreference() {
 }
 
 @MainActor
+private func clearComposerContextPreferences() {
+    UserDefaults.standard.removeObject(forKey: LoomPreferenceKeys.composerHistoryContextLevel)
+    UserDefaults.standard.removeObject(forKey: LoomPreferenceKeys.composerFileContextLevel)
+}
+
+@MainActor
 private func clearAIStatusOrderPreference() {
     UserDefaults.standard.removeObject(forKey: LoomPreferenceKeys.aiStatusServiceOrder)
 }
@@ -301,6 +307,22 @@ struct StatusViewModelCoverageTests {
         #expect(vm.snapshot.ollamaReachable)
         #expect(vm.snapshot.installedModelCount == 2)
         #expect(vm.ollamaActionTitle == "Ollama is running")
+    }
+
+    @Test
+    @MainActor
+    func refreshRecordsRecentRuntimeHealth() async {
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            modelsResult: .success([OllamaModel(tag: "llama3")])
+        )
+        let vm = StatusViewModel(client: client)
+
+        await vm.refresh()
+
+        #expect(vm.recentRuntimeHealth.count == 1)
+        #expect(vm.recentRuntimeHealth.first?.ollamaReachable == true)
+        #expect(vm.recentRuntimeHealth.first?.installedModelCount == 1)
     }
 
     @Test
@@ -1603,6 +1625,95 @@ struct SessionMessagesViewModelCoverageTests {
         #expect(vm.banner?.text == "Loom couldn’t save your message. Try again.")
         #expect(vm.messages.isEmpty)
         #expect(!vm.isGenerating)
+    }
+
+    @Test
+    @MainActor
+    func conciseHistoryContextCapsOutgoingWindow() async throws {
+        clearModelSelectionPreference()
+        clearComposerContextPreferences()
+        defer {
+            clearModelSelectionPreference()
+            clearComposerContextPreferences()
+        }
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "History Limit Test")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        for index in 1...10 {
+            try await store.appendMessage(
+                ChatMessage(role: .user, content: "Question \(index)"),
+                sessionID: session.id
+            )
+            try await store.appendMessage(
+                ChatMessage(role: .assistant, content: "Answer \(index)"),
+                sessionID: session.id
+            )
+        }
+
+        let chatClient = ScriptedChatClient([.complete(["ok"])])
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)),
+            chatClient: chatClient
+        )
+        await vm.load()
+        vm.historyContextLevel = .concise
+
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+        vm.draft = "Newest question"
+        await vm.sendDraft()
+        await waitUntil { !vm.isGenerating }
+
+        let requests = await chatClient.readRecordedRequests()
+        #expect(requests.count == 1)
+        if let request = requests.first {
+            #expect(request.messages.count == 8)
+            #expect(request.messages.last?.content == "Newest question")
+        }
+    }
+
+    @Test
+    @MainActor
+    func fileContextOffSkipsAttachmentInjection() async throws {
+        clearModelSelectionPreference()
+        clearComposerContextPreferences()
+        defer {
+            clearModelSelectionPreference()
+            clearComposerContextPreferences()
+        }
+
+        let attachmentURL = try makeTemporaryTextFile(contents: "Private roadmap notes", fileName: "notes.txt")
+        defer { try? FileManager.default.removeItem(at: attachmentURL.deletingLastPathComponent()) }
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Attachment Context Off")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let chatClient = ScriptedChatClient([.complete(["done"])])
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)),
+            chatClient: chatClient
+        )
+        await vm.load()
+        vm.fileContextLevel = .off
+        await vm.importAttachments(from: [attachmentURL])
+        #expect(!vm.pendingAttachments.isEmpty)
+
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+        vm.draft = "Summarize please"
+        await vm.sendDraft()
+        await waitUntil { !vm.isGenerating }
+
+        let requests = await chatClient.readRecordedRequests()
+        #expect(requests.count == 1)
+        if let request = requests.first {
+            #expect(!request.messages.contains(where: { $0.role == .system }))
+        }
     }
 }
 

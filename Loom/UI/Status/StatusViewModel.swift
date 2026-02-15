@@ -6,10 +6,20 @@ import OSLog
 @MainActor
 @Observable
 final class StatusViewModel {
+    struct LocalRuntimeHealthEntry: Identifiable, Sendable, Equatable {
+        let id: UUID
+        let checkedAt: Date
+        let readiness: LoomReadiness
+        let ollamaReachable: Bool
+        let installedModelCount: Int
+        let lowDiskSpace: Bool
+    }
+
     private let log = Logger(subsystem: "com.loom.app", category: "StatusViewModel")
     private let client: any OllamaStatusProviding
     private var refreshTask: Task<Void, Never>?
     private var activationObserver: NSObjectProtocol?
+    private let runtimeHistoryLimit = 12
 
     private nonisolated static func isAutoRefreshEnabled() -> Bool {
         if let stored = UserDefaults.standard.object(forKey: LoomPreferenceKeys.statusAutoRefreshEnabled) as? Bool {
@@ -22,6 +32,7 @@ final class StatusViewModel {
     var isRefreshing: Bool = false
     var lastRefreshAt: Date?
     var ollamaAppInstalled: Bool = false
+    var recentRuntimeHealth: [LocalRuntimeHealthEntry] = []
 
     init(client: any OllamaStatusProviding = OllamaClient()) {
         self.client = client
@@ -98,6 +109,8 @@ final class StatusViewModel {
             offlineAvailable: isReachable && !models.isEmpty && activeModelTag != nil,
             diskSpace: diskSpace
         )
+
+        recordRuntimeHealth(snapshot: snapshot)
     }
 
     var ollamaActionTitle: String {
@@ -116,6 +129,31 @@ final class StatusViewModel {
     }
 
     private static let ollamaDownloadURL = URL(string: "https://ollama.com/download")!
+
+    private func recordRuntimeHealth(snapshot: LoomStatusSnapshot) {
+        let entry = LocalRuntimeHealthEntry(
+            id: UUID(),
+            checkedAt: Date(),
+            readiness: snapshot.readiness,
+            ollamaReachable: snapshot.ollamaReachable,
+            installedModelCount: snapshot.installedModelCount,
+            lowDiskSpace: snapshot.lowDiskSpaceWarning != nil
+        )
+
+        if let last = recentRuntimeHealth.last,
+           last.readiness == entry.readiness,
+           last.ollamaReachable == entry.ollamaReachable,
+           last.installedModelCount == entry.installedModelCount,
+           last.lowDiskSpace == entry.lowDiskSpace,
+           entry.checkedAt.timeIntervalSince(last.checkedAt) < 25 {
+            recentRuntimeHealth[recentRuntimeHealth.count - 1] = entry
+        } else {
+            recentRuntimeHealth.append(entry)
+            if recentRuntimeHealth.count > runtimeHistoryLimit {
+                recentRuntimeHealth.removeFirst(recentRuntimeHealth.count - runtimeHistoryLimit)
+            }
+        }
+    }
 
     private static func ollamaAppURL() -> URL? {
         let bundleIdentifiers = [

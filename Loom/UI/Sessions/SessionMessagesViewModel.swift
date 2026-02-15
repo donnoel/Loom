@@ -29,6 +29,84 @@ final class SessionMessagesViewModel {
         let action: Action?
     }
 
+    nonisolated enum HistoryContextLevel: String, CaseIterable, Identifiable, Sendable {
+        case concise
+        case balanced
+        case extended
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .concise: "Concise"
+            case .balanced: "Balanced"
+            case .extended: "Extended"
+            }
+        }
+
+        var messageLimit: Int {
+            switch self {
+            case .concise: 8
+            case .balanced: 20
+            case .extended: 40
+            }
+        }
+
+        var baseTokenBudget: Int {
+            switch self {
+            case .concise: 2_000
+            case .balanced: 4_000
+            case .extended: 8_000
+            }
+        }
+    }
+
+    nonisolated enum FileContextLevel: String, CaseIterable, Identifiable, Sendable {
+        case off
+        case compact
+        case full
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .off: "Off"
+            case .compact: "Compact"
+            case .full: "Full"
+            }
+        }
+
+        var attachmentCharacterBudget: Int {
+            switch self {
+            case .off: 0
+            case .compact: 4_000
+            case .full: 12_000
+            }
+        }
+
+        var additionalTokenBudget: Int {
+            switch self {
+            case .off: 0
+            case .compact: 1_000
+            case .full: 2_000
+            }
+        }
+    }
+
+    struct ContextBudgetSnapshot: Equatable, Sendable {
+        let estimatedTokens: Int
+        let budgetTokens: Int
+
+        var usageRatio: Double {
+            guard budgetTokens > 0 else { return 1 }
+            return min(1, Double(estimatedTokens) / Double(budgetTokens))
+        }
+
+        var label: String {
+            "~\(estimatedTokens) / \(budgetTokens) tokens"
+        }
+    }
+
     private let store: SessionStore
     private let sessionID: UUID
     private let onActivity: (() async -> Void)?
@@ -38,7 +116,7 @@ final class SessionMessagesViewModel {
     private let attachmentImporter: SessionAttachmentImporter
     private let streamUpdateInterval: Duration = .milliseconds(60)
     private static let maxPendingAttachmentCount = 8
-    private static let maxAttachmentContextCharacters = 12_000
+    private static let roughCharactersPerToken = 4
     private static let uiTestChatScenarioEnvironmentKey = "LOOM_UI_TEST_CHAT_STUB_SCENARIO"
     private static let uiTestActiveModelTagEnvironmentKey = "LOOM_UI_TEST_ACTIVE_MODEL_TAG"
     private static let uiTestChatScenarioDefaultsKey = "loom.uiTest.chatScenario"
@@ -52,6 +130,18 @@ final class SessionMessagesViewModel {
     private(set) var isShowingFullHistory: Bool = false
     private(set) var pendingAttachments: [PendingAttachment] = []
     private(set) var availableModelTags: [String] = []
+    var historyContextLevel: HistoryContextLevel {
+        didSet {
+            guard historyContextLevel != oldValue else { return }
+            UserDefaults.standard.set(historyContextLevel.rawValue, forKey: LoomPreferenceKeys.composerHistoryContextLevel)
+        }
+    }
+    var fileContextLevel: FileContextLevel {
+        didSet {
+            guard fileContextLevel != oldValue else { return }
+            UserDefaults.standard.set(fileContextLevel.rawValue, forKey: LoomPreferenceKeys.composerFileContextLevel)
+        }
+    }
     private var isPreparingGeneration: Bool = false
     private var activeModelTagStorage: String?
     private var lastStreamModel: String?
@@ -85,6 +175,8 @@ final class SessionMessagesViewModel {
 
         self.activeModelTagStorage = Self.storedActiveModelTag()
         self.lastStreamModel = Self.storedLastStreamModel(for: sessionID)
+        self.historyContextLevel = Self.storedHistoryContextLevel()
+        self.fileContextLevel = Self.storedFileContextLevel()
     }
 
     init(
@@ -105,6 +197,8 @@ final class SessionMessagesViewModel {
         self.attachmentImporter = attachmentImporter
         self.activeModelTagStorage = Self.storedActiveModelTag()
         self.lastStreamModel = Self.storedLastStreamModel(for: sessionID)
+        self.historyContextLevel = Self.storedHistoryContextLevel()
+        self.fileContextLevel = Self.storedFileContextLevel()
     }
 
     var activeModelSupportsSpeechInput: Bool {
@@ -179,6 +273,19 @@ final class SessionMessagesViewModel {
         set {
             UserDefaults.standard.set(newValue, forKey: LoomPreferenceKeys.voiceReplyEnabled)
         }
+    }
+
+    var contextBudgetSnapshot: ContextBudgetSnapshot {
+        let contextMessages = nextTurnContextMessagesPreview()
+        let estimatedTokens = Self.estimatedTokenCount(for: contextMessages)
+        return ContextBudgetSnapshot(
+            estimatedTokens: estimatedTokens,
+            budgetTokens: contextTokenBudget
+        )
+    }
+
+    var contextBudgetHint: String {
+        "\(historyContextLevel.title) history · \(fileContextLevel.title) files"
     }
 
     func modelDisplayName(for tag: String) -> String {
@@ -283,7 +390,7 @@ final class SessionMessagesViewModel {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
 
-        if !pendingAttachments.isEmpty && !activeModelSupportsFileUploads {
+        if fileContextLevel != .off && !pendingAttachments.isEmpty && !activeModelSupportsFileUploads {
             banner = BannerState(
                 text: "This model can’t use uploaded files yet. Choose one with file upload support.",
                 actionTitle: "Choose Model",
@@ -339,13 +446,17 @@ final class SessionMessagesViewModel {
         generatingMessageID = assistantPlaceholder.id
         generatingMessageIndex = messages.index(before: messages.endIndex)
 
+        let historyLimit = historyContextLevel.messageLimit
         var context: [ChatMessage]
         if didSwitchModels(from: lastStreamModel, to: activeModelTag) {
-            context = contextMessagesForModelSwitch(limit: 20)
+            context = contextMessagesForModelSwitch(limit: historyLimit)
         } else {
-            context = contextMessages(excluding: assistantPlaceholder.id, limit: 20)
+            context = contextMessages(excluding: assistantPlaceholder.id, limit: historyLimit)
         }
-        if let attachmentContext = attachmentContextMessage(for: attachmentsForThisTurn) {
+        if let attachmentContext = attachmentContextMessage(
+            for: attachmentsForThisTurn,
+            level: fileContextLevel
+        ) {
             context.append(attachmentContext)
         }
         lastStreamModel = activeModelTag
@@ -387,7 +498,7 @@ final class SessionMessagesViewModel {
         }
         let effectiveContext: [ChatMessage]
         if didSwitchModels(from: lastStreamModel, to: model) {
-            effectiveContext = contextMessagesForModelSwitch(limit: 20)
+            effectiveContext = contextMessagesForModelSwitch(limit: historyContextLevel.messageLimit)
         } else {
             effectiveContext = context
         }
@@ -431,15 +542,6 @@ final class SessionMessagesViewModel {
             return .default
         }
         return model.resolvedCapabilities
-    }
-
-    private func contextMessagesForModelSwitch(limit: Int) -> [ChatMessage] {
-        guard limit > 0 else { return [] }
-        let userOnlyMessages = messages.filter { $0.role == .user }
-        guard userOnlyMessages.count > limit else {
-            return userOnlyMessages
-        }
-        return Array(userOnlyMessages.suffix(limit))
     }
 
     private func didSwitchModels(from previousModel: String?, to currentModel: String?) -> Bool {
@@ -488,7 +590,37 @@ final class SessionMessagesViewModel {
         return stored.compactMap(\.nonEmptyTrimmed)
     }
 
-    private func attachmentContextMessage(for attachments: [PendingAttachment]) -> ChatMessage? {
+    private var contextTokenBudget: Int {
+        historyContextLevel.baseTokenBudget + fileContextLevel.additionalTokenBudget
+    }
+
+    private func nextTurnContextMessagesPreview() -> [ChatMessage] {
+        let historyLimit = historyContextLevel.messageLimit
+        let switchedModels = didSwitchModels(from: lastStreamModel, to: activeModelTag)
+
+        var context: [ChatMessage]
+        if switchedModels {
+            context = contextMessagesForModelSwitch(source: messages, limit: historyLimit)
+        } else {
+            context = contextMessages(source: messages, excluding: nil, limit: historyLimit)
+        }
+
+        if let trimmedDraft = draft.nonEmptyTrimmed {
+            context.append(ChatMessage(role: .user, content: trimmedDraft))
+        }
+
+        if let attachmentContext = attachmentContextMessage(for: pendingAttachments, level: fileContextLevel) {
+            context.append(attachmentContext)
+        }
+
+        return context
+    }
+
+    private func attachmentContextMessage(
+        for attachments: [PendingAttachment],
+        level: FileContextLevel
+    ) -> ChatMessage? {
+        guard level != .off else { return nil }
         guard !attachments.isEmpty else { return nil }
 
         var lines: [String] = [
@@ -497,7 +629,7 @@ final class SessionMessagesViewModel {
         ]
         lines.append("")
 
-        var remainingCharacters = Self.maxAttachmentContextCharacters
+        var remainingCharacters = level.attachmentCharacterBudget
         var didTrimForBudget = false
         var includedCount = 0
 
@@ -539,6 +671,22 @@ final class SessionMessagesViewModel {
 
     private static func storedLastStreamModel(for sessionID: UUID) -> String? {
         UserDefaults.standard.string(forKey: LoomPreferenceKeys.sessionLastStreamModelKey(for: sessionID))?.nonEmptyTrimmed
+    }
+
+    private static func storedHistoryContextLevel() -> HistoryContextLevel {
+        guard let raw = UserDefaults.standard.string(forKey: LoomPreferenceKeys.composerHistoryContextLevel),
+              let level = HistoryContextLevel(rawValue: raw) else {
+            return .balanced
+        }
+        return level
+    }
+
+    private static func storedFileContextLevel() -> FileContextLevel {
+        guard let raw = UserDefaults.standard.string(forKey: LoomPreferenceKeys.composerFileContextLevel),
+              let level = FileContextLevel(rawValue: raw) else {
+            return .full
+        }
+        return level
     }
 
     private static func storedActiveModelTag() -> String? {
@@ -619,17 +767,44 @@ final class SessionMessagesViewModel {
     }
 
     private func contextMessages(excluding messageID: UUID, limit: Int) -> [ChatMessage] {
+        contextMessages(source: messages, excluding: messageID, limit: limit)
+    }
+
+    private func contextMessages(source: [ChatMessage], excluding messageID: UUID?, limit: Int) -> [ChatMessage] {
         guard limit > 0 else { return [] }
 
-        if messages.last?.id == messageID {
-            let context = messages.dropLast()
+        if let messageID, source.last?.id == messageID {
+            let context = source.dropLast()
             guard context.count > limit else { return Array(context) }
             return Array(context.suffix(limit))
         }
 
-        let context = messages.filter { $0.id != messageID }
+        let context = source.filter { message in
+            guard let messageID else { return true }
+            return message.id != messageID
+        }
         guard context.count > limit else { return context }
         return Array(context.suffix(limit))
+    }
+
+    private func contextMessagesForModelSwitch(limit: Int) -> [ChatMessage] {
+        contextMessagesForModelSwitch(source: messages, limit: limit)
+    }
+
+    private func contextMessagesForModelSwitch(source: [ChatMessage], limit: Int) -> [ChatMessage] {
+        guard limit > 0 else { return [] }
+        let userOnlyMessages = source.filter { $0.role == .user }
+        guard userOnlyMessages.count > limit else {
+            return userOnlyMessages
+        }
+        return Array(userOnlyMessages.suffix(limit))
+    }
+
+    private static func estimatedTokenCount(for messages: [ChatMessage]) -> Int {
+        messages.reduce(into: 0) { total, message in
+            let contentTokenEstimate = max(1, message.content.count / roughCharactersPerToken)
+            total += contentTokenEstimate + 8
+        }
     }
 
     private func applyDelta(_ delta: String, to messageID: UUID) {

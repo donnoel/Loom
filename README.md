@@ -33,6 +33,8 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 🎙️ **Speech Input (Push-to-Talk)** | Use the mic button to dictate directly into the draft field with on-device speech recognition. |
 | 🔊 **Optional Voice Replies** | Toggle read-aloud mode so new assistant replies are spoken after generation completes, using your chosen voice + speaking rate from Settings. |
 | 📎 **File Upload Grounding** | Attach local text/PDF files and Loom injects extracted excerpts as context for the next turn, with size/count guardrails and automatic context-budget trimming. |
+| 🎚️ **Composer Context Controls** | Choose concise/balanced/extended history and off/compact/full file context from the composer, with a live token budget indicator before send. |
+| 🛡️ **Trust Center** | Dedicated local-only panel showing where data lives, local storage footprint, attachment retention footprint, and recent local runtime health checks. |
 | 🧭 **Capability-Aware Guidance** | Model cards and chat composer clearly show which models support speech input/output and file uploads. |
 | 💬 **Animated Typing Pulse** | While Loom is generating, assistant placeholders show a pulsing typing indicator. |
 | ✍️ **Readable Chat Formatting** | Assistant text is normalized for paragraph/list readability when raw output arrives as a dense block, while keeping stable whitespace-preserving rendering during streaming to avoid visual "snap back." |
@@ -69,6 +71,8 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Dictate Message** with the mic button (when supported by the active model)
 - **Read Replies Aloud** with the speaker toggle (when supported by the active model)
 - **Switch Models In Session** from the model menu above the message composer
+- **Tune Context Before Send** from the `Context` menu (history + file inclusion) and watch the live token-budget meter
+- **Open Trust Center** from **App → Trust Center** for local data location, footprint, and runtime health visibility
 - **Tune Voice Quality** in Settings with a voice picker, speaking-rate slider, and preview button
 - **Auto-Correct + Spell Check** in the message field (uses your macOS Keyboard settings)
 - **Stop** to cancel streaming while keeping partial text
@@ -121,7 +125,7 @@ Chat interaction coordinator:
 - Exposes inline banner state for guidance
 
 ### **Root UI (SwiftUI + NavigationSplitView)**
-- Sidebar areas: Sessions, Models, Settings
+- Sidebar areas: Sessions, Models, Info, AI Status, Trust Center, Settings
 - Status pill in toolbar with quick readiness visibility
 - Session detail optimized for steady, low-jank streaming updates
 
@@ -167,6 +171,7 @@ Loom/
 │   ├── Sessions/
 │   ├── Models/
 │   ├── Status/
+│   ├── Trust/
 │   ├── Settings/
 │   └── Sidebar/
 ├── Utilities/
@@ -192,8 +197,10 @@ Also included:
 - `ModelCatalog` loading and curated model lookups
 - `DiskSpaceSnapshot` probe-path ordering/deduplication rules
 - `SessionMessagesViewModel` send/stream/cancel/retry/failure/model-switch context flows
+- `SessionMessagesViewModel` context controls (history/file modes), context budgeting, and attachment-context toggles
 - `ModelsViewModel` refresh/install/update/delete and safety rails
 - `RootViewModel` load/rename/pin/tags/delete flows
+- `StatusViewModel` local runtime-health history snapshots for Trust Center
 - `OllamaChatClient` stream-line parsing and transport-level stream error mapping
 - `OllamaClient` diagnosis/list/delete/pull network-path behavior via mocked transport
 
@@ -202,6 +209,7 @@ Also included:
 - Session create/delete
 - Setup guidance when no model is active
 - Streaming reply path
+- Long model-label layout safety for composer send-button hittability
 - Stop generation with relaunch verification
 
 ---

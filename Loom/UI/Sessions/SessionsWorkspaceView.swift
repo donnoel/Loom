@@ -330,7 +330,7 @@ struct SessionDetailView: View {
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)
                             .frame(minHeight: 32)
-                            .fixedSize(horizontal: true, vertical: false)
+                            .frame(maxWidth: 220, alignment: .leading)
                             .background(
                                 Capsule(style: .continuous)
                                     .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.48))
@@ -342,6 +342,60 @@ struct SessionDetailView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("session.detail.modelPicker")
+
+                        Menu {
+                            Section("History") {
+                                ForEach(SessionMessagesViewModel.HistoryContextLevel.allCases) { level in
+                                    Button {
+                                        vm.historyContextLevel = level
+                                    } label: {
+                                        if vm.historyContextLevel == level {
+                                            Label(level.title, systemImage: "checkmark")
+                                        } else {
+                                            Text(level.title)
+                                        }
+                                    }
+                                }
+                            }
+
+                            Section("Files") {
+                                ForEach(SessionMessagesViewModel.FileContextLevel.allCases) { level in
+                                    Button {
+                                        vm.fileContextLevel = level
+                                    } label: {
+                                        if vm.fileContextLevel == level {
+                                            Label(level.title, systemImage: "checkmark")
+                                        } else {
+                                            Text(level.title)
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(LoomTheme.Typography.captionTinyStrong)
+                                Text("Context")
+                                    .lineLimit(1)
+                                Image(systemName: "chevron.down")
+                                    .font(LoomTheme.Typography.captionTinyStrong)
+                            }
+                            .font(LoomTheme.Typography.bodyStrong)
+                            .foregroundStyle(LoomTheme.textPrimary(colorScheme))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .frame(minHeight: 32)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.48))
+                                    .overlay(
+                                        Capsule(style: .continuous)
+                                            .stroke(LoomTheme.surfaceBorder(colorScheme), lineWidth: 1)
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("session.detail.contextPicker")
 
                         Spacer(minLength: 8)
 
@@ -409,6 +463,28 @@ struct SessionDetailView: View {
                             }
                     }
                     .animation(.easeOut(duration: 0.16), value: isDraftFieldFocused)
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack(spacing: 8) {
+                            Label(vm.contextBudgetSnapshot.label, systemImage: "gauge.medium")
+                            Spacer(minLength: 8)
+                            Text(vm.contextBudgetHint)
+                        }
+                        .font(LoomTheme.Typography.caption)
+                        .foregroundStyle(LoomTheme.textSecondary(colorScheme))
+
+                        ProgressView(value: vm.contextBudgetSnapshot.usageRatio)
+                            .progressViewStyle(.linear)
+                            .tint(contextBudgetTint(for: vm.contextBudgetSnapshot.usageRatio))
+
+                        if !vm.pendingAttachments.isEmpty && vm.fileContextLevel == .off {
+                            Text("Attached files are excluded from context.")
+                                .font(LoomTheme.Typography.captionTiny)
+                                .foregroundStyle(LoomTheme.textSecondary(colorScheme))
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                    .accessibilityIdentifier("session.detail.contextBudget")
 
                 }
                 .padding(.top, 14)
@@ -496,6 +572,17 @@ struct SessionDetailView: View {
 
     private var draftIsEmpty: Bool {
         vm.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func contextBudgetTint(for usageRatio: Double) -> Color {
+        switch usageRatio {
+        case ..<0.70:
+            return .green
+        case ..<0.90:
+            return .yellow
+        default:
+            return .red
+        }
     }
 
     @ViewBuilder
