@@ -67,12 +67,12 @@ struct SessionDetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(spacing: 2) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(session.metadata.title)
                     .font(LoomTheme.sessionHeaderFont())
                     .foregroundStyle(LoomTheme.textPrimary(colorScheme))
                     .lineLimit(2)
-                    .multilineTextAlignment(.center)
+                    .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 2)
                     .padding(.bottom, 4)
@@ -81,9 +81,12 @@ struct SessionDetailView: View {
                     .font(LoomTheme.Typography.caption)
                     .foregroundStyle(LoomTheme.textSecondary(colorScheme))
             }
-            .frame(maxWidth: .infinity, alignment: .center)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 48)
+            .padding(.top, 10)
 
             Divider()
+                .padding(.horizontal, 48)
 
             if let banner = vm.banner {
                 SessionInlineBanner(banner: banner) { action in
@@ -96,6 +99,7 @@ struct SessionDetailView: View {
                         Task { await vm.retryLastReply() }
                     }
                 }
+                .padding(.horizontal, 48)
             }
 
             ScrollViewReader { proxy in

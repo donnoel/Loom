@@ -377,7 +377,6 @@ struct RootView: View {
         }
         .searchable(text: $sessionsViewModel.searchQuery, placement: .automatic)
         .navigationSplitViewColumnWidth(min: 272, ideal: 272, max: 272)
-        .navigationTitle("Loom")
     }
 
     @ViewBuilder
@@ -524,9 +523,10 @@ struct RootView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(session.metadata.title)
-                        .font(LoomTheme.Typography.sectionTitle)
+                        .font(LoomTheme.Typography.bodyStrong)
                         .foregroundStyle(LoomTheme.textPrimary(colorScheme))
                         .lineLimit(1)
+                        .truncationMode(.tail)
 
                     if session.metadata.isPinned {
                         Image(systemName: "pin.fill")

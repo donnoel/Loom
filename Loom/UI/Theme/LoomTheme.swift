@@ -130,14 +130,14 @@ nonisolated enum LoomTheme {
     }
 
     static func sessionHeaderFont() -> Font {
-        .system(.title, design: .default).weight(.semibold)
+        .system(.title2, design: .default).weight(.semibold)
     }
 
     nonisolated enum Typography {
         static var pageTitle: Font { .title2.weight(.semibold) }
         static var pageHero: Font { .title3.weight(.semibold) }
         static var sectionTitle: Font { .headline }
-        static var body: Font { .subheadline }
+        static var body: Font { .body }
         static var bodyStrong: Font { .subheadline.weight(.semibold) }
         static var bodyRegular: Font { .body }
         static var caption: Font { .caption }

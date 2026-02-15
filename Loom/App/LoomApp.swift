@@ -1,8 +1,11 @@
 import SwiftUI
+import AppKit
 
 @main
 struct LoomApp: App {
     private let store = SessionStore()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     private static let uiTestResetDefaultsEnvironmentKey = "LOOM_UI_TEST_RESET_DEFAULTS"
     private static let uiTestResetStorageEnvironmentKey = "LOOM_UI_TEST_RESET_STORAGE"
     private static let uiTestActiveModelTagEnvironmentKey = "LOOM_UI_TEST_ACTIVE_MODEL_TAG"
@@ -59,4 +62,17 @@ struct LoomApp: App {
 extension Notification.Name {
     static let loomExportSessionRequested = Notification.Name("loom.exportSessionRequested")
     static let loomSessionsDidChange = Notification.Name("loom.sessionsDidChange")
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Hide the window title text ("Loom") in the unified toolbar/titlebar.
+        DispatchQueue.main.async {
+            for window in NSApp.windows {
+                window.titleVisibility = .hidden
+                window.titlebarAppearsTransparent = true
+                window.title = ""
+            }
+        }
+    }
 }
