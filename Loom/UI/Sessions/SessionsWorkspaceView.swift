@@ -487,7 +487,7 @@ struct SessionDetailView: View {
                     .accessibilityIdentifier("session.detail.contextBudget")
 
                 }
-                .padding(.top, 24)
+                .padding(.top, 14)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 14)
                 .frame(maxWidth: 760)
@@ -531,6 +531,7 @@ struct SessionDetailView: View {
                     }
                 }
                 .animation(.easeOut(duration: 0.16), value: isDraftFieldFocused)
+                .padding(.top, 34)
 
                 Spacer(minLength: 0)
             }
