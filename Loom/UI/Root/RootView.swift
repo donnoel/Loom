@@ -377,6 +377,7 @@ struct RootView: View {
         }
         .searchable(text: $sessionsViewModel.searchQuery, placement: .automatic)
         .navigationSplitViewColumnWidth(min: 272, ideal: 272, max: 272)
+        .navigationTitle("Loom")
     }
 
     @ViewBuilder
