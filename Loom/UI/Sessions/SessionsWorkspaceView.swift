@@ -1006,23 +1006,25 @@ private struct MessageContentView: View {
 
     var body: some View {
         let displayContent = ChatDisplayFormatter.format(content)
-        let markdownSyntax = ChatDisplayFormatter.markdownSyntax(for: displayContent)
+        let blocks = ChatMarkdownBlockParser.parse(displayContent)
 
-        Group {
-            if let attributed = try? AttributedString(
-                markdown: displayContent,
-                options: AttributedString.MarkdownParsingOptions(interpretedSyntax: markdownSyntax)
-            ) {
-                Text(attributed)
-            } else {
-                Text(displayContent)
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { item in
+                switch item.element {
+                case .markdown(let markdown):
+                    MarkdownTextBlockView(markdown: markdown)
+                case .code(let language, let code):
+                    MarkdownCodeBlockView(language: language, code: code)
+                case .table(let table):
+                    MarkdownTableBlockView(tableText: table)
+                }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .textSelection(.enabled)
         .contextMenu {
             Button("Copy") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(displayContent, forType: .string)
+                copyTextToPasteboard(displayContent)
             }
 
             if role == .assistant,
@@ -1031,6 +1033,306 @@ private struct MessageContentView: View {
                 Button("Regenerate", action: onRegenerate)
             }
         }
+    }
+}
+
+@MainActor
+private func copyTextToPasteboard(_ text: String) {
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(text, forType: .string)
+}
+
+private struct MarkdownTextBlockView: View {
+    let markdown: String
+
+    var body: some View {
+        let syntax = ChatDisplayFormatter.markdownSyntax(for: markdown)
+
+        Group {
+            if let attributed = try? AttributedString(
+                markdown: markdown,
+                options: AttributedString.MarkdownParsingOptions(interpretedSyntax: syntax)
+            ) {
+                Text(attributed)
+            } else {
+                Text(markdown)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct MarkdownCodeBlockView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    let language: String?
+    let code: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(languageLabel)
+                    .font(LoomTheme.Typography.captionStrong)
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+
+                Spacer()
+
+                Button {
+                    copyTextToPasteboard(code)
+                } label: {
+                    Label("Copy", systemImage: "doc.on.doc")
+                        .font(LoomTheme.Typography.captionStrong)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .accessibilityIdentifier("session.message.code.copy")
+            }
+
+            ScrollView(.horizontal, showsIndicators: true) {
+                Text(code.isEmpty ? " " : code)
+                    .font(.system(size: 13, weight: .regular, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(codeBackgroundColor)
+            )
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(codeContainerFill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.10), lineWidth: 1)
+        )
+    }
+
+    private var languageLabel: String {
+        language?.nonEmptyTrimmed ?? "Code"
+    }
+
+    private var codeContainerFill: Color {
+        colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.02)
+    }
+
+    private var codeBackgroundColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.30) : Color.black.opacity(0.06)
+    }
+}
+
+private struct MarkdownTableBlockView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    let tableText: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text("Table")
+                    .font(LoomTheme.Typography.captionStrong)
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+
+                Spacer()
+
+                Button {
+                    copyTextToPasteboard(tableText)
+                } label: {
+                    Label("Copy", systemImage: "doc.on.doc")
+                        .font(LoomTheme.Typography.captionStrong)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .accessibilityIdentifier("session.message.table.copy")
+            }
+
+            ScrollView(.horizontal, showsIndicators: true) {
+                Text(tableText)
+                    .font(.system(size: 13, weight: .regular, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(tableBackgroundColor)
+            )
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(tableContainerFill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.10), lineWidth: 1)
+        )
+    }
+
+    private var tableContainerFill: Color {
+        colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.02)
+    }
+
+    private var tableBackgroundColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.24) : Color.black.opacity(0.05)
+    }
+}
+
+nonisolated enum ChatMarkdownBlockParser {
+    nonisolated enum Block: Equatable, Sendable {
+        case markdown(String)
+        case code(language: String?, code: String)
+        case table(String)
+    }
+
+    private static let codeFence = "```"
+    private static let tableSeparatorRegex = makeRegex("^\\s*\\|?(?:\\s*:?-{3,}:?\\s*\\|)+\\s*:?-{3,}:?\\s*\\|?\\s*$")
+
+    static func parse(_ text: String) -> [Block] {
+        let normalized = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        guard !normalized.isEmpty else { return [.markdown("")] }
+
+        let lines = normalized.components(separatedBy: "\n")
+        var blocks: [Block] = []
+        var markdownLines: [String] = []
+        var codeLines: [String] = []
+        var codeLanguage: String?
+        var isInsideCodeBlock = false
+
+        func flushMarkdownLines() {
+            guard !markdownLines.isEmpty else { return }
+            let markdown = markdownLines.joined(separator: "\n")
+            markdownLines.removeAll(keepingCapacity: true)
+            appendMarkdown(markdown, into: &blocks)
+        }
+
+        func flushCodeLines() {
+            blocks.append(.code(language: codeLanguage?.nonEmptyTrimmed, code: codeLines.joined(separator: "\n")))
+            codeLines.removeAll(keepingCapacity: true)
+            codeLanguage = nil
+        }
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix(codeFence) {
+                if isInsideCodeBlock {
+                    flushCodeLines()
+                } else {
+                    flushMarkdownLines()
+                    let language = String(trimmed.dropFirst(codeFence.count))
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    codeLanguage = language.nonEmptyTrimmed
+                }
+                isInsideCodeBlock.toggle()
+                continue
+            }
+
+            if isInsideCodeBlock {
+                codeLines.append(line)
+            } else {
+                markdownLines.append(line)
+            }
+        }
+
+        if isInsideCodeBlock {
+            var openingFence = codeFence
+            if let codeLanguage, !codeLanguage.isEmpty {
+                openingFence += codeLanguage
+            }
+            markdownLines.append(openingFence)
+            markdownLines.append(contentsOf: codeLines)
+        } else if !codeLines.isEmpty {
+            flushCodeLines()
+        }
+
+        flushMarkdownLines()
+        return blocks.isEmpty ? [.markdown(normalized)] : blocks
+    }
+
+    private static func appendMarkdown(_ markdown: String, into blocks: inout [Block]) {
+        let splitBlocks = splitMarkdownAndTables(markdown)
+        for block in splitBlocks {
+            switch block {
+            case .markdown(let text):
+                if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    blocks.append(.markdown(text))
+                }
+            case .table(let table):
+                blocks.append(.table(table))
+            case .code:
+                break
+            }
+        }
+    }
+
+    private static func splitMarkdownAndTables(_ markdown: String) -> [Block] {
+        let lines = markdown.components(separatedBy: "\n")
+        var result: [Block] = []
+        var markdownBuffer: [String] = []
+        var index = 0
+
+        func flushMarkdownBuffer() {
+            guard !markdownBuffer.isEmpty else { return }
+            result.append(.markdown(markdownBuffer.joined(separator: "\n")))
+            markdownBuffer.removeAll(keepingCapacity: true)
+        }
+
+        while index < lines.count {
+            if let table = parseTable(lines: lines, startIndex: index) {
+                flushMarkdownBuffer()
+                result.append(.table(table.tableText))
+                index = table.nextIndex
+            } else {
+                markdownBuffer.append(lines[index])
+                index += 1
+            }
+        }
+
+        flushMarkdownBuffer()
+        return result
+    }
+
+    private static func parseTable(
+        lines: [String],
+        startIndex: Int
+    ) -> (tableText: String, nextIndex: Int)? {
+        guard startIndex + 1 < lines.count else { return nil }
+
+        let headerLine = lines[startIndex]
+        let separatorLine = lines[startIndex + 1]
+        guard headerLine.contains("|") else { return nil }
+        guard containsMatch(tableSeparatorRegex, in: separatorLine) else { return nil }
+
+        var collectedLines: [String] = [headerLine, separatorLine]
+        var index = startIndex + 2
+
+        while index < lines.count {
+            let line = lines[index]
+            if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                break
+            }
+            guard line.contains("|") else { break }
+            collectedLines.append(line)
+            index += 1
+        }
+
+        return (collectedLines.joined(separator: "\n"), index)
+    }
+
+    private static func containsMatch(_ regex: NSRegularExpression, in text: String) -> Bool {
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.firstMatch(in: text, options: [], range: range) != nil
+    }
+
+    private static func makeRegex(_ pattern: String) -> NSRegularExpression {
+        try! NSRegularExpression(pattern: pattern)
     }
 }
 

@@ -712,3 +712,85 @@ struct ChatDisplayFormatterTests {
         }())
     }
 }
+
+struct ChatMarkdownBlockParserTests {
+    @Test
+    func parseSplitsCodeFenceBlocksFromMarkdownText() {
+        let input = """
+        Before code.
+
+        ```swift
+        let greeting = "Hello"
+        print(greeting)
+        ```
+
+        After code.
+        """
+
+        let blocks = ChatMarkdownBlockParser.parse(input)
+
+        #expect(blocks.count == 3)
+        #expect({
+            if case .markdown(let markdown) = blocks[0] {
+                return markdown.contains("Before code.")
+            }
+            return false
+        }())
+        #expect({
+            if case .code(let language, let code) = blocks[1] {
+                return language == "swift"
+                    && code.contains("let greeting = \"Hello\"")
+                    && code.contains("print(greeting)")
+            }
+            return false
+        }())
+        #expect({
+            if case .markdown(let markdown) = blocks[2] {
+                return markdown.contains("After code.")
+            }
+            return false
+        }())
+    }
+
+    @Test
+    func parseExtractsMarkdownTableBlock() {
+        let input = """
+        Before table
+        | Name | Score |
+        | --- | ---: |
+        | Ada | 98 |
+        | Ben | 91 |
+        After table
+        """
+
+        let blocks = ChatMarkdownBlockParser.parse(input)
+
+        #expect(blocks.count == 3)
+        #expect({
+            if case .table(let tableText) = blocks[1] {
+                return tableText.contains("| Name | Score |")
+                    && tableText.contains("| Ada | 98 |")
+                    && tableText.contains("| Ben | 91 |")
+            }
+            return false
+        }())
+    }
+
+    @Test
+    func parseKeepsPipeOnlyTextAsMarkdownWhenNoTableSeparatorExists() {
+        let input = """
+        This line has a | pipe but is not a table.
+        Another normal line.
+        """
+
+        let blocks = ChatMarkdownBlockParser.parse(input)
+
+        #expect(blocks.count == 1)
+        #expect({
+            if case .markdown(let markdown) = blocks[0] {
+                return markdown.contains("a | pipe")
+            }
+            return false
+        }())
+    }
+}
