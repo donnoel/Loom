@@ -399,13 +399,6 @@ struct SessionDetailView: View {
                     }
                     .padding(.horizontal, 6)
                     .frame(minHeight: 38)
-                    .background {
-                        if isDraftFieldFocused {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .strokeBorder(LoomTheme.activeInputBorder(colorScheme).opacity(0.45), lineWidth: 1)
-                        }
-                    }
-                    .animation(.easeOut(duration: 0.16), value: isDraftFieldFocused)
 
                     if !vm.pendingAttachments.isEmpty && vm.fileContextLevel == .off {
                         Text("Attached files are off for this send. Enable file context in Tools.")
@@ -428,17 +421,8 @@ struct SessionDetailView: View {
                         .overlay {
                             shape.strokeBorder(LoomTheme.surfaceBorder(colorScheme).opacity(0.52), lineWidth: 1)
                         }
-                        .overlay {
-                            if isDraftFieldFocused {
-                                shape.strokeBorder(
-                                    LoomTheme.activeInputBorder(colorScheme).opacity(colorScheme == .dark ? 0.55 : 0.70),
-                                    lineWidth: 1
-                                )
-                            }
-                        }
                 }
                 .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.09 : 0.04), radius: 2, x: 0, y: 1)
-                .animation(.easeOut(duration: 0.16), value: isDraftFieldFocused)
                 .padding(.top, 10)
 
                 Spacer(minLength: 0)
