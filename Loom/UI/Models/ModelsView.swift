@@ -52,10 +52,10 @@ struct ModelsView: View {
             isPresented: isShowingDeleteConfirmation,
             titleVisibility: .visible
         ) {
-            if viewModel.selectedModelToDelete != nil {
+            if let modelTag = viewModel.selectedModelToDelete {
                 Button("Delete", role: .destructive) {
                     Task {
-                        let didDelete = await viewModel.confirmDelete()
+                        let didDelete = await viewModel.confirmDelete(modelTag: modelTag)
                         if didDelete {
                             await onModelSelectionChanged()
                         }

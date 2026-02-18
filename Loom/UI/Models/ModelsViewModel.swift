@@ -387,10 +387,14 @@ final class ModelsViewModel {
     }
 
     func confirmDelete() async -> Bool {
-        guard !isDeletingModel else { return false }
-        guard let modelTag = selectedModelToDelete?.nonEmptyTrimmed else { return false }
+        await confirmDelete(modelTag: selectedModelToDelete ?? "")
+    }
 
-        guard activeModelTag != modelTag else {
+    func confirmDelete(modelTag: String) async -> Bool {
+        guard !isDeletingModel else { return false }
+        guard let normalizedTag = modelTag.nonEmptyTrimmed else { return false }
+
+        guard activeModelTag != normalizedTag else {
             selectedModelToDelete = nil
             deleteAlertMessage = activeModelDeleteBlockedMessage
             return false
@@ -401,12 +405,12 @@ final class ModelsViewModel {
         defer { isDeletingModel = false }
 
         do {
-            try await client.deleteModel(name: modelTag)
+            try await client.deleteModel(name: normalizedTag)
             await refresh()
             return true
         } catch {
-            log.error("Failed to delete model \(modelTag, privacy: .public): \(String(describing: error), privacy: .public)")
-            deleteAlertMessage = deleteFailureMessage(for: error, modelTag: modelTag)
+            log.error("Failed to delete model \(normalizedTag, privacy: .public): \(String(describing: error), privacy: .public)")
+            deleteAlertMessage = deleteFailureMessage(for: error, modelTag: normalizedTag)
             return false
         }
     }

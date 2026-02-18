@@ -708,6 +708,32 @@ struct StatusViewModelCoverageTests {
 
     @Test
     @MainActor
+    func confirmDeleteUsesExplicitTagWhenSelectionWasCleared() async {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            modelsResult: .success([OllamaModel(tag: "llama3"), OllamaModel(tag: "phi4")]),
+            deleteResult: .success(())
+        )
+        let vm = ModelsViewModel(client: client)
+        await vm.refresh()
+        vm.requestDelete(modelTag: "phi4")
+
+        // Mirrors confirmationDialog dismissal clearing selection state before the button task runs.
+        vm.cancelDeleteRequest()
+        let didDelete = await vm.confirmDelete(modelTag: "phi4")
+
+        #expect(didDelete)
+        #expect(vm.selectedModelToDelete == nil)
+        #expect(vm.deleteAlertMessage == nil)
+        #expect(await client.readDeletedModelNames() == ["phi4"])
+    }
+
+    @Test
+    @MainActor
     func confirmDeleteSurfacesDeleteServerMessage() async {
         clearModelSelectionPreference()
         defer { clearModelSelectionPreference() }
