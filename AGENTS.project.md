@@ -17,7 +17,7 @@ We have the V1 local chat spine in place:
 7) **Model Library UX** now supports drag-and-drop reordering of installed models with persisted order across refresh/relaunch
 8) **Session UX polish** now includes a cleaner chat-first dark visual treatment with calmer selected-session emphasis, clearer chat bubble readability, a simplified composer panel, friendly empty-state onboarding, and starter prompt chips for non-technical users
 9) **In-session model switching** is available from the chat composer so users can change models without leaving their active session
-10) **Automatic session naming** now derives a new session title from the first user request when the title is still the default
+10) **Automatic session naming** now derives a concise topic-style title from the first user request when the title is still the default
 11) **AI service monitoring** now includes an App-level status screen (including Grok) that checks public chatbot status feeds, surfaces known incidents, and supports drag-and-drop card reordering with persisted order
 12) **Composer context controls** now let users choose concise/balanced/extended history and off/compact/full file context from a compact Tools menu
 13) **Trust Center** now provides a local-only panel for sessions-data location, local storage footprint, attachment retention footprint, and recent local runtime health history

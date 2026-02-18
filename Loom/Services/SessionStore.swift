@@ -356,14 +356,84 @@ actor SessionStore {
             return nil
         }
 
-        let maximumLength = 72
-        guard collapsed.count > maximumLength else {
-            return collapsed
+        let sentence = mainSentence(in: collapsed)
+        let topicTokens = topicTokens(from: sentence)
+        if !topicTokens.isEmpty {
+            let summary = topicTokens
+                .prefix(maxTopicWordCount)
+                .map { formattedTopicToken($0) }
+                .joined(separator: " ")
+            if let title = summary.nonEmptyTrimmed {
+                return truncatedTitle(title, maximumLength: 56, minimumWordBoundary: 18)
+            }
         }
 
-        var truncated = String(collapsed.prefix(maximumLength))
+        return truncatedTitle(collapsed, maximumLength: 72, minimumWordBoundary: 24)
+    }
+
+    private nonisolated static func mainSentence(in text: String) -> String {
+        guard let end = text.firstIndex(where: { sentenceTerminatorCharacters.contains($0) }) else {
+            return text
+        }
+        let sentence = String(text[..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return sentence.isEmpty ? text : sentence
+    }
+
+    private nonisolated static func topicTokens(from text: String) -> [String] {
+        let words = text
+            .split(whereSeparator: \.isWhitespace)
+            .compactMap { normalizedTopicToken(from: String($0)) }
+        guard !words.isEmpty else {
+            return []
+        }
+
+        let droppedLeadingPrompt = Array(words.drop { leadingPromptWords.contains($0.lowercased()) })
+        let candidateWords = droppedLeadingPrompt.isEmpty ? words : droppedLeadingPrompt
+
+        let filteredWords = candidateWords.filter { !topicStopWords.contains($0.lowercased()) }
+        if !filteredWords.isEmpty {
+            return filteredWords
+        }
+        return candidateWords
+    }
+
+    private nonisolated static func normalizedTopicToken(from raw: String) -> String? {
+        var cleaned = raw.trimmingCharacters(in: titleEdgeTrimCharacters)
+        cleaned = cleaned.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        guard let token = cleaned.nonEmptyTrimmed else {
+            return nil
+        }
+        guard token.unicodeScalars.contains(where: { CharacterSet.alphanumerics.contains($0) }) else {
+            return nil
+        }
+        return token
+    }
+
+    private nonisolated static func formattedTopicToken(_ token: String) -> String {
+        if token == token.lowercased() {
+            return token
+                .split(separator: "-", omittingEmptySubsequences: false)
+                .map { segment in
+                    guard let first = segment.first else { return "" }
+                    return String(first).uppercased() + segment.dropFirst()
+                }
+                .joined(separator: "-")
+        }
+        return token
+    }
+
+    private nonisolated static func truncatedTitle(
+        _ text: String,
+        maximumLength: Int,
+        minimumWordBoundary: Int
+    ) -> String {
+        guard text.count > maximumLength else {
+            return text
+        }
+
+        var truncated = String(text.prefix(maximumLength))
         if let lastSpace = truncated.lastIndex(of: " "),
-           truncated.distance(from: truncated.startIndex, to: lastSpace) >= 24 {
+           truncated.distance(from: truncated.startIndex, to: lastSpace) >= minimumWordBoundary {
             truncated = String(truncated[..<lastSpace])
         }
         return truncated + "..."
@@ -379,4 +449,20 @@ actor SessionStore {
         }
         return false
     }
+
+    private nonisolated static let maxTopicWordCount = 6
+    private nonisolated static let sentenceTerminatorCharacters: Set<Character> = [".", "!", "?"]
+    private nonisolated static let titleEdgeTrimCharacters = CharacterSet(charactersIn: "\"'`.,!?;:()[]{}<>")
+    private nonisolated static let leadingPromptWords: Set<String> = [
+        "a", "an", "can", "could", "create", "describe", "do", "draft", "explain", "generate",
+        "give", "help", "how", "i", "let", "lets", "list", "make", "me", "my", "need", "plan",
+        "please", "provide", "show", "summarize", "tell", "to", "want", "what", "would", "write", "you"
+    ]
+    private nonisolated static let topicStopWords: Set<String> = [
+        "a", "an", "and", "are", "as", "at", "be", "by", "can", "could", "did", "do", "does",
+        "for", "from", "help", "how", "i", "in", "include", "including", "into", "is", "it",
+        "me", "my", "of", "on", "or", "our", "please", "show", "tell", "that", "the", "these",
+        "this", "to", "us", "was", "we", "were", "what", "when", "where", "which", "who", "why",
+        "with", "without", "would", "you", "your"
+    ]
 }

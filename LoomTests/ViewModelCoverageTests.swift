@@ -1828,6 +1828,6 @@ struct RootViewModelCoverageTests {
 
         await vm.touchSession(id: session.id)
 
-        #expect(vm.session(for: session.id)?.metadata.title == "Plan my weekend trip")
+        #expect(vm.session(for: session.id)?.metadata.title == "Weekend Trip")
     }
 }

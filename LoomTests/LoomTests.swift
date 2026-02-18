@@ -93,7 +93,27 @@ struct SessionStoreTests {
 
         let metadataURL = try LoomPaths.sessionMetadataURL(for: session.id)
         let metadata = try decodeMetadata(at: metadataURL)
-        #expect(metadata.title == "Help me plan a two-week budget meal prep.")
+        #expect(metadata.title == "Two-Week Budget Meal Prep")
+    }
+
+    @Test
+    func firstUserMessageAutoTitlePullsMainTopic() async throws {
+        let store = SessionStore()
+        let session = try await store.createSession(title: Session.Metadata.defaultTitle)
+        defer { cleanupSessionFolder(id: session.id) }
+
+        try await store.appendMessage(
+            ChatMessage(
+                role: .user,
+                content: "Can you plan my weekend trip with a hiking day and food stops?",
+                createdAt: fixedDate("2026-01-01T00:00:00Z")
+            ),
+            sessionID: session.id
+        )
+
+        let metadataURL = try LoomPaths.sessionMetadataURL(for: session.id)
+        let metadata = try decodeMetadata(at: metadataURL)
+        #expect(metadata.title == "Weekend Trip Hiking Day Food Stops")
     }
 
     @Test
