@@ -295,6 +295,21 @@ private func sendDraftWithModelRetry(
 struct StatusViewModelCoverageTests {
     @Test
     @MainActor
+    func displayedReadinessStartsCheckingUntilFirstRefreshCompletes() async {
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: false)
+        )
+        let vm = StatusViewModel(client: client)
+
+        #expect(vm.displayedReadiness == .checking)
+
+        await vm.refresh()
+
+        #expect(vm.displayedReadiness == .notReady)
+    }
+
+    @Test
+    @MainActor
     func refreshBuildsSnapshotWhenReachable() async {
         let client = StubOllamaClient(
             diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),

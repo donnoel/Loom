@@ -126,7 +126,7 @@ Chat interaction coordinator:
 
 ### **Root UI (SwiftUI + NavigationSplitView)**
 - Sidebar areas: Sessions, Models, Info, AI Status, Trust Center, Settings
-- Status pill in toolbar with quick readiness visibility
+- Status pill in toolbar with quick readiness visibility (shows `Checking…` until initial local status refresh completes)
 - Session detail optimized for steady, low-jank streaming updates
 
 ---

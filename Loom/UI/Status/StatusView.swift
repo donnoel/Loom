@@ -6,19 +6,24 @@ struct LoomStatusPopoverView: View {
     let browseModels: () -> Void
 
     var body: some View {
+        let readiness = viewModel.displayedReadiness
+
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
-                Image(systemName: viewModel.snapshot.readiness.symbolName)
-                    .foregroundStyle(viewModel.snapshot.readiness.tintColor)
+                Image(systemName: readiness.symbolName)
+                    .foregroundStyle(readiness.tintColor)
                 Text("Loom Ready")
                     .font(LoomTheme.Typography.sectionTitle)
                 Spacer()
-                Text(viewModel.snapshot.readiness.label)
+                Text(readiness.label)
                     .font(LoomTheme.Typography.captionStrong)
-                    .foregroundStyle(viewModel.snapshot.readiness.tintColor)
+                    .foregroundStyle(readiness.tintColor)
             }
 
-            LoomStatusLinesView(snapshot: viewModel.snapshot)
+            LoomStatusLinesView(
+                snapshot: viewModel.snapshot,
+                isChecking: readiness == .checking
+            )
 
             HStack(spacing: 10) {
                 popoverPrimaryAction
@@ -56,21 +61,24 @@ struct LoomStatusPopoverView: View {
 
 struct LoomStatusLinesView: View {
     let snapshot: LoomStatusSnapshot
+    var isChecking: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            line("Ollama", snapshot.ollamaReachable ? "Running" : "Not running")
+            line("Ollama", isChecking ? "Checking…" : (snapshot.ollamaReachable ? "Running" : "Not running"))
             line(
                 "Models",
-                snapshot.installedModelCount > 0
+                isChecking
+                    ? "Checking…"
+                    : snapshot.installedModelCount > 0
                     ? "Installed (\(snapshot.installedModelCount))"
                     : "None installed"
             )
-            line("Active model", snapshot.activeModelTag ?? "Not selected")
-            line("Offline", snapshot.offlineAvailable ? "Available" : "Not available")
-            line("Disk", diskSummaryText)
+            line("Active model", isChecking ? "Checking…" : (snapshot.activeModelTag ?? "Not selected"))
+            line("Offline", isChecking ? "Checking…" : (snapshot.offlineAvailable ? "Available" : "Not available"))
+            line("Disk", isChecking ? "Checking…" : diskSummaryText)
 
-            if let warning = snapshot.lowDiskSpaceWarning {
+            if !isChecking, let warning = snapshot.lowDiskSpaceWarning {
                 Text(warning)
                     .font(LoomTheme.Typography.footnoteStrong)
                     .foregroundStyle(.orange)
@@ -101,6 +109,7 @@ struct LoomStatusLinesView: View {
 extension LoomReadiness {
     var tintColor: Color {
         switch self {
+        case .checking: .secondary
         case .ready: .green
         case .needsSetup: .yellow
         case .notReady: .red
@@ -109,6 +118,7 @@ extension LoomReadiness {
 
     var symbolName: String {
         switch self {
+        case .checking: "clock.fill"
         case .ready: "checkmark.seal.fill"
         case .needsSetup: "exclamationmark.triangle.fill"
         case .notReady: "xmark.octagon.fill"

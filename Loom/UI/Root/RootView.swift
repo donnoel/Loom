@@ -693,14 +693,14 @@ struct RootView: View {
             isShowingStatusPopover.toggle()
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: statusViewModel.snapshot.readiness.symbolName)
+                Image(systemName: statusViewModel.displayedReadiness.symbolName)
                     .font(LoomTheme.Typography.captionStrong)
-                    .foregroundStyle(statusViewModel.snapshot.readiness.tintColor)
+                    .foregroundStyle(statusViewModel.displayedReadiness.tintColor)
                 Text("Loom")
                     .font(LoomTheme.Typography.bodyStrong)
-                Text(statusViewModel.snapshot.readiness.label)
+                Text(statusViewModel.displayedReadiness.label)
                     .font(LoomTheme.Typography.captionStrong)
-                    .foregroundStyle(statusViewModel.snapshot.readiness.tintColor)
+                    .foregroundStyle(statusViewModel.displayedReadiness.tintColor)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)

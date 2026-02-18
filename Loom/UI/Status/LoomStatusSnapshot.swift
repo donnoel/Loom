@@ -1,12 +1,14 @@
 import Foundation
 
 nonisolated enum LoomReadiness: String, Sendable {
+    case checking
     case ready
     case needsSetup
     case notReady
 
     var label: String {
         switch self {
+        case .checking: "Checking…"
         case .ready: "Ready"
         case .needsSetup: "Needs setup"
         case .notReady: "Not ready"

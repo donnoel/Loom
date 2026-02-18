@@ -211,7 +211,7 @@ struct TrustCenterView: View {
             Text("Recent Local Runtime Health")
                 .font(LoomTheme.Typography.sectionTitle)
 
-            valueRow("Current readiness", value: statusViewModel.snapshot.readiness.label)
+            valueRow("Current readiness", value: statusViewModel.displayedReadiness.label)
             valueRow("Ollama", value: statusViewModel.snapshot.ollamaReachable ? "Reachable" : "Not reachable")
             valueRow("Installed models", value: "\(statusViewModel.snapshot.installedModelCount)")
             if let warning = statusViewModel.snapshot.lowDiskSpaceWarning {

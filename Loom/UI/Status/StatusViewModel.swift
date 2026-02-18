@@ -33,6 +33,11 @@ final class StatusViewModel {
     var lastRefreshAt: Date?
     var ollamaAppInstalled: Bool = false
     var recentRuntimeHealth: [LocalRuntimeHealthEntry] = []
+    var hasCompletedInitialRefresh: Bool = false
+
+    var displayedReadiness: LoomReadiness {
+        hasCompletedInitialRefresh ? snapshot.readiness : .checking
+    }
 
     init(client: any OllamaStatusProviding = OllamaClient()) {
         self.client = client
@@ -109,6 +114,7 @@ final class StatusViewModel {
             offlineAvailable: isReachable && !models.isEmpty && activeModelTag != nil,
             diskSpace: diskSpace
         )
+        hasCompletedInitialRefresh = true
 
         recordRuntimeHealth(snapshot: snapshot)
     }
