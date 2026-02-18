@@ -66,6 +66,10 @@ nonisolated enum LoomTheme {
         scheme == .dark ? darkTextMuted : Color.secondary.opacity(0.75)
     }
 
+    static func sidebarSelectedText(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? darkFocusRing : Color.accentColor
+    }
+
     static func surfaceBorder(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? darkSurfaceBorder : Color.primary.opacity(0.09)
     }

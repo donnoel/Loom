@@ -506,7 +506,7 @@ struct RootView: View {
         let isSelected = selectedSidebarSelection == .destination(item)
 
         return Label(item.title, systemImage: item.systemImage)
-            .foregroundStyle(isSelected ? LoomTheme.textPrimary(colorScheme) : LoomTheme.textSecondary(colorScheme))
+            .foregroundStyle(isSelected ? LoomTheme.sidebarSelectedText(colorScheme) : LoomTheme.textSecondary(colorScheme))
             .padding(.vertical, 5)
             .padding(.horizontal, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -526,7 +526,7 @@ struct RootView: View {
         return HStack(spacing: 10) {
             Text(session.metadata.title)
                 .font(LoomTheme.Typography.bodyStrong)
-                .foregroundStyle(isSelected ? LoomTheme.textPrimary(colorScheme) : LoomTheme.textSecondary(colorScheme))
+                .foregroundStyle(isSelected ? LoomTheme.sidebarSelectedText(colorScheme) : LoomTheme.textSecondary(colorScheme))
                 .lineLimit(1)
                 .truncationMode(.tail)
 
