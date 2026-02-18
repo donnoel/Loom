@@ -36,7 +36,6 @@ struct SessionDetailView: View {
     @State private var bottomMarkerFrame: CGRect = .null
     @State private var isShowingFileImporter: Bool = false
     @State private var isDictating: Bool = false
-    @State private var isComposerHovered: Bool = false
     @FocusState private var isDraftFieldFocused: Bool
     @AppStorage(LoomPreferenceKeys.voiceReplyVoiceIdentifier)
     private var voiceReplyVoiceIdentifier: String = ""
@@ -67,27 +66,6 @@ struct SessionDetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(session.metadata.title)
-                    .font(LoomTheme.sessionHeaderFont())
-                    .foregroundStyle(LoomTheme.textPrimary(colorScheme))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 2)
-                    .padding(.bottom, 4)
-
-                Text("Updated \(session.metadata.updatedAt.formatted(date: .abbreviated, time: .omitted))")
-                    .font(LoomTheme.Typography.caption)
-                    .foregroundStyle(LoomTheme.textSecondary(colorScheme))
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 48)
-            .padding(.top, 10)
-
-            Divider()
-                .padding(.horizontal, 48)
-
             if let banner = vm.banner {
                 SessionInlineBanner(banner: banner) { action in
                     switch action {
@@ -99,7 +77,7 @@ struct SessionDetailView: View {
                         Task { await vm.retryLastReply() }
                     }
                 }
-                .padding(.horizontal, 48)
+                .padding(.horizontal, 24)
             }
 
             ScrollViewReader { proxy in
@@ -252,9 +230,9 @@ struct SessionDetailView: View {
                             guard !vm.isGenerating else { return }
                             sendAndScroll(proxy)
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.top, 8)
-                        .padding(.bottom, 10)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 10)
+                        .padding(.bottom, 8)
 
                     HStack(alignment: .center, spacing: 8) {
                         HStack(spacing: 4) {
@@ -379,7 +357,7 @@ struct SessionDetailView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "slider.horizontal.3")
                                     .font(LoomTheme.Typography.captionTinyStrong)
-                                Text("Context")
+                                Text("Tools")
                                     .lineLimit(1)
                                 Image(systemName: "chevron.down")
                                     .font(LoomTheme.Typography.captionTinyStrong)
@@ -456,101 +434,57 @@ struct SessionDetailView: View {
                     .background {
                         let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
                         shape
-                            .fill(colorScheme == .dark ? Color.white.opacity(0.03) : Color.white.opacity(0.30))
+                            .fill(colorScheme == .dark ? Color.white.opacity(0.04) : Color.black.opacity(0.03))
                             .overlay {
                                 shape.strokeBorder(
                                     isDraftFieldFocused
-                                        ? LoomTheme.activeInputBorder(colorScheme)
+                                        ? LoomTheme.activeInputBorder(colorScheme).opacity(0.45)
                                         : LoomTheme.surfaceBorder(colorScheme),
-                                    lineWidth: isDraftFieldFocused ? 1.0 : 0.75
+                                    lineWidth: 1
                                 )
                             }
                     }
                     .animation(.easeOut(duration: 0.16), value: isDraftFieldFocused)
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 8) {
-                            Label(vm.contextBudgetSnapshot.label, systemImage: "gauge.medium")
-                            Spacer(minLength: 8)
-                            Text(vm.contextBudgetHint)
-                        }
-                        .font(LoomTheme.Typography.caption)
-                        .foregroundStyle(LoomTheme.textSecondary(colorScheme))
-
-                        ProgressView(value: vm.contextBudgetSnapshot.usageRatio)
-                            .progressViewStyle(.linear)
-                            .tint(contextBudgetTint(for: vm.contextBudgetSnapshot.usageRatio))
-
-                        if !vm.pendingAttachments.isEmpty && vm.fileContextLevel == .off {
-                            Text("Attached files are excluded from context.")
-                                .font(LoomTheme.Typography.captionTiny)
-                                .foregroundStyle(LoomTheme.textSecondary(colorScheme))
-                        }
+                    if !vm.pendingAttachments.isEmpty && vm.fileContextLevel == .off {
+                        Text("Attached files are off for this send. Enable file context in Tools.")
+                            .font(LoomTheme.Typography.captionTiny)
+                            .foregroundStyle(LoomTheme.textSecondary(colorScheme))
+                            .padding(.horizontal, 8)
+                            .accessibilityIdentifier("session.detail.fileContextHint")
                     }
-                    .padding(.horizontal, 2)
-                    .accessibilityIdentifier("session.detail.contextBudget")
-
                 }
-                .padding(.top, 15)
-                .padding(.horizontal, 18)
-                .padding(.bottom, 15)
-                .frame(maxWidth: 760)
-                .frame(minHeight: 138)
+                .padding(.top, 8)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 10)
+                .frame(maxWidth: 860)
+                .frame(minHeight: 120)
                 .frame(maxWidth: .infinity)
                 .background {
-                    let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
                     shape
-                        .fill(
-                            colorScheme == .dark
-                                ? AnyShapeStyle(Color.white.opacity(0.02))
-                                : AnyShapeStyle(Color.white.opacity(0.78))
-                        )
+                        .fill(colorScheme == .dark ? Color(red: 0.12, green: 0.13, blue: 0.15) : Color.white.opacity(0.96))
                         .overlay {
-                            shape.fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(colorScheme == .dark ? 0.14 : 0.20),
-                                        Color.clear,
-                                        Color.white.opacity(colorScheme == .dark ? 0.02 : 0.06)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                        }
-                        .overlay {
-                            shape.fill(LoomTheme.accentGradient(colorScheme).opacity(colorScheme == .dark ? 0.12 : 0.06))
-                        }
-                        .overlay {
-                            shape.strokeBorder(LoomTheme.surfaceBorder(colorScheme).opacity(0.64), lineWidth: 0.75)
+                            shape.strokeBorder(LoomTheme.surfaceBorder(colorScheme).opacity(0.68), lineWidth: 1)
                         }
                         .overlay {
                             if isDraftFieldFocused {
                                 shape.strokeBorder(
-                                    LoomTheme.focusRing(colorScheme).opacity(colorScheme == .dark ? 0.50 : 0.78),
-                                    lineWidth: 1.05
-                                )
-                            } else if isComposerHovered {
-                                shape.strokeBorder(
-                                    Color.white.opacity(colorScheme == .dark ? 0.09 : 0.18),
-                                    lineWidth: 0.65
+                                    LoomTheme.activeInputBorder(colorScheme).opacity(colorScheme == .dark ? 0.55 : 0.70),
+                                    lineWidth: 1
                                 )
                             }
                         }
                 }
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.09 : 0.04), radius: 6, x: 0, y: 2)
-                .onHover { hovering in
-                    withAnimation(.easeOut(duration: 0.16)) {
-                        isComposerHovered = hovering
-                    }
-                }
+                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.24 : 0.08), radius: 12, x: 0, y: 2)
                 .animation(.easeOut(duration: 0.16), value: isDraftFieldFocused)
-                .padding(.top, 34)
+                .padding(.top, 16)
 
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 48)
-            .padding(.vertical, 20)
+            .padding(.horizontal, 24)
+            .padding(.top, 8)
+            .padding(.bottom, 20)
         }
         .fileImporter(
             isPresented: $isShowingFileImporter,
@@ -587,17 +521,6 @@ struct SessionDetailView: View {
 
     private var draftIsEmpty: Bool {
         vm.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private func contextBudgetTint(for usageRatio: Double) -> Color {
-        switch usageRatio {
-        case ..<0.70:
-            return .green
-        case ..<0.90:
-            return .yellow
-        default:
-            return .red
-        }
     }
 
     @ViewBuilder

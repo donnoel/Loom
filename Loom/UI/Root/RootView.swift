@@ -233,28 +233,10 @@ struct RootView: View {
 
     var body: some View {
         ZStack {
-            Color.clear
-                .background(.ultraThinMaterial)
+            (colorScheme == .dark
+                ? Color(red: 0.11, green: 0.11, blue: 0.12)
+                : Color(red: 0.96, green: 0.96, blue: 0.97))
                 .ignoresSafeArea()
-
-            Rectangle()
-                .fill(LoomTheme.backgroundGradient(colorScheme))
-                .opacity(colorScheme == .dark ? 0.30 : 0.44)
-                .ignoresSafeArea()
-
-            Circle()
-                .fill(LoomTheme.accentGradient(colorScheme).opacity(colorScheme == .dark ? 0.24 : 0.20))
-                .frame(width: 520, height: 520)
-                .blur(radius: 120)
-                .offset(x: -290, y: -260)
-                .allowsHitTesting(false)
-
-            Circle()
-                .fill(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.25))
-                .frame(width: 420, height: 420)
-                .blur(radius: 110)
-                .offset(x: 320, y: -220)
-                .allowsHitTesting(false)
 
             NavigationSplitView {
                 sidebar
@@ -375,9 +357,12 @@ struct RootView: View {
                 destinationSidebarRow(.settings)
             }
         }
-        .searchable(text: $sessionsViewModel.searchQuery, placement: .automatic)
+        .searchable(text: $sessionsViewModel.searchQuery, placement: .sidebar)
+        .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(colorScheme == .dark ? Color(red: 0.10, green: 0.10, blue: 0.11) : Color(red: 0.95, green: 0.95, blue: 0.96))
         .navigationSplitViewColumnWidth(min: 272, ideal: 272, max: 272)
-        .navigationTitle("Loom")
+        .navigationTitle("")
     }
 
     @ViewBuilder
@@ -521,29 +506,21 @@ struct RootView: View {
         let isSelected = selectedSidebarSelection == .session(session.id)
 
         return HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(session.metadata.title)
-                        .font(LoomTheme.Typography.bodyStrong)
-                        .foregroundStyle(LoomTheme.textPrimary(colorScheme))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+            Text(session.metadata.title)
+                .font(LoomTheme.Typography.bodyStrong)
+                .foregroundStyle(LoomTheme.textPrimary(colorScheme))
+                .lineLimit(1)
+                .truncationMode(.tail)
 
-                    if session.metadata.isPinned {
-                        Image(systemName: "pin.fill")
-                            .font(LoomTheme.Typography.captionTiny)
-                            .foregroundStyle(LoomTheme.textSecondary(colorScheme))
-                    }
-                }
-
-                Text(session.metadata.updatedAt, style: .date)
-                    .font(LoomTheme.Typography.caption)
-                    .foregroundStyle(LoomTheme.textMuted(colorScheme))
+            if session.metadata.isPinned {
+                Image(systemName: "pin.fill")
+                    .font(LoomTheme.Typography.captionTiny)
+                    .foregroundStyle(LoomTheme.textSecondary(colorScheme))
             }
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 7)
         .padding(.horizontal, 10)
         .accessibilityIdentifier("sidebar.session.\(session.id.uuidString)")
         .loomSidebarItem(selected: isSelected)

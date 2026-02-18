@@ -15,11 +15,11 @@ We have the V1 local chat spine in place:
 5) **Stop/cancel generation** keeps partial output and persists it
 6) **Multimodal chat controls** now include optional speech input/output and uploaded file context for supported models, with guardrails on attachment size/count/context budget and user-configurable voice quality controls (voice/rate preview)
 7) **Model Library UX** now supports drag-and-drop reordering of installed models with persisted order across refresh/relaunch
-8) **Session UX polish** now includes a softer airy-blue visual treatment with improved dark-mode contrast tokens, calmer selected-session emphasis, clearer chat bubble readability, a more defined composer panel, friendly empty-state onboarding, and starter prompt chips for non-technical users
+8) **Session UX polish** now includes a cleaner chat-first dark visual treatment with calmer selected-session emphasis, clearer chat bubble readability, a simplified composer panel, friendly empty-state onboarding, and starter prompt chips for non-technical users
 9) **In-session model switching** is available from the chat composer so users can change models without leaving their active session
 10) **Automatic session naming** now derives a new session title from the first user request when the title is still the default
 11) **AI service monitoring** now includes an App-level status screen (including Grok) that checks public chatbot status feeds, surfaces known incidents, and supports drag-and-drop card reordering with persisted order
-12) **Composer context controls** now let users choose concise/balanced/extended history and off/compact/full file context with a visible token-budget indicator
+12) **Composer context controls** now let users choose concise/balanced/extended history and off/compact/full file context from a compact Tools menu
 13) **Trust Center** now provides a local-only panel for sessions-data location, local storage footprint, attachment retention footprint, and recent local runtime health history
 
 Current focus should be reliability, polish, and guardrails (not sweeping architecture rewrites).
@@ -55,7 +55,7 @@ When user sends a message:
 Additional expectations:
 - Keep the user draft intact if send fails.
 - Throttle/coalesce streaming UI updates (currently ~50ms).
-- Keep context bounded by the selected composer policy (history/file context levels + budget indicator).
+- Keep context bounded by the selected composer policy (history/file context levels + internal budget guardrails).
 - If active model changes for a session (including after leaving and returning), use user-only context for the next turn to avoid old-model anchoring.
 - Avoid full message-list reload per token.
 
