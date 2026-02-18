@@ -250,25 +250,31 @@ struct RootView: View {
                         Button {
                             Task { await createSession() }
                         } label: {
-                            Label("New Session", systemImage: "plus")
+                            Image(systemName: "square.and.pencil")
                         }
+                        .help("New Session")
                         .accessibilityIdentifier("sessions.toolbar.new")
+                        .controlSize(.small)
 
                         Button {
                             beginRenameForSelectedSession()
                         } label: {
-                            Label("Rename", systemImage: "pencil")
+                            Image(systemName: "pencil")
                         }
+                        .help("Rename")
                         .accessibilityIdentifier("sessions.toolbar.rename")
                         .disabled(selectedSession == nil)
+                        .controlSize(.small)
 
                         Button(role: .destructive) {
                             Task { await deleteSelectedSession() }
                         } label: {
-                            Label("Delete", systemImage: "trash")
+                            Image(systemName: "trash")
                         }
+                        .help("Delete")
                         .accessibilityIdentifier("sessions.toolbar.delete")
                         .disabled(selectedSession == nil)
+                        .controlSize(.small)
                     }
                 }
 
@@ -314,17 +320,21 @@ struct RootView: View {
     }
 
     private var sidebar: some View {
-        List(selection: $selectedSidebarSelection) {
-            Section("Sessions") {
+        List {
+            Section {
                 if sessionsViewModel.filteredSessions.isEmpty {
-                    Text("No sessions yet")
+                    Text("No chats yet")
                         .font(LoomTheme.Typography.body)
                         .foregroundStyle(.secondary)
                         .padding(.vertical, 4)
+                        .listRowBackground(Color.clear)
                 } else {
                     ForEach(sessionsViewModel.filteredSessions) { session in
                         sessionSidebarRow(session)
-                            .tag(SidebarSelection.session(session.id))
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                selectedSidebarSelection = .session(session.id)
+                            }
                             .contextMenu {
                                 Button("Rename") {
                                     beginRename(session)
@@ -342,15 +352,17 @@ struct RootView: View {
                                     Text("Delete")
                                 }
                             }
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
                     }
                 }
+            } header: {
+                Text("Chats")
+                    .textCase(nil)
             }
 
-            Section("System") {
+            Section {
                 destinationSidebarRow(.models)
-            }
-
-            Section("App") {
                 destinationSidebarRow(.info)
                 destinationSidebarRow(.status)
                 destinationSidebarRow(.trust)
@@ -361,7 +373,7 @@ struct RootView: View {
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
         .background(colorScheme == .dark ? Color(red: 0.10, green: 0.10, blue: 0.11) : Color(red: 0.95, green: 0.95, blue: 0.96))
-        .navigationSplitViewColumnWidth(min: 272, ideal: 272, max: 272)
+        .navigationSplitViewColumnWidth(min: 208, ideal: 220, max: 232)
         .navigationTitle("")
     }
 
@@ -494,12 +506,18 @@ struct RootView: View {
         let isSelected = selectedSidebarSelection == .destination(item)
 
         return Label(item.title, systemImage: item.systemImage)
-            .padding(.vertical, 6)
-            .padding(.horizontal, 10)
+            .foregroundStyle(isSelected ? LoomTheme.textPrimary(colorScheme) : LoomTheme.textSecondary(colorScheme))
+            .padding(.vertical, 5)
+            .padding(.horizontal, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityIdentifier("sidebar.\(item.id)")
             .loomSidebarItem(selected: isSelected)
-            .tag(SidebarSelection.destination(item))
+            .contentShape(Rectangle())
+            .onTapGesture {
+                selectedSidebarSelection = .destination(item)
+            }
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
     }
 
     private func sessionSidebarRow(_ session: Session) -> some View {
@@ -508,7 +526,7 @@ struct RootView: View {
         return HStack(spacing: 10) {
             Text(session.metadata.title)
                 .font(LoomTheme.Typography.bodyStrong)
-                .foregroundStyle(LoomTheme.textPrimary(colorScheme))
+                .foregroundStyle(isSelected ? LoomTheme.textPrimary(colorScheme) : LoomTheme.textSecondary(colorScheme))
                 .lineLimit(1)
                 .truncationMode(.tail)
 
@@ -520,8 +538,8 @@ struct RootView: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 7)
-        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
         .accessibilityIdentifier("sidebar.session.\(session.id.uuidString)")
         .loomSidebarItem(selected: isSelected)
     }
@@ -669,20 +687,14 @@ struct RootView: View {
         Button {
             isShowingStatusPopover.toggle()
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: statusViewModel.displayedReadiness.symbolName)
-                    .font(LoomTheme.Typography.captionStrong)
-                    .foregroundStyle(statusViewModel.displayedReadiness.tintColor)
-                Text("Loom")
-                    .font(LoomTheme.Typography.bodyStrong)
-                Text(statusViewModel.displayedReadiness.label)
-                    .font(LoomTheme.Typography.captionStrong)
-                    .foregroundStyle(statusViewModel.displayedReadiness.tintColor)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            Image(systemName: statusViewModel.displayedReadiness.symbolName)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(statusViewModel.displayedReadiness.tintColor)
+                .frame(width: 22, height: 22)
         }
         .buttonStyle(.plain)
+        .help("Loom Status")
+        .accessibilityLabel("Loom status: \(statusViewModel.displayedReadiness.label)")
         .popover(isPresented: $isShowingStatusPopover, arrowEdge: .bottom) {
             LoomStatusPopoverView(
                 viewModel: statusViewModel,

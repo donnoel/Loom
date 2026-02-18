@@ -1,10 +1,10 @@
 import SwiftUI
 
 nonisolated enum LoomTheme {
-    private static let darkTextPrimary = Color(red: 0.91, green: 0.93, blue: 0.97)
+    private static let darkTextPrimary = Color(red: 0.94, green: 0.94, blue: 0.95)
     private static let darkTextSecondary = Color(red: 0.67, green: 0.71, blue: 0.78)
     private static let darkTextMuted = Color(red: 0.50, green: 0.54, blue: 0.64)
-    private static let darkSurfaceBorder = Color.white.opacity(0.14)
+    private static let darkSurfaceBorder = Color.white.opacity(0.10)
     private static let darkFocusRing = Color(red: 0.37, green: 0.66, blue: 1.00)
     private static let darkActiveInputBorder = Color(red: 0.47, green: 0.65, blue: 1.00)
 
@@ -67,7 +67,7 @@ nonisolated enum LoomTheme {
     }
 
     static func surfaceBorder(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? darkSurfaceBorder : Color.primary.opacity(0.12)
+        scheme == .dark ? darkSurfaceBorder : Color.primary.opacity(0.09)
     }
 
     static func focusRing(_ scheme: ColorScheme) -> Color {
@@ -113,7 +113,7 @@ nonisolated enum LoomTheme {
         static var monospacedBody: Font { .system(.body, design: .monospaced) }
         static var monospacedFootnote: Font { .system(.footnote, design: .monospaced) }
         static var chatBubbleChip: Font { .callout }
-        static var chatBubbleBody: Font { .system(size: 14, weight: .regular, design: .default) }
+        static var chatBubbleBody: Font { .system(size: 15, weight: .regular, design: .default) }
     }
 
     static func bubblePalette(
@@ -136,17 +136,17 @@ nonisolated enum LoomTheme {
                 alignment: .trailing,
                 background: AnyShapeStyle(
                     Color(
-                        red: scheme == .dark ? 0.38 : 0.46,
-                        green: scheme == .dark ? 0.23 : 0.31,
-                        blue: scheme == .dark ? 0.61 : 0.73
+                        red: scheme == .dark ? 0.34 : 0.42,
+                        green: scheme == .dark ? 0.22 : 0.28,
+                        blue: scheme == .dark ? 0.52 : 0.64
                     )
                 ),
                 foreground: .white,
                 stroke: .clear,
                 strokeOpacity: 0,
                 cornerRadius: 18,
-                shadow: Color.black.opacity(scheme == .dark ? 0.20 : 0.08),
-                shadowRadius: scheme == .dark ? 10 : 6,
+                shadow: Color.black.opacity(scheme == .dark ? 0.10 : 0.05),
+                shadowRadius: scheme == .dark ? 4 : 2,
                 shadowYOffset: 1
             )
 
@@ -190,12 +190,9 @@ private struct LoomCardModifier: ViewModifier {
                 let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
                 shape
-                    .fill(colorScheme == .dark ? .thinMaterial : .ultraThinMaterial)
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.03) : Color.black.opacity(0.02))
                     .overlay {
-                        shape.fill(LoomTheme.accentGradient(colorScheme).opacity(colorScheme == .dark ? 0.10 : 0.07))
-                    }
-                    .overlay {
-                        shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.12), lineWidth: 1)
+                        shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.12 : 0.08), lineWidth: 1)
                     }
             }
     }
@@ -210,13 +207,13 @@ private struct LoomBubbleModifier: ViewModifier {
         let palette = LoomTheme.bubblePalette(role: role, scheme: colorScheme)
         let isChipRole = role == .system || role == .tool
         let isAssistantPlain = role == .assistant
-        let bubbleMaxWidth: CGFloat = role == .user ? 460 : 780
+        let bubbleMaxWidth: CGFloat = role == .user ? 430 : 720
         let bubbleShape = RoundedRectangle(cornerRadius: palette.cornerRadius, style: .continuous)
 
         content
             .foregroundStyle(palette.foreground)
             .font(isChipRole ? LoomTheme.Typography.chatBubbleChip : LoomTheme.Typography.chatBubbleBody)
-            .lineSpacing(isChipRole ? 1 : 5)
+            .lineSpacing(isChipRole ? 1 : 4)
             .multilineTextAlignment(.leading)
             .contentShape(RoundedRectangle(cornerRadius: max(palette.cornerRadius, 10), style: .continuous))
             .padding(.horizontal, isChipRole ? 10 : (isAssistantPlain ? 0 : 16))
@@ -244,35 +241,10 @@ private struct LoomBubbleModifier: ViewModifier {
 }
 
 private struct LoomSidebarItemModifier: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
-
     let selected: Bool
 
     func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
-
         content
-            .background {
-                if selected {
-                    shape
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08))
-                        .overlay {
-                            shape.strokeBorder(
-                                colorScheme == .dark ? Color.white.opacity(0.16) : Color.black.opacity(0.12),
-                                lineWidth: 0.8
-                            )
-                        }
-                }
-            }
-            .overlay {
-                shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.06), lineWidth: selected ? 0 : 0.8)
-            }
-            .shadow(
-                color: selected ? Color.black.opacity(colorScheme == .dark ? 0.22 : 0.08) : .clear,
-                radius: 6,
-                x: 0,
-                y: 1
-            )
     }
 }
 

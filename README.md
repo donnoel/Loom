@@ -62,7 +62,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 
 - **Create Session** with the `+` toolbar button
 - **Auto-Name New Sessions** by sending your first message (title is derived from the opening request)
-- **Browse Sessions** directly in the sidebar (chat-list style)
+- **Browse Chats** directly in the sidebar
 - **Rename/Delete** from toolbar or session context menu
 - **Type + Send** in the message field to start a local model response
 - **Tap Starter Prompts** in a new session to prefill a question instantly
@@ -70,8 +70,8 @@ It is built for people who want a clean, Finder-like experience with **local-fir
   Limits: up to 8 files, max ~2 MB per text file, max ~5 MB per PDF, and excerpt trimming when total attachment context is too large.
 - **Dictate Message** with the mic button (when supported by the active model)
 - **Read Replies Aloud** with the speaker toggle (when supported by the active model)
-- **Switch Models In Session** from the model menu above the message composer
-- **Tune Context Before Send** from the `Tools` menu (history + file inclusion)
+- **Switch Models In Session** from the combined model/tools menu above the composer
+- **Tune Context Before Send** from the same `Tools` menu (history + file inclusion)
 - **Open Trust Center** from **App → Trust Center** for local data location, footprint, and runtime health visibility
 - **Tune Voice Quality** in Settings with a voice picker, speaking-rate slider, and preview button
 - **Auto-Correct + Spell Check** in the message field (uses your macOS Keyboard settings)

@@ -83,7 +83,7 @@ struct SessionDetailView: View {
             ScrollViewReader { proxy in
                 ZStack(alignment: .bottom) {
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 10) {
+                        LazyVStack(alignment: .leading, spacing: 12) {
                             if !vm.isShowingFullHistory && vm.messages.count >= 200 {
                                 Button("Load Earlier") {
                                     loadEarlierAndPreservePosition(proxy)
@@ -201,12 +201,8 @@ struct SessionDetailView: View {
                                     .padding(.horizontal, 9)
                                     .padding(.vertical, 6)
                                     .background(
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.white.opacity(0.42))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                    .stroke(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10), lineWidth: 0.75)
-                                            )
+                                        Capsule(style: .continuous)
+                                            .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.05))
                                     )
                                 }
                             }
@@ -230,9 +226,9 @@ struct SessionDetailView: View {
                             guard !vm.isGenerating else { return }
                             sendAndScroll(proxy)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.top, 10)
-                        .padding(.bottom, 8)
+                        .padding(.horizontal, 10)
+                        .padding(.top, 8)
+                        .padding(.bottom, 6)
 
                     HStack(alignment: .center, spacing: 8) {
                         HStack(spacing: 4) {
@@ -271,61 +267,31 @@ struct SessionDetailView: View {
                             if vm.availableModelTags.isEmpty {
                                 Button("No installed models") {}
                                     .disabled(true)
-                                Divider()
-                                Button("Refresh Models") {
-                                    Task { await vm.refreshInstalledModels() }
-                                }
-                                Button("Browse Models…") {
-                                    browseModels()
-                                }
                             } else {
-                                ForEach(vm.availableModelTags, id: \.self) { tag in
-                                    Button {
-                                        vm.selectActiveModel(tag: tag)
-                                    } label: {
-                                        if vm.activeModelTag == tag {
-                                            Label(vm.modelDisplayName(for: tag), systemImage: "checkmark")
-                                        } else {
-                                            Text(vm.modelDisplayName(for: tag))
+                                Section("Model") {
+                                    ForEach(vm.availableModelTags, id: \.self) { tag in
+                                        Button {
+                                            vm.selectActiveModel(tag: tag)
+                                        } label: {
+                                            if vm.activeModelTag == tag {
+                                                Label(vm.modelDisplayName(for: tag), systemImage: "checkmark")
+                                            } else {
+                                                Text(vm.modelDisplayName(for: tag))
+                                            }
                                         }
                                     }
                                 }
-                                Divider()
-                                Button("Refresh Models") {
-                                    Task { await vm.refreshInstalledModels() }
-                                }
-                                Button("Browse Models…") {
-                                    browseModels()
-                                }
                             }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Text(vm.activeModelSelectionLabel)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                                    .foregroundStyle(LoomTheme.textPrimary(colorScheme))
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .font(LoomTheme.Typography.captionTinyStrong)
-                                    .foregroundStyle(LoomTheme.textSecondary(colorScheme))
-                            }
-                            .font(LoomTheme.Typography.bodyStrong)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .frame(minHeight: 32)
-                            .frame(maxWidth: 220, alignment: .leading)
-                            .background(
-                                Capsule(style: .continuous)
-                                    .fill(colorScheme == .dark ? Color.white.opacity(0.03) : Color.white.opacity(0.32))
-                                    .overlay(
-                                        Capsule(style: .continuous)
-                                            .stroke(LoomTheme.surfaceBorder(colorScheme).opacity(0.70), lineWidth: 0.75)
-                                    )
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("session.detail.modelPicker")
 
-                        Menu {
+                            Divider()
+
+                            Button("Refresh Models") {
+                                Task { await vm.refreshInstalledModels() }
+                            }
+                            Button("Browse Models…") {
+                                browseModels()
+                            }
+
                             Section("History") {
                                 ForEach(SessionMessagesViewModel.HistoryContextLevel.allCases) { level in
                                     Button {
@@ -357,29 +323,31 @@ struct SessionDetailView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "slider.horizontal.3")
                                     .font(LoomTheme.Typography.captionTinyStrong)
-                                Text("Tools")
+                                Text(vm.activeModelSelectionLabel)
                                     .lineLimit(1)
+                                    .truncationMode(.middle)
                                 Image(systemName: "chevron.down")
                                     .font(LoomTheme.Typography.captionTinyStrong)
                             }
                             .font(LoomTheme.Typography.bodyStrong)
                             .foregroundStyle(LoomTheme.textPrimary(colorScheme))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 7)
-                            .frame(minHeight: 32)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 6)
+                            .frame(minHeight: 30)
                             .background(
                                 Capsule(style: .continuous)
-                                    .fill(colorScheme == .dark ? Color.white.opacity(0.03) : Color.white.opacity(0.32))
+                                    .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.05))
                                     .overlay(
                                         Capsule(style: .continuous)
-                                            .stroke(LoomTheme.surfaceBorder(colorScheme).opacity(0.70), lineWidth: 0.75)
+                                            .stroke(LoomTheme.surfaceBorder(colorScheme).opacity(0.55), lineWidth: 0.75)
                                     )
                             )
                         }
                         .buttonStyle(.plain)
-                        .accessibilityIdentifier("session.detail.contextPicker")
+                        .accessibilityIdentifier("session.detail.modelPicker")
+                        .accessibilityLabel("Model and tools")
 
-                        Spacer(minLength: 8)
+                        Spacer(minLength: 4)
 
                         if vm.isGenerating {
                             Button(role: .destructive) {
@@ -429,20 +397,13 @@ struct SessionDetailView: View {
                             .contentShape(Rectangle())
                         }
                     }
-                    .padding(.horizontal, 8)
-                    .frame(minHeight: 42)
+                    .padding(.horizontal, 6)
+                    .frame(minHeight: 38)
                     .background {
-                        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        shape
-                            .fill(colorScheme == .dark ? Color.white.opacity(0.04) : Color.black.opacity(0.03))
-                            .overlay {
-                                shape.strokeBorder(
-                                    isDraftFieldFocused
-                                        ? LoomTheme.activeInputBorder(colorScheme).opacity(0.45)
-                                        : LoomTheme.surfaceBorder(colorScheme),
-                                    lineWidth: 1
-                                )
-                            }
+                        if isDraftFieldFocused {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(LoomTheme.activeInputBorder(colorScheme).opacity(0.45), lineWidth: 1)
+                        }
                     }
                     .animation(.easeOut(duration: 0.16), value: isDraftFieldFocused)
 
@@ -450,22 +411,22 @@ struct SessionDetailView: View {
                         Text("Attached files are off for this send. Enable file context in Tools.")
                             .font(LoomTheme.Typography.captionTiny)
                             .foregroundStyle(LoomTheme.textSecondary(colorScheme))
-                            .padding(.horizontal, 8)
+                            .padding(.horizontal, 6)
                             .accessibilityIdentifier("session.detail.fileContextHint")
                     }
                 }
-                .padding(.top, 8)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 10)
-                .frame(maxWidth: 860)
-                .frame(minHeight: 120)
+                .padding(.top, 6)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+                .frame(maxWidth: 880)
+                .frame(minHeight: 96)
                 .frame(maxWidth: .infinity)
                 .background {
-                    let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
                     shape
-                        .fill(colorScheme == .dark ? Color(red: 0.12, green: 0.13, blue: 0.15) : Color.white.opacity(0.96))
+                        .fill(colorScheme == .dark ? Color(red: 0.13, green: 0.13, blue: 0.14) : Color.white.opacity(0.98))
                         .overlay {
-                            shape.strokeBorder(LoomTheme.surfaceBorder(colorScheme).opacity(0.68), lineWidth: 1)
+                            shape.strokeBorder(LoomTheme.surfaceBorder(colorScheme).opacity(0.52), lineWidth: 1)
                         }
                         .overlay {
                             if isDraftFieldFocused {
@@ -476,15 +437,15 @@ struct SessionDetailView: View {
                             }
                         }
                 }
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.24 : 0.08), radius: 12, x: 0, y: 2)
+                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.09 : 0.04), radius: 2, x: 0, y: 1)
                 .animation(.easeOut(duration: 0.16), value: isDraftFieldFocused)
-                .padding(.top, 16)
+                .padding(.top, 10)
 
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 20)
             .padding(.top, 8)
-            .padding(.bottom, 20)
+            .padding(.bottom, 16)
         }
         .fileImporter(
             isPresented: $isShowingFileImporter,
@@ -831,7 +792,6 @@ private struct MessageRowView: View, Equatable {
     let message: ChatMessage
     let isThinking: Bool
     let onRegenerate: (() -> Void)?
-    @State private var isHovered: Bool = false
 
     static func == (lhs: MessageRowView, rhs: MessageRowView) -> Bool {
         lhs.message == rhs.message && lhs.isThinking == rhs.isThinking
@@ -840,7 +800,7 @@ private struct MessageRowView: View, Equatable {
     var body: some View {
         let isUser = message.role == .user
 
-        VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
+        VStack(alignment: isUser ? .trailing : .leading, spacing: 6) {
             MessageBubbleChrome(role: message.role) {
                 if isThinking {
                     TypingPulseView()
@@ -857,15 +817,7 @@ private struct MessageRowView: View, Equatable {
             .accessibilityIdentifier(accessibilityIdentifier)
         }
         .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
-        .padding(.vertical, 4)
-        .scaleEffect(isHovered ? 1.006 : 1.0)
-        .offset(y: isHovered ? -1 : 0)
-        .brightness(isHovered ? 0.06 : 0)
-        .animation(.easeOut(duration: 0.16), value: isHovered)
-        .onHover { hovering in
-            guard message.role == .assistant || message.role == .user else { return }
-            isHovered = hovering
-        }
+        .padding(.vertical, 3)
     }
 
     private var roleLabel: String {
@@ -945,8 +897,6 @@ private struct ComposerUtilityIconButton: View {
     let isDisabled: Bool
     let action: () -> Void
 
-    @State private var isHovered: Bool = false
-
     var body: some View {
         Button(action: action) {
             Image(systemName: symbolName)
@@ -956,18 +906,14 @@ private struct ComposerUtilityIconButton: View {
                         ? LoomTheme.textMuted(colorScheme)
                         : (isActive ? Color.accentColor : LoomTheme.textPrimary(colorScheme).opacity(0.88))
                 )
-                .frame(width: 32, height: 32)
+                .frame(width: 28, height: 28)
                 .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    Circle()
                         .fill(
-                            colorScheme == .dark
-                                ? Color.white.opacity(isActive ? 0.09 : 0.02)
-                                : Color.white.opacity(isActive ? 0.42 : 0.16)
+                            isActive
+                                ? (colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.10))
+                                : (colorScheme == .dark ? Color.white.opacity(0.03) : Color.black.opacity(0.04))
                         )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(LoomTheme.surfaceBorder(colorScheme).opacity(0.84), lineWidth: 0.85)
                 )
         }
         .help(helpText)
@@ -975,11 +921,6 @@ private struct ComposerUtilityIconButton: View {
         .disabled(isDisabled)
         .padding(2)
         .contentShape(Rectangle())
-        .brightness(isHovered && !isDisabled ? 0.06 : 0)
-        .animation(.easeOut(duration: 0.16), value: isHovered)
-        .onHover { hovering in
-            isHovered = hovering
-        }
     }
 }
 
