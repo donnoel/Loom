@@ -323,7 +323,7 @@ struct SessionDetailView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "slider.horizontal.3")
                                     .font(LoomTheme.Typography.captionTinyStrong)
-                                Text(vm.activeModelSelectionLabel)
+                                Text("Models")
                                     .lineLimit(1)
                                     .truncationMode(.middle)
                                 Image(systemName: "chevron.down")
