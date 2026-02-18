@@ -217,6 +217,7 @@ struct SessionDetailView: View {
                             .foregroundStyle(LoomTheme.inputPlaceholder(colorScheme)),
                         axis: .vertical
                     )
+                        .autocorrectionDisabled(false)
                         .textFieldStyle(.plain)
                         .lineLimit(2...8)
                         .foregroundStyle(LoomTheme.textPrimary(colorScheme))
