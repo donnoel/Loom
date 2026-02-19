@@ -322,6 +322,8 @@ struct RootView: View {
     private var sidebar: some View {
         List {
             Section {
+                newSessionSidebarRow
+
                 if sessionsViewModel.filteredSessions.isEmpty {
                     Text("No chats yet")
                         .font(LoomTheme.Typography.body)
@@ -375,6 +377,25 @@ struct RootView: View {
         .background(colorScheme == .dark ? Color(red: 0.10, green: 0.10, blue: 0.11) : Color(red: 0.95, green: 0.95, blue: 0.96))
         .navigationSplitViewColumnWidth(min: 208, ideal: 220, max: 232)
         .navigationTitle("")
+    }
+
+    private var newSessionSidebarRow: some View {
+        Button {
+            Task { await createSession() }
+        } label: {
+            Label("New Session", systemImage: "square.and.pencil")
+                .font(LoomTheme.Typography.bodyStrong)
+                .foregroundStyle(Color.accentColor)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("sidebar.session.new")
+        .loomSidebarItem(selected: false)
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
     }
 
     @ViewBuilder
