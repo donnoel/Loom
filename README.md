@@ -49,7 +49,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 🧩 **Model Picker** | View installed Ollama models with plain-language "good for" guidance plus maker/country and last-trained details, use streamlined actions (Set Active / Update / Delete), and keep model selection across launches until you change it. |
 | ↕️ **Drag-Reorder Models** | Reorder installed models in Model Library with drag-and-drop, and Loom remembers your order across refresh/relaunch. |
 | ℹ️ **System Info Sheet** | Open **App → Info** in the sidebar to see a plain-language walkthrough of how Loom, Ollama, and local models work together, with official source links per company. |
-| 📥 **In-App Model Install** | Use **Add Model…** to browse a curated catalog, review friendly model summaries, and install with live progress + cancel support. |
+| 📥 **In-App Model Install** | Use **Add Model…** to browse a focused curated catalog (Qwen 3 8B, DeepSeek R1 8B, Gemma 3 4B/12B, Mistral Small 24B), review friendly summaries, and install with live progress + cancel support. |
 | 🧹 **Model Cleanup** | Delete installed models directly from Loom (with confirmation and active-model safety checks). |
 | 💽 **Disk Awareness** | Model Library shows local free-space info and warns when free space is below 10%. |
 | 🩺 **Readiness Status** | Model Library + toolbar pill show ready/setup/not-ready state in plain language. |

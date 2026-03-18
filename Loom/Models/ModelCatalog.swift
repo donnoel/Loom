@@ -44,6 +44,10 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
         all.first(where: { $0.tag == tag })
     }
 
+    static func fallbackForTesting() -> ModelCatalog {
+        ModelCatalog(all: fallbackModels)
+    }
+
     static func load(from preferredBundle: Bundle = .main) -> ModelCatalog {
         for bundle in candidateBundles(preferredBundle: preferredBundle) {
             guard let url = bundle.url(forResource: "ModelCatalog", withExtension: "json") else { continue }
@@ -69,36 +73,17 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
 
     private static let fallbackModels: [CatalogModel] = [
         CatalogModel(
-            id: "llama3.1:8b",
-            tag: "llama3.1:8b",
-            displayName: "Llama 3.1 (8B)",
-            vendor: "Meta",
-            country: "United States",
-            lastTrained: "July 2024",
-            summary: "Balanced all-around model for chat, drafting, and summaries.",
-            bestAt: ["General chat", "Summaries", "Writing help"],
-            approxDownloadBytes: 4_700_000_000,
-            approxDiskBytes: 5_200_000_000,
-            notes: "Great default for most Macs.",
-            recommended: true,
-            capabilities: CatalogModelCapabilities(
-                speechInput: true,
-                speechOutput: true,
-                fileUploads: true
-            )
-        ),
-        CatalogModel(
-            id: "qwen2.5:7b",
-            tag: "qwen2.5:7b",
-            displayName: "Qwen 2.5 (7B)",
+            id: "qwen3:8b",
+            tag: "qwen3:8b",
+            displayName: "Qwen 3 (8B)",
             vendor: "Qwen",
             country: "China",
-            lastTrained: "September 2024",
-            summary: "Fast and strong at structured responses and coding support.",
-            bestAt: ["Coding help", "Structured output", "Reasoning"],
-            approxDownloadBytes: 4_400_000_000,
-            approxDiskBytes: 4_900_000_000,
-            notes: "Good balance of speed and quality.",
+            lastTrained: "2025",
+            summary: "Current balanced default for coding, analysis, and general chat.",
+            bestAt: ["Coding help", "Reasoning", "General chat"],
+            approxDownloadBytes: 5_200_000_000,
+            approxDiskBytes: 5_800_000_000,
+            notes: "Best starting point for most Macs.",
             recommended: true,
             capabilities: CatalogModelCapabilities(
                 speechInput: true,
@@ -107,18 +92,18 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             )
         ),
         CatalogModel(
-            id: "phi4:latest",
-            tag: "phi4:latest",
-            displayName: "Phi 4",
-            vendor: "Microsoft",
-            country: "United States",
-            lastTrained: "December 2024",
-            summary: "Compact reasoning-focused model with strong instruction following.",
-            bestAt: ["Reasoning", "Task planning", "Short analyses"],
-            approxDownloadBytes: 8_000_000_000,
-            approxDiskBytes: 9_000_000_000,
-            notes: "Needs more RAM than small 7-8B models.",
-            recommended: false,
+            id: "deepseek-r1:8b",
+            tag: "deepseek-r1:8b",
+            displayName: "DeepSeek R1 (8B)",
+            vendor: "DeepSeek",
+            country: "China",
+            lastTrained: "2025",
+            summary: "Reasoning-first model with strong logic and technical performance at 8B size.",
+            bestAt: ["Reasoning", "Math and logic", "Technical Q&A"],
+            approxDownloadBytes: 5_200_000_000,
+            approxDiskBytes: 5_800_000_000,
+            notes: "Use when you want deeper step-by-step answers.",
+            recommended: true,
             capabilities: CatalogModelCapabilities(
                 speechInput: true,
                 speechOutput: true,
@@ -126,37 +111,18 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             )
         ),
         CatalogModel(
-            id: "mistral:7b",
-            tag: "mistral:7b",
-            displayName: "Mistral (7B)",
-            vendor: "Mistral AI",
-            country: "France",
-            lastTrained: "2023",
-            summary: "Reliable lightweight model for everyday prompts and edits.",
-            bestAt: ["Quick answers", "Rewrite tasks", "General chat"],
-            approxDownloadBytes: 4_100_000_000,
-            approxDiskBytes: 4_600_000_000,
-            notes: "Fast on older hardware.",
-            recommended: false,
-            capabilities: CatalogModelCapabilities(
-                speechInput: true,
-                speechOutput: false,
-                fileUploads: false
-            )
-        ),
-        CatalogModel(
-            id: "gemma2:9b",
-            tag: "gemma2:9b",
-            displayName: "Gemma 2 (9B)",
+            id: "gemma3:4b",
+            tag: "gemma3:4b",
+            displayName: "Gemma 3 (4B)",
             vendor: "Google",
             country: "United States",
-            lastTrained: "June 2024",
-            summary: "Helpful for concise answers, summaries, and research notes.",
-            bestAt: ["Summaries", "Research notes", "General chat"],
-            approxDownloadBytes: 5_600_000_000,
-            approxDiskBytes: 6_200_000_000,
-            notes: "Solid quality with moderate resource use.",
-            recommended: false,
+            lastTrained: "2025",
+            summary: "Small modern model for fast local work with strong quality for its size.",
+            bestAt: ["Fast drafts", "Summaries", "Low-memory Macs"],
+            approxDownloadBytes: 3_300_000_000,
+            approxDiskBytes: 3_800_000_000,
+            notes: "Best lightweight pick in the refreshed catalog.",
+            recommended: true,
             capabilities: CatalogModelCapabilities(
                 speechInput: true,
                 speechOutput: true,
@@ -164,22 +130,41 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             )
         ),
         CatalogModel(
-            id: "llama3.2:3b",
-            tag: "llama3.2:3b",
-            displayName: "Llama 3.2 (3B)",
-            vendor: "Meta",
+            id: "gemma3:12b",
+            tag: "gemma3:12b",
+            displayName: "Gemma 3 (12B)",
+            vendor: "Google",
             country: "United States",
-            lastTrained: "September 2024",
-            summary: "Small model for lightweight local tasks and quick drafts.",
-            bestAt: ["Fast drafts", "Simple Q&A", "Low-memory Macs"],
-            approxDownloadBytes: 2_000_000_000,
-            approxDiskBytes: 2_300_000_000,
-            notes: "Best speed/resource option in this catalog.",
+            lastTrained: "2025",
+            summary: "Higher-quality Gemma 3 option for users with more RAM.",
+            bestAt: ["Long-form answers", "Summaries", "General chat"],
+            approxDownloadBytes: 8_100_000_000,
+            approxDiskBytes: 9_000_000_000,
+            notes: "Great quality jump from 4B if your Mac can handle it.",
             recommended: true,
             capabilities: CatalogModelCapabilities(
                 speechInput: true,
-                speechOutput: false,
-                fileUploads: false
+                speechOutput: true,
+                fileUploads: true
+            )
+        ),
+        CatalogModel(
+            id: "mistral-small:24b",
+            tag: "mistral-small:24b",
+            displayName: "Mistral Small (24B)",
+            vendor: "Mistral AI",
+            country: "France",
+            lastTrained: "2025",
+            summary: "High-capability local model for users prioritizing quality over speed.",
+            bestAt: ["Complex prompts", "Reasoning", "Agent-style tasks"],
+            approxDownloadBytes: 14_000_000_000,
+            approxDiskBytes: 15_500_000_000,
+            notes: "Recommended for 32GB+ memory setups.",
+            recommended: false,
+            capabilities: CatalogModelCapabilities(
+                speechInput: true,
+                speechOutput: true,
+                fileUploads: true
             )
         )
     ]

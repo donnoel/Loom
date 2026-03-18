@@ -17,8 +17,8 @@ struct AddModelSheet: View {
                         lowDiskWarningBanner(warning)
                     }
 
-                    modelsSection(title: "Recommended", models: filteredRecommendedModels)
-                    modelsSection(title: "All Models", models: filteredOtherModels)
+                    modelsSection(title: "Available", models: filteredRecommendedModels)
+                    modelsSection(title: "", models: filteredOtherModels)
                 }
                 .padding(20)
             }
@@ -54,8 +54,10 @@ struct AddModelSheet: View {
     @ViewBuilder
     private func modelsSection(title: String, models: [CatalogModel]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(LoomTheme.Typography.sectionTitle)
+            if let sectionTitle = title.nonEmptyTrimmed {
+                Text(sectionTitle)
+                    .font(LoomTheme.Typography.sectionTitle)
+            }
 
             if models.isEmpty {
                 Text(emptyStateText(for: title))
@@ -228,7 +230,7 @@ struct AddModelSheet: View {
             return "No matching models found."
         }
 
-        if sectionTitle == "Recommended" {
+        if sectionTitle == "Available" {
             return "No recommended models available right now."
         }
 
