@@ -18,7 +18,10 @@ struct AddModelSheet: View {
                     }
 
                     modelsSection(title: "Available", models: filteredRecommendedModels)
-                    modelsSection(title: "", models: filteredOtherModels)
+
+                    if !filteredOtherModels.isEmpty {
+                        modelsSection(title: nil, models: filteredOtherModels)
+                    }
                 }
                 .padding(20)
             }
@@ -52,9 +55,9 @@ struct AddModelSheet: View {
     }
 
     @ViewBuilder
-    private func modelsSection(title: String, models: [CatalogModel]) -> some View {
+    private func modelsSection(title: String?, models: [CatalogModel]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            if let sectionTitle = title.nonEmptyTrimmed {
+            if let sectionTitle = title?.nonEmptyTrimmed {
                 Text(sectionTitle)
                     .font(LoomTheme.Typography.sectionTitle)
             }
@@ -225,13 +228,13 @@ struct AddModelSheet: View {
         return searchableText.contains(normalizedSearchText)
     }
 
-    private func emptyStateText(for sectionTitle: String) -> String {
+    private func emptyStateText(for sectionTitle: String?) -> String {
         if searchText.nonEmptyTrimmed != nil {
             return "No matching models found."
         }
 
         if sectionTitle == "Available" {
-            return "No recommended models available right now."
+            return "No available models right now."
         }
 
         return "No models available."

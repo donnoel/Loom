@@ -9,6 +9,7 @@ struct ModelCatalogTests {
         #expect(!catalog.all.isEmpty)
         #expect(catalog.all.count == 5)
         #expect(catalog.all.contains(where: { $0.tag == "qwen3:8b" }))
+        #expect(catalog.lastRefreshedAt == "2026-03-18")
     }
 
     @Test
@@ -48,6 +49,12 @@ struct ModelCatalogTests {
         #expect(highEnd?.speechInput == true)
         #expect(highEnd?.speechOutput == true)
         #expect(highEnd?.fileUploads == true)
+    }
+
+    @Test
+    func allCatalogModelsDeclareCapabilitiesExplicitly() {
+        let catalog = ModelCatalog.load()
+        #expect(catalog.all.filter { $0.capabilities == nil }.isEmpty)
     }
 
     @Test

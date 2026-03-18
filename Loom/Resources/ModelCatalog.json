@@ -1,97 +1,120 @@
-[
-  {
-    "id": "qwen3:8b",
-    "tag": "qwen3:8b",
-    "displayName": "Qwen 3 (8B)",
-    "vendor": "Qwen",
-    "country": "China",
-    "lastTrained": "2025",
-    "summary": "Current balanced default for coding, analysis, and general chat.",
-    "bestAt": ["Coding help", "Reasoning", "General chat"],
-    "approxDownloadBytes": 5200000000,
-    "approxDiskBytes": 5800000000,
-    "notes": "Best starting point for most Macs.",
-    "recommended": true,
-    "capabilities": {
-      "speechInput": true,
-      "speechOutput": true,
-      "fileUploads": true
+{
+  "lastRefreshedAt": "2026-03-18",
+  "models": [
+    {
+      "id": "qwen3:8b",
+      "tag": "qwen3:8b",
+      "displayName": "Qwen 3 (8B)",
+      "vendor": "Qwen",
+      "country": "China",
+      "lastTrained": "2025",
+      "summary": "Current balanced default for coding, analysis, and general chat.",
+      "bestAt": [
+        "Coding help",
+        "Reasoning",
+        "General chat"
+      ],
+      "approxDownloadBytes": 5200000000,
+      "approxDiskBytes": 5800000000,
+      "notes": "Best starting point for most Macs.",
+      "recommended": true,
+      "capabilities": {
+        "speechInput": true,
+        "speechOutput": true,
+        "fileUploads": true
+      }
+    },
+    {
+      "id": "deepseek-r1:8b",
+      "tag": "deepseek-r1:8b",
+      "displayName": "DeepSeek R1 (8B)",
+      "vendor": "DeepSeek",
+      "country": "China",
+      "lastTrained": "2025",
+      "summary": "Reasoning-first model with strong logic and technical performance at 8B size.",
+      "bestAt": [
+        "Reasoning",
+        "Math and logic",
+        "Technical Q&A"
+      ],
+      "approxDownloadBytes": 5200000000,
+      "approxDiskBytes": 5800000000,
+      "notes": "Use when you want deeper step-by-step answers.",
+      "recommended": true,
+      "capabilities": {
+        "speechInput": true,
+        "speechOutput": true,
+        "fileUploads": true
+      }
+    },
+    {
+      "id": "gemma3:4b",
+      "tag": "gemma3:4b",
+      "displayName": "Gemma 3 (4B)",
+      "vendor": "Google",
+      "country": "United States",
+      "lastTrained": "2025",
+      "summary": "Small modern model for fast local work with strong quality for its size.",
+      "bestAt": [
+        "Fast drafts",
+        "Summaries",
+        "Low-memory Macs"
+      ],
+      "approxDownloadBytes": 3300000000,
+      "approxDiskBytes": 3800000000,
+      "notes": "Best lightweight pick in the refreshed catalog.",
+      "recommended": true,
+      "capabilities": {
+        "speechInput": true,
+        "speechOutput": true,
+        "fileUploads": true
+      }
+    },
+    {
+      "id": "gemma3:12b",
+      "tag": "gemma3:12b",
+      "displayName": "Gemma 3 (12B)",
+      "vendor": "Google",
+      "country": "United States",
+      "lastTrained": "2025",
+      "summary": "Higher-quality Gemma 3 option for users with more RAM.",
+      "bestAt": [
+        "Long-form answers",
+        "Summaries",
+        "General chat"
+      ],
+      "approxDownloadBytes": 8100000000,
+      "approxDiskBytes": 9000000000,
+      "notes": "Great quality jump from 4B if your Mac can handle it.",
+      "recommended": true,
+      "capabilities": {
+        "speechInput": true,
+        "speechOutput": true,
+        "fileUploads": true
+      }
+    },
+    {
+      "id": "mistral-small:24b",
+      "tag": "mistral-small:24b",
+      "displayName": "Mistral Small (24B)",
+      "vendor": "Mistral AI",
+      "country": "France",
+      "lastTrained": "2025",
+      "summary": "High-capability local model for users prioritizing quality over speed.",
+      "bestAt": [
+        "Complex prompts",
+        "Reasoning",
+        "Agent-style tasks"
+      ],
+      "approxDownloadBytes": 14000000000,
+      "approxDiskBytes": 15500000000,
+      "notes": "Recommended for 32GB+ memory setups.",
+      "recommended": false,
+      "capabilities": {
+        "speechInput": true,
+        "speechOutput": true,
+        "fileUploads": true
+      }
     }
-  },
-  {
-    "id": "deepseek-r1:8b",
-    "tag": "deepseek-r1:8b",
-    "displayName": "DeepSeek R1 (8B)",
-    "vendor": "DeepSeek",
-    "country": "China",
-    "lastTrained": "2025",
-    "summary": "Reasoning-first model with strong logic and technical performance at 8B size.",
-    "bestAt": ["Reasoning", "Math and logic", "Technical Q&A"],
-    "approxDownloadBytes": 5200000000,
-    "approxDiskBytes": 5800000000,
-    "notes": "Use when you want deeper step-by-step answers.",
-    "recommended": true,
-    "capabilities": {
-      "speechInput": true,
-      "speechOutput": true,
-      "fileUploads": true
-    }
-  },
-  {
-    "id": "gemma3:4b",
-    "tag": "gemma3:4b",
-    "displayName": "Gemma 3 (4B)",
-    "vendor": "Google",
-    "country": "United States",
-    "lastTrained": "2025",
-    "summary": "Small modern model for fast local work with strong quality for its size.",
-    "bestAt": ["Fast drafts", "Summaries", "Low-memory Macs"],
-    "approxDownloadBytes": 3300000000,
-    "approxDiskBytes": 3800000000,
-    "notes": "Best lightweight pick in the refreshed catalog.",
-    "recommended": true,
-    "capabilities": {
-      "speechInput": true,
-      "speechOutput": true,
-      "fileUploads": true
-    }
-  },
-  {
-    "id": "gemma3:12b",
-    "tag": "gemma3:12b",
-    "displayName": "Gemma 3 (12B)",
-    "vendor": "Google",
-    "country": "United States",
-    "lastTrained": "2025",
-    "summary": "Higher-quality Gemma 3 option for users with more RAM.",
-    "bestAt": ["Long-form answers", "Summaries", "General chat"],
-    "approxDownloadBytes": 8100000000,
-    "approxDiskBytes": 9000000000,
-    "notes": "Great quality jump from 4B if your Mac can handle it.",
-    "recommended": true,
-    "capabilities": {
-      "speechInput": true,
-      "speechOutput": true,
-      "fileUploads": true
-    }
-  },
-  {
-    "id": "mistral-small:24b",
-    "tag": "mistral-small:24b",
-    "displayName": "Mistral Small (24B)",
-    "vendor": "Mistral AI",
-    "country": "France",
-    "lastTrained": "2025",
-    "summary": "High-capability local model for users prioritizing quality over speed.",
-    "bestAt": ["Complex prompts", "Reasoning", "Agent-style tasks"],
-    "approxDownloadBytes": 14000000000,
-    "approxDiskBytes": 15500000000,
-    "notes": "Recommended for 32GB+ memory setups.",
-    "recommended": false,
-    "capabilities": {
-      "speechInput": true,
-      "speechOutput": true,
-      "fileUploads": true
-    }
-  }
-]
+  ]
+}
