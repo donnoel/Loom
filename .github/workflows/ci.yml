@@ -1,4 +1,4 @@
-name: iOS CI
+name: Loom CI
 
 on:
   push:
@@ -8,7 +8,10 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: macos-15  # macOS 15 is GA and is what macos-latest maps to now
+    runs-on: macos-15
+    env:
+      DERIVED_DATA: ${{ github.workspace }}/DerivedData
+      RESULT_BUNDLE: ${{ github.workspace }}/TestResults/Loom.xcresult
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,7 +21,6 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      # Optional but speeds things up a lot: cache SwiftPM artifacts
       - name: Cache SwiftPM
         uses: actions/cache@v4
         with:
@@ -32,23 +34,34 @@ jobs:
       - name: Resolve packages
         run: xcodebuild -resolvePackageDependencies -project Loom.xcodeproj
 
-      # Build + test on the latest iOS simulator
-      - name: Build and test
-        env:
-          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }} # add in repo Settings → Secrets
+      - name: Build for testing (macOS)
         run: |
-          set -e
+          set -eo pipefail
           xcodebuild \
             -project Loom.xcodeproj \
             -scheme Loom \
-            -destination "platform=iOS Simulator,OS=latest,name=iPhone 15" \
             -configuration Debug \
-            CODE_SIGNING_ALLOWED=NO \
-            clean test | xcpretty
+            -destination "platform=macOS" \
+            -derivedDataPath "$DERIVED_DATA" \
+            clean build-for-testing
+
+      - name: Build and test
+        run: |
+          set -eo pipefail
+          xcodebuild \
+            -project Loom.xcodeproj \
+            -scheme Loom \
+            -configuration Debug \
+            -destination "platform=macOS" \
+            -derivedDataPath "$DERIVED_DATA" \
+            -resultBundlePath "$RESULT_BUNDLE" \
+            test-without-building
 
       - name: Upload xcodebuild logs (if the job fails)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: xcodebuild-logs
-          path: ~/Library/Logs/scan # or fall back to derived logs if you prefer
+          name: xcodebuild-artifacts
+          path: |
+            ${{ env.RESULT_BUNDLE }}
+            ${{ env.DERIVED_DATA }}/Logs/Test
