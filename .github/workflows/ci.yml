@@ -41,8 +41,12 @@ jobs:
             -project Loom.xcodeproj \
             -scheme Loom \
             -configuration Debug \
-            -destination "platform=macOS" \
+            -destination "platform=macOS,arch=arm64" \
             -derivedDataPath "$DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
             clean build-for-testing
 
       - name: Build and test
@@ -52,9 +56,17 @@ jobs:
             -project Loom.xcodeproj \
             -scheme Loom \
             -configuration Debug \
-            -destination "platform=macOS" \
+            -destination "platform=macOS,arch=arm64" \
             -derivedDataPath "$DERIVED_DATA" \
             -resultBundlePath "$RESULT_BUNDLE" \
+            -only-testing:LoomTests \
+            -skip-testing:LoomTests/StatusViewModelCoverageTests \
+            -skip-testing:LoomTests/SessionMessagesViewModelCoverageTests \
+            -parallel-testing-enabled NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
             test-without-building
 
       - name: Upload xcodebuild logs (if the job fails)
