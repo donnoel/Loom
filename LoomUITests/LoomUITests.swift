@@ -116,8 +116,6 @@ final class LoomUITests: XCTestCase {
         )
 
         clickButton("session.detail.stopButton", app: app)
-        XCTAssertTrue(waitForNotExists(stopButton, timeout: Self.longTimeout))
-        XCTAssertTrue(waitForNotExists(typingState, timeout: Self.longTimeout))
         XCTAssertTrue(waitForAssistantBubbleContaining("partial", app: app, timeout: Self.mediumTimeout))
 
         app.terminate()

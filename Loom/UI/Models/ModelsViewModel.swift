@@ -20,12 +20,20 @@ final class ModelsViewModel {
     private var installTask: Task<Void, Never>?
     private var progressFlushTask: Task<Void, Never>?
     private var pendingPullProgress: PullProgress?
+    private static let uiTestResetDefaultsEnvironmentKey = "LOOM_UI_TEST_RESET_DEFAULTS"
 
     private nonisolated static func isAutoCheckEnabled() -> Bool {
         if let stored = UserDefaults.standard.object(forKey: LoomPreferenceKeys.modelsAutoCheckEnabled) as? Bool {
             return stored
         }
         return true
+    }
+
+    private nonisolated static func defaultClient() -> any OllamaStatusProviding {
+        if ProcessInfo.processInfo.environment[uiTestResetDefaultsEnvironmentKey] == "1" {
+            return UITestModelsStatusClient()
+        }
+        return OllamaClient()
     }
 
     var diagnosis: OllamaDiagnosis = .unavailable
@@ -47,10 +55,10 @@ final class ModelsViewModel {
     var checkedForUpdatesAtByTag: [String: Date] = [:]
 
     init(
-        client: any OllamaStatusProviding = OllamaClient(),
+        client: (any OllamaStatusProviding)? = nil,
         catalog: ModelCatalog = .load()
     ) {
-        self.client = client
+        self.client = client ?? Self.defaultClient()
         self.catalog = catalog
     }
 
@@ -712,4 +720,24 @@ nonisolated extension OllamaDiagnosis {
         summary: "Checking status",
         nextStep: .tryAgain
     )
+}
+
+private actor UITestModelsStatusClient: OllamaStatusProviding {
+    func diagnose() async -> OllamaDiagnosis {
+        OllamaDiagnosis(
+            isInstalled: true,
+            isRunning: true,
+            reachableBaseURL: URL(string: "http://localhost:11434"),
+            summary: "Ready",
+            nextStep: .ready
+        )
+    }
+
+    func listModels() async throws -> [OllamaModel] {
+        [OllamaModel(tag: "ui-test-model")]
+    }
+
+    func deleteModel(name: String) async throws {}
+
+    func pullModel(name: String, onProgress: @Sendable (PullProgress) -> Void) async throws {}
 }

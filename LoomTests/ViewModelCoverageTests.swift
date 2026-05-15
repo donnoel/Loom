@@ -1126,6 +1126,12 @@ struct SessionMessagesViewModelCoverageTests {
         vm.stopGenerating()
         await waitUntil { !vm.isGenerating }
 
+        let clock = ContinuousClock()
+        let deadline = clock.now + .seconds(2)
+        while try await store.loadMessages(sessionID: session.id).count < 2 && clock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+
         let persisted = try await store.loadMessages(sessionID: session.id)
         #expect(persisted.count == 2)
         if persisted.count == 2 {
