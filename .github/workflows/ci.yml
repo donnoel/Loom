@@ -52,6 +52,10 @@ jobs:
             -destination 'platform=macOS,arch=arm64' \
             -derivedDataPath "$DERIVED_DATA" \
             -resultBundlePath "$RESULT_BUNDLE" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
             clean test
 
       - name: Upload xcodebuild artifacts
