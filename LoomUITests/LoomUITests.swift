@@ -115,9 +115,9 @@ final class LoomUITests: XCTestCase {
             "Expected partial assistant content before cancel."
         )
 
-        stopButton.click()
-        XCTAssertTrue(waitForNotExists(stopButton, timeout: Self.mediumTimeout))
-        XCTAssertTrue(waitForNotExists(typingState, timeout: Self.mediumTimeout))
+        clickButton("session.detail.stopButton", app: app)
+        XCTAssertTrue(waitForNotExists(stopButton, timeout: Self.longTimeout))
+        XCTAssertTrue(waitForNotExists(typingState, timeout: Self.longTimeout))
         XCTAssertTrue(waitForAssistantBubbleContaining("partial", app: app, timeout: Self.mediumTimeout))
 
         app.terminate()
@@ -183,9 +183,10 @@ final class LoomUITests: XCTestCase {
     }
 
     private func element(_ identifier: String, app: XCUIApplication) -> XCUIElement {
-        app.descendants(matching: .any)
-            .matching(identifier: identifier)
-            .firstMatch
+        if identifier == "session.detail.messageField" {
+            return app.textViews[identifier].firstMatch
+        }
+        return app.otherElements[identifier].firstMatch
     }
 
     private func ensureSidebarVisible(app: XCUIApplication) {

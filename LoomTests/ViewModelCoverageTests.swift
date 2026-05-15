@@ -533,9 +533,9 @@ struct StatusViewModelCoverageTests {
     @MainActor
     func installedModelBestForTextUsesCatalogHighlights() {
         let vm = ModelsViewModel(client: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)))
-        let model = OllamaModel(tag: "qwen2.5:7b")
+        let model = OllamaModel(tag: "qwen3:8b")
 
-        #expect(vm.installedModelBestForText(for: model) == "Good for: Coding help, Structured output.")
+        #expect(vm.installedModelBestForText(for: model) == "Good for: Coding help, Reasoning.")
     }
 
     @Test
@@ -551,7 +551,7 @@ struct StatusViewModelCoverageTests {
     @MainActor
     func installedModelCompanyCountryTextUsesCatalogData() {
         let vm = ModelsViewModel(client: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)))
-        let model = OllamaModel(tag: "qwen2.5:7b")
+        let model = OllamaModel(tag: "qwen3:8b")
 
         #expect(vm.installedModelCompanyCountryText(for: model) == "Made by Qwen in China.")
     }
@@ -569,9 +569,9 @@ struct StatusViewModelCoverageTests {
     @MainActor
     func installedModelLastTrainedTextUsesCatalogData() {
         let vm = ModelsViewModel(client: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)))
-        let model = OllamaModel(tag: "qwen2.5:7b")
+        let model = OllamaModel(tag: "qwen3:8b")
 
-        #expect(vm.installedModelLastTrainedText(for: model) == "Last trained: September 2024.")
+        #expect(vm.installedModelLastTrainedText(for: model) == "Last trained: 2025.")
     }
 
     @Test
@@ -934,10 +934,10 @@ struct SessionMessagesViewModelCoverageTests {
         }
 
         UserDefaults.standard.set(
-            ["phi4:latest", "qwen2.5:7b"],
+            ["phi4:latest", "qwen3:8b"],
             forKey: LoomPreferenceKeys.modelLibraryOrder
         )
-        UserDefaults.standard.set("qwen2.5:7b", forKey: LoomPreferenceKeys.activeModelTag)
+        UserDefaults.standard.set("qwen3:8b", forKey: LoomPreferenceKeys.activeModelTag)
 
         let store = SessionStore()
         let session = try await store.createSession(title: "Session Model Ordering")
@@ -949,7 +949,7 @@ struct SessionMessagesViewModelCoverageTests {
             ollamaClient: StubOllamaClient(
                 diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
                 modelsResult: .success([
-                    OllamaModel(tag: "qwen2.5:7b"),
+                    OllamaModel(tag: "qwen3:8b"),
                     OllamaModel(tag: "mistral:7b"),
                     OllamaModel(tag: "phi4:latest")
                 ])
@@ -959,8 +959,8 @@ struct SessionMessagesViewModelCoverageTests {
 
         await vm.load()
 
-        #expect(vm.availableModelTags == ["phi4:latest", "qwen2.5:7b", "mistral:7b"])
-        #expect(vm.activeModelSelectionLabel == "Qwen 2.5 (7B)")
+        #expect(vm.availableModelTags == ["phi4:latest", "qwen3:8b", "mistral:7b"])
+        #expect(vm.activeModelSelectionLabel == "Qwen 3 (8B)")
     }
 
     @Test
@@ -982,12 +982,12 @@ struct SessionMessagesViewModelCoverageTests {
             chatClient: ScriptedChatClient([])
         )
 
-        vm.activeModelTag = "  qwen2.5:7b  "
-        #expect(vm.activeModelTag == "qwen2.5:7b")
+        vm.activeModelTag = "  qwen3:8b  "
+        #expect(vm.activeModelTag == "qwen3:8b")
         #expect(
-            UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag) == "qwen2.5:7b"
+            UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag) == "qwen3:8b"
         )
-        #expect(vm.activeModelSelectionLabel == "Qwen 2.5 (7B) (Unavailable)")
+        #expect(vm.activeModelSelectionLabel == "Qwen 3 (8B) (Unavailable)")
 
         vm.activeModelTag = "   "
         #expect(vm.activeModelTag == nil)
