@@ -472,7 +472,18 @@ final class SessionMessagesViewModel {
     }
 
     func stopGenerating() {
+        let placeholderID = generatingMessageID
         generationTask?.cancel()
+        generationTask = nil
+        generatingMessageID = nil
+        generatingMessageIndex = nil
+        isGenerating = false
+
+        if let placeholderID {
+            Task { [weak self] in
+                await self?.persistAssistantMessage(id: placeholderID, forcePersist: false)
+            }
+        }
     }
 
     func retryLastReply() async {

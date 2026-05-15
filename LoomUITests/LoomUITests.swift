@@ -21,10 +21,10 @@ final class LoomUITests: XCTestCase {
         XCTAssertTrue(element("root.detail.sessions", app: app).waitForExistence(timeout: Self.mediumTimeout))
 
         tapSidebarItem(identifier: "sidebar.models", title: "Models", app: app)
-        XCTAssertTrue(element("root.detail.models", app: app).waitForExistence(timeout: Self.mediumTimeout))
+        XCTAssertTrue(screen("screen.models", app: app).waitForExistence(timeout: Self.mediumTimeout))
 
         tapSidebarItem(identifier: "sidebar.settings", title: "Settings", app: app)
-        XCTAssertTrue(element("root.detail.settings", app: app).waitForExistence(timeout: Self.mediumTimeout))
+        XCTAssertTrue(screen("screen.settings", app: app).waitForExistence(timeout: Self.mediumTimeout))
     }
 
     func testCreateAndDeleteSessionFromToolbar() throws {
@@ -180,6 +180,10 @@ final class LoomUITests: XCTestCase {
         app.descendants(matching: .button)
             .matching(identifier: identifier)
             .firstMatch
+    }
+
+    private func screen(_ identifier: String, app: XCUIApplication) -> XCUIElement {
+        app.scrollViews[identifier].firstMatch
     }
 
     private func element(_ identifier: String, app: XCUIApplication) -> XCUIElement {
