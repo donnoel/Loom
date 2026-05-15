@@ -21,10 +21,10 @@ final class LoomUITests: XCTestCase {
         XCTAssertTrue(element("root.detail.sessions", app: app).waitForExistence(timeout: Self.mediumTimeout))
 
         tapSidebarItem(identifier: "sidebar.models", title: "Models", app: app)
-        XCTAssertTrue(screen("screen.models", app: app).waitForExistence(timeout: Self.mediumTimeout))
+        XCTAssertTrue(app.staticTexts["Model Library"].waitForExistence(timeout: Self.mediumTimeout))
 
         tapSidebarItem(identifier: "sidebar.settings", title: "Settings", app: app)
-        XCTAssertTrue(screen("screen.settings", app: app).waitForExistence(timeout: Self.mediumTimeout))
+        XCTAssertTrue(app.staticTexts["Control how Loom stays up to date and where your local session data is stored."].waitForExistence(timeout: Self.mediumTimeout))
     }
 
     func testCreateAndDeleteSessionFromToolbar() throws {
@@ -180,10 +180,6 @@ final class LoomUITests: XCTestCase {
             .firstMatch
     }
 
-    private func screen(_ identifier: String, app: XCUIApplication) -> XCUIElement {
-        app.scrollViews[identifier].firstMatch
-    }
-
     private func element(_ identifier: String, app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any)
             .matching(identifier: identifier)
@@ -277,10 +273,9 @@ final class LoomUITests: XCTestCase {
         app: XCUIApplication,
         timeout: TimeInterval
     ) -> Bool {
-        let bubbleQuery = app.descendants(matching: .any)
-            .matching(identifier: "session.message.assistant.bubble")
-            .containing(NSPredicate(format: "label CONTAINS[c] %@", text))
-        return bubbleQuery.firstMatch.waitForExistence(timeout: timeout)
+        let predicate = NSPredicate(format: "label CONTAINS[c] %@", text)
+        let matchingText = app.staticTexts.matching(predicate).firstMatch
+        return matchingText.waitForExistence(timeout: timeout)
     }
 
     private func waitForSessionDetailReady(app: XCUIApplication, timeout: TimeInterval) -> Bool {

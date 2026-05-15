@@ -148,6 +148,7 @@ final class SessionMessagesViewModel {
     private var lastStreamContext: [ChatMessage]?
     private var lastStreamPlaceholderID: UUID?
     private var generatingMessageIndex: Int?
+    private var persistedAssistantMessageIDs: Set<UUID> = []
 
     init(
         store: SessionStore,
@@ -903,6 +904,7 @@ final class SessionMessagesViewModel {
 
     private func persistAssistantMessage(id: UUID, forcePersist: Bool) async {
         guard let index = resolvedMessageIndex(for: id) else { return }
+        guard !persistedAssistantMessageIDs.contains(id) else { return }
 
         let message = messages[index]
         let hasContent = message.content.nonEmptyTrimmed != nil
@@ -917,6 +919,7 @@ final class SessionMessagesViewModel {
 
         do {
             try await store.appendMessage(message, sessionID: sessionID)
+            persistedAssistantMessageIDs.insert(id)
 
             if let onActivity {
                 await onActivity()
