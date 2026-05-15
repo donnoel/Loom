@@ -1,10 +1,10 @@
-name: Loom CI
+name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build-and-test:
@@ -14,7 +14,7 @@ jobs:
       RESULT_BUNDLE: ${{ github.workspace }}/TestResults/Loom.xcresult
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -34,42 +34,27 @@ jobs:
       - name: Resolve packages
         run: xcodebuild -resolvePackageDependencies -project Loom.xcodeproj
 
-      - name: Build for testing (macOS)
+      - name: Show environment
         run: |
-          set -eo pipefail
-          xcodebuild \
-            -project Loom.xcodeproj \
-            -scheme Loom \
-            -configuration Debug \
-            -destination "platform=macOS,arch=arm64" \
-            -derivedDataPath "$DERIVED_DATA" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
-            clean build-for-testing
+          xcode-select -p
+          xcodebuild -version
+          xcodebuild -project Loom.xcodeproj -scheme Loom -showdestinations
 
       - name: Build and test
         run: |
-          set -eo pipefail
+          set -euo pipefail
+          mkdir -p "$(dirname "$RESULT_BUNDLE")"
+          rm -rf "$RESULT_BUNDLE"
           xcodebuild \
             -project Loom.xcodeproj \
             -scheme Loom \
             -configuration Debug \
-            -destination "platform=macOS,arch=arm64" \
+            -destination 'platform=macOS,arch=arm64' \
             -derivedDataPath "$DERIVED_DATA" \
             -resultBundlePath "$RESULT_BUNDLE" \
-            -only-testing:LoomTests \
-            -skip-testing:LoomTests/StatusViewModelCoverageTests \
-            -skip-testing:LoomTests/SessionMessagesViewModelCoverageTests \
-            -parallel-testing-enabled NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
-            test-without-building
+            clean test
 
-      - name: Upload xcodebuild logs (if the job fails)
+      - name: Upload xcodebuild artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
