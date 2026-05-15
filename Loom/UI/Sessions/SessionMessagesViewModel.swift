@@ -917,14 +917,16 @@ final class SessionMessagesViewModel {
             return
         }
 
+        persistedAssistantMessageIDs.insert(id)
+
         do {
             try await store.appendMessage(message, sessionID: sessionID)
-            persistedAssistantMessageIDs.insert(id)
 
             if let onActivity {
                 await onActivity()
             }
         } catch {
+            persistedAssistantMessageIDs.remove(id)
             banner = BannerState(
                 text: "Loom couldn’t save the assistant reply.",
                 actionTitle: nil,

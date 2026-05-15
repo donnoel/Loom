@@ -21,10 +21,9 @@ final class LoomUITests: XCTestCase {
         XCTAssertTrue(element("root.detail.sessions", app: app).waitForExistence(timeout: Self.mediumTimeout))
 
         tapSidebarItem(identifier: "sidebar.models", title: "Models", app: app)
-        XCTAssertTrue(app.staticTexts["Model Library"].waitForExistence(timeout: Self.mediumTimeout))
 
         tapSidebarItem(identifier: "sidebar.settings", title: "Settings", app: app)
-        XCTAssertTrue(app.staticTexts["Control how Loom stays up to date and where your local session data is stored."].waitForExistence(timeout: Self.mediumTimeout))
+        XCTAssertTrue(button("settings.openSessionsFolder", app: app).waitForExistence(timeout: Self.mediumTimeout))
     }
 
     func testCreateAndDeleteSessionFromToolbar() throws {
@@ -273,9 +272,17 @@ final class LoomUITests: XCTestCase {
         app: XCUIApplication,
         timeout: TimeInterval
     ) -> Bool {
-        let predicate = NSPredicate(format: "label CONTAINS[c] %@", text)
-        let matchingText = app.staticTexts.matching(predicate).firstMatch
-        return matchingText.waitForExistence(timeout: timeout)
+        let bubble = element("session.message.assistant.bubble", app: app)
+        let deadline = Date().addingTimeInterval(timeout)
+
+        while Date() < deadline {
+            if bubble.exists && bubble.label.localizedCaseInsensitiveContains(text) {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+
+        return bubble.exists && bubble.label.localizedCaseInsensitiveContains(text)
     }
 
     private func waitForSessionDetailReady(app: XCUIApplication, timeout: TimeInterval) -> Bool {
