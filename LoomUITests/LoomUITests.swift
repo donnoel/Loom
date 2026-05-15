@@ -183,10 +183,9 @@ final class LoomUITests: XCTestCase {
     }
 
     private func element(_ identifier: String, app: XCUIApplication) -> XCUIElement {
-        if identifier == "session.detail.messageField" {
-            return app.textViews[identifier].firstMatch
-        }
-        return app.otherElements[identifier].firstMatch
+        app.descendants(matching: .any)
+            .matching(identifier: identifier)
+            .firstMatch
     }
 
     private func ensureSidebarVisible(app: XCUIApplication) {
