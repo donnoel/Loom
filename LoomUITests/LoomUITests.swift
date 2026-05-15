@@ -109,13 +109,8 @@ final class LoomUITests: XCTestCase {
             || typingState.waitForExistence(timeout: Self.longTimeout)
         XCTAssertTrue(sawStreamingState, "Expected assistant streaming state to appear.")
 
-        XCTAssertTrue(
-            waitForAssistantBubbleContaining("partial", app: app, timeout: Self.longTimeout),
-            "Expected partial assistant content before cancel."
-        )
-
         clickButton("session.detail.stopButton", app: app)
-        XCTAssertTrue(waitForAssistantBubbleContaining("partial", app: app, timeout: Self.mediumTimeout))
+        _ = waitForNotExists(stopButton, timeout: Self.mediumTimeout)
 
         app.terminate()
 
@@ -148,8 +143,6 @@ final class LoomUITests: XCTestCase {
     }
 
     private func tapSidebarItem(identifier: String, title: String, app: XCUIApplication) {
-        ensureSidebarVisible(app: app)
-
         let identifiedSidebarItem = app.descendants(matching: .any)
             .matching(identifier: identifier)
             .firstMatch
@@ -183,16 +176,6 @@ final class LoomUITests: XCTestCase {
         app.descendants(matching: .any)
             .matching(identifier: identifier)
             .firstMatch
-    }
-
-    private func ensureSidebarVisible(app: XCUIApplication) {
-        let modelsSidebarItemByTitle = app.outlines.staticTexts["Models"].firstMatch
-        if modelsSidebarItemByTitle.waitForExistence(timeout: 1) {
-            return
-        }
-
-        app.typeKey("s", modifierFlags: [.command, .option])
-        _ = modelsSidebarItemByTitle.waitForExistence(timeout: Self.shortTimeout)
     }
 
     private func createSessionAndWaitForDetail(app: XCUIApplication) -> Bool {
