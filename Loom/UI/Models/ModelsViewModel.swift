@@ -741,3 +741,4 @@ private actor UITestModelsStatusClient: OllamaStatusProviding {
 
     func pullModel(name: String, onProgress: @Sendable (PullProgress) -> Void) async throws {}
 }
+

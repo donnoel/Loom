@@ -996,6 +996,27 @@ private struct MarkdownTextBlockView: View {
     let markdown: String
 
     var body: some View {
+        let segments = ChatRichTextSegmentParser.parse(markdown)
+
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(Array(segments.enumerated()), id: \.offset) { item in
+                switch item.element {
+                case .markdown(let text):
+                    MarkdownInlineFragmentView(markdown: text)
+                case .heading(let level, let text):
+                    ChatSectionHeadingView(level: level, text: text)
+                case .divider:
+                    ChatSectionDividerView()
+                }
+            }
+        }
+    }
+}
+
+private struct MarkdownInlineFragmentView: View {
+    let markdown: String
+
+    var body: some View {
         let syntax = ChatDisplayFormatter.markdownSyntax(for: markdown)
 
         Group {
@@ -1008,6 +1029,58 @@ private struct MarkdownTextBlockView: View {
                 Text(markdown)
             }
         }
+        .font(LoomTheme.Typography.chatBubbleBody)
+        .lineSpacing(4)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+private struct ChatSectionHeadingView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    let level: Int
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(font)
+            .foregroundStyle(foreground)
+            .padding(.top, topPadding)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var font: Font {
+        switch min(max(level, 1), 4) {
+        case 1:
+            return .title3.weight(.semibold)
+        case 2:
+            return .headline.weight(.semibold)
+        default:
+            return .subheadline.weight(.semibold)
+        }
+    }
+
+    private var foreground: Color {
+        level <= 2
+            ? LoomTheme.textPrimary(colorScheme)
+            : LoomTheme.textPrimary(colorScheme).opacity(0.92)
+    }
+
+    private var topPadding: CGFloat {
+        level <= 2 ? 6 : 2
+    }
+}
+
+private struct ChatSectionDividerView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Rectangle()
+            .fill(LoomTheme.textMuted(colorScheme).opacity(colorScheme == .dark ? 0.28 : 0.18))
+            .frame(maxWidth: .infinity)
+            .frame(height: 1)
+            .padding(.vertical, 6)
+            .accessibilityHidden(true)
     }
 }
 
@@ -1129,6 +1202,70 @@ private struct MarkdownTableBlockView: View {
 
     private var tableBackgroundColor: Color {
         colorScheme == .dark ? Color.black.opacity(0.24) : Color.black.opacity(0.05)
+    }
+}
+
+nonisolated enum ChatRichTextSegmentParser {
+    enum Segment: Equatable {
+        case markdown(String)
+        case heading(level: Int, text: String)
+        case divider
+    }
+
+    private static let headingRegex = makeRegex("(?m)^\\s{0,3}(#{1,6})\\s+(.+?)\\s*$")
+    private static let dividerRegex = makeRegex("(?m)^\\s{0,3}(?:---+|\\*\\*\\*+|___+)\\s*$")
+
+    static func parse(_ markdown: String) -> [Segment] {
+        let lines = markdown.components(separatedBy: "\n")
+        var segments: [Segment] = []
+        var markdownBuffer: [String] = []
+
+        func flushMarkdownBuffer() {
+            guard !markdownBuffer.isEmpty else { return }
+            let text = markdownBuffer.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+            markdownBuffer.removeAll(keepingCapacity: true)
+            guard !text.isEmpty else { return }
+            segments.append(.markdown(text))
+        }
+
+        for rawLine in lines {
+            let trimmed = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if trimmed.isEmpty {
+                markdownBuffer.append("")
+                continue
+            }
+
+            if dividerRegex.firstMatch(in: trimmed, options: [], range: NSRange(trimmed.startIndex..., in: trimmed)) != nil {
+                flushMarkdownBuffer()
+                if segments.last != .divider {
+                    segments.append(.divider)
+                }
+                continue
+            }
+
+            let range = NSRange(rawLine.startIndex..., in: rawLine)
+            if let match = headingRegex.firstMatch(in: rawLine, options: [], range: range),
+               let hashesRange = Range(match.range(at: 1), in: rawLine),
+               let textRange = Range(match.range(at: 2), in: rawLine) {
+                flushMarkdownBuffer()
+                let level = rawLine[hashesRange].count
+                let headingText = rawLine[textRange].trimmingCharacters(in: .whitespacesAndNewlines)
+                if !headingText.isEmpty {
+                    segments.append(.heading(level: level, text: headingText))
+                }
+                continue
+            }
+
+            markdownBuffer.append(rawLine)
+        }
+
+        flushMarkdownBuffer()
+        return segments.isEmpty ? [.markdown(markdown)] : segments
+    }
+
+    private static func makeRegex(_ pattern: String) -> NSRegularExpression {
+        try! NSRegularExpression(pattern: pattern)
     }
 }
 
