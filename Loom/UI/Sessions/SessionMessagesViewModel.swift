@@ -5,6 +5,29 @@ import PDFKit
 @MainActor
 @Observable
 final class SessionMessagesViewModel {
+    nonisolated enum AssistantQuickTransform: String, CaseIterable, Sendable {
+        case summarize
+        case simplify
+        case professional
+        case checklist
+
+        func prompt(for source: String) -> String {
+            let instruction: String
+            switch self {
+            case .summarize:
+                instruction = "Summarize the following text in a concise, clear way."
+            case .simplify:
+                instruction = "Rewrite the following text in simpler plain language while preserving the meaning."
+            case .professional:
+                instruction = "Rewrite the following text in a more professional tone while preserving the meaning."
+            case .checklist:
+                instruction = "Turn the following text into a practical checklist with short actionable items."
+            }
+
+            return "\(instruction)\n\nText:\n\"\"\"\n\(source)\n\"\"\""
+        }
+    }
+
     struct PendingAttachment: Identifiable, Equatable, Sendable {
         let id: UUID
         let fileName: String
@@ -122,6 +145,7 @@ final class SessionMessagesViewModel {
     private static let uiTestChatScenarioDefaultsKey = "loom.uiTest.chatScenario"
 
     var messages: [ChatMessage] = []
+    var scratchpadText: String = ""
     var draft: String = ""
     var isGenerating: Bool = false
     var generationTask: Task<Void, Never>?
@@ -149,6 +173,7 @@ final class SessionMessagesViewModel {
     private var lastStreamPlaceholderID: UUID?
     private var generatingMessageIndex: Int?
     private var persistedAssistantMessageIDs: Set<UUID> = []
+    private var scratchpadSaveTask: Task<Void, Never>?
 
     init(
         store: SessionStore,
@@ -325,7 +350,30 @@ final class SessionMessagesViewModel {
             generatingMessageIndex = nil
         }
 
+        do {
+            scratchpadText = try await store.loadScratchpad(sessionID: sessionID)
+        } catch {
+            scratchpadText = ""
+        }
+
         await refreshInstalledModels()
+    }
+
+    func updateScratchpadText(_ text: String) {
+        scratchpadText = text
+        scratchpadSaveTask?.cancel()
+        let latest = text
+        scratchpadSaveTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+            await self?.persistScratchpad(latest)
+        }
+    }
+
+    func flushScratchpad() async {
+        scratchpadSaveTask?.cancel()
+        scratchpadSaveTask = nil
+        await persistScratchpad(scratchpadText)
     }
 
     func loadFullHistory() async {
@@ -419,14 +467,81 @@ final class SessionMessagesViewModel {
             return
         }
 
-        let userMessage = ChatMessage(role: .user, content: text)
         let attachmentsForThisTurn = pendingAttachments
+        let sent = await submitUserTurn(
+            text: text,
+            modelTag: activeModelTag,
+            attachmentsForThisTurn: attachmentsForThisTurn,
+            clearDraftOnSuccess: true,
+            clearPendingAttachmentsOnSuccess: true
+        )
+        guard sent else { return }
+    }
+
+    func runAssistantQuickTransform(
+        from sourceMessageID: UUID,
+        transform: AssistantQuickTransform
+    ) async {
+        guard !isGenerating, !isPreparingGeneration else { return }
+        isPreparingGeneration = true
+        defer { isPreparingGeneration = false }
+        synchronizeActiveModelSelectionFromPreferences()
+
+        guard let sourceMessage = messages.first(where: { $0.id == sourceMessageID }),
+              sourceMessage.role == .assistant else {
+            return
+        }
+
+        let sourceText = sourceMessage.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !sourceText.isEmpty else { return }
+
+        guard let activeModelTag else {
+            banner = BannerState(
+                text: "Choose a model to chat with.",
+                actionTitle: "Choose Model",
+                action: .browseModels
+            )
+            return
+        }
+
+        let diagnosis = await ollamaClient.diagnose()
+        guard diagnosis.isRunning else {
+            banner = BannerState(
+                text: "Loom can’t reach Ollama. Start it to continue.",
+                actionTitle: diagnosis.isInstalled ? "Start Ollama" : "Install Ollama…",
+                action: .openOrInstallOllama
+            )
+            return
+        }
+
+        let prompt = transform.prompt(for: sourceText)
+        _ = await submitUserTurn(
+            text: prompt,
+            modelTag: activeModelTag,
+            attachmentsForThisTurn: [],
+            clearDraftOnSuccess: false,
+            clearPendingAttachmentsOnSuccess: false
+        )
+    }
+
+    private func submitUserTurn(
+        text: String,
+        modelTag: String,
+        attachmentsForThisTurn: [PendingAttachment],
+        clearDraftOnSuccess: Bool,
+        clearPendingAttachmentsOnSuccess: Bool
+    ) async -> Bool {
+        let userMessage = ChatMessage(role: .user, content: text)
 
         do {
             try await store.appendMessage(userMessage, sessionID: sessionID)
             messages.append(userMessage)
-            draft = ""
-            pendingAttachments = []
+            if clearDraftOnSuccess {
+                draft = ""
+            }
+            if clearPendingAttachmentsOnSuccess {
+                pendingAttachments = []
+            }
             banner = nil
 
             if let onActivity {
@@ -438,7 +553,7 @@ final class SessionMessagesViewModel {
                 actionTitle: nil,
                 action: nil
             )
-            return
+            return false
         }
 
         let assistantPlaceholder = ChatMessage(role: .assistant, content: "")
@@ -449,7 +564,7 @@ final class SessionMessagesViewModel {
 
         let historyLimit = historyContextLevel.messageLimit
         var context: [ChatMessage]
-        if didSwitchModels(from: lastStreamModel, to: activeModelTag) {
+        if didSwitchModels(from: lastStreamModel, to: modelTag) {
             context = contextMessagesForModelSwitch(limit: historyLimit)
         } else {
             context = contextMessages(excluding: assistantPlaceholder.id, limit: historyLimit)
@@ -460,16 +575,17 @@ final class SessionMessagesViewModel {
         ) {
             context.append(attachmentContext)
         }
-        lastStreamModel = activeModelTag
-        persistLastStreamModel(activeModelTag)
+        lastStreamModel = modelTag
+        persistLastStreamModel(modelTag)
         lastStreamContext = context
         lastStreamPlaceholderID = assistantPlaceholder.id
 
         startStreamingReply(
-            model: activeModelTag,
+            model: modelTag,
             placeholderID: assistantPlaceholder.id,
             context: context
         )
+        return true
     }
 
     func stopGenerating() {
@@ -929,6 +1045,18 @@ final class SessionMessagesViewModel {
             persistedAssistantMessageIDs.remove(id)
             banner = BannerState(
                 text: "Loom couldn’t save the assistant reply.",
+                actionTitle: nil,
+                action: nil
+            )
+        }
+    }
+
+    private func persistScratchpad(_ text: String) async {
+        do {
+            try await store.saveScratchpad(text, sessionID: sessionID)
+        } catch {
+            banner = BannerState(
+                text: "Loom couldn’t save your scratchpad notes.",
                 actionTitle: nil,
                 action: nil
             )

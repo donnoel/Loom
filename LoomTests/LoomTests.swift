@@ -254,6 +254,37 @@ struct SessionStoreTests {
         try await store.deleteSession(id: session.id)
         #expect(UserDefaults.standard.string(forKey: modelKey) == nil)
     }
+
+    @Test
+    func scratchpadPersistsAndLoadsBySession() async throws {
+        let store = SessionStore()
+        let first = try await store.createSession(title: "Scratch One")
+        let second = try await store.createSession(title: "Scratch Two")
+        defer {
+            cleanupSessionFolder(id: first.id)
+            cleanupSessionFolder(id: second.id)
+        }
+
+        try await store.saveScratchpad("First session notes", sessionID: first.id)
+        try await store.saveScratchpad("Second session notes", sessionID: second.id)
+
+        let loadedFirst = try await store.loadScratchpad(sessionID: first.id)
+        let loadedSecond = try await store.loadScratchpad(sessionID: second.id)
+
+        #expect(loadedFirst == "First session notes")
+        #expect(loadedSecond == "Second session notes")
+    }
+
+    @Test
+    func loadScratchpadReturnsEmptyForMissingFile() async throws {
+        let store = SessionStore()
+        let session = try await store.createSession(title: "No Scratchpad Yet")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let loaded = try await store.loadScratchpad(sessionID: session.id)
+
+        #expect(loaded.isEmpty)
+    }
 }
 
 struct LoomStatusSnapshotTests {

@@ -11,18 +11,30 @@ final class RootViewModel {
     }
 
     private let store: SessionStore
+    private let searchService: SessionSearchService
     private let log = Logger(subsystem: "com.loom.app", category: "RootViewModel")
 
     var sessions: [Session] = []
     var selectedSessionID: Session.ID?
     var sidebarBanner: SidebarBannerState?
     var searchQuery: String = ""
+    var globalSearchResults: [SessionSearchResult] = []
+    var isSearchingGlobally: Bool = false
+    private var searchGeneration: UInt64 = 0
+
+    var activeSessions: [Session] {
+        sessions.filter { !$0.metadata.isArchived }
+    }
+
+    var archivedSessions: [Session] {
+        sessions.filter { $0.metadata.isArchived }
+    }
 
     var filteredSessions: [Session] {
         let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return sessions }
+        guard !query.isEmpty else { return activeSessions }
 
-        return sessions.filter { session in
+        return activeSessions.filter { session in
             if session.metadata.title.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil {
                 return true
             }
@@ -35,6 +47,7 @@ final class RootViewModel {
 
     init(store: SessionStore) {
         self.store = store
+        self.searchService = SessionSearchService(store: store)
     }
 
     func load() async {
@@ -43,10 +56,10 @@ final class RootViewModel {
             sessions = sortSessions(items)
             sidebarBanner = nil
             if selectedSessionID == nil {
-                selectedSessionID = sessions.first?.id
+                selectedSessionID = defaultSelectionID(from: sessions)
             } else if let selectedSessionID,
                       !sessions.contains(where: { $0.id == selectedSessionID }) {
-                self.selectedSessionID = sessions.first?.id
+                self.selectedSessionID = defaultSelectionID(from: sessions)
             }
         } catch {
             sessions = []
@@ -55,6 +68,28 @@ final class RootViewModel {
                 actionTitle: "Reload"
             )
         }
+
+        await refreshGlobalSearchResults()
+    }
+
+    func refreshGlobalSearchResults() async {
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        searchGeneration &+= 1
+        let currentGeneration = searchGeneration
+
+        guard !query.isEmpty else {
+            globalSearchResults = []
+            isSearchingGlobally = false
+            return
+        }
+
+        isSearchingGlobally = true
+        let sessionSnapshot = sessions
+        let results = await searchService.search(query: query, in: sessionSnapshot)
+
+        guard currentGeneration == searchGeneration else { return }
+        globalSearchResults = results
+        isSearchingGlobally = false
     }
 
     func newSession() async {
@@ -152,6 +187,24 @@ final class RootViewModel {
         }
     }
 
+    func toggleArchived(id: Session.ID) async {
+        guard var session = sessions.first(where: { $0.id == id }) else { return }
+        session.metadata.isArchived.toggle()
+
+        do {
+            try await store.updateMetadata(session.metadata, for: id)
+            let keepSelected = selectedSessionID
+            await load()
+            selectedSessionID = keepSelected ?? defaultSelectionID(from: sessions)
+        } catch {
+            log.error("Failed to update archived state for session \(id.uuidString, privacy: .public): \(String(describing: error), privacy: .public)")
+            sidebarBanner = SidebarBannerState(
+                text: "Loom couldn’t update this session. Try again.",
+                actionTitle: "Reload"
+            )
+        }
+    }
+
     func updateTags(id: Session.ID, tags: [String]) async {
         guard var session = sessions.first(where: { $0.id == id }) else { return }
         guard session.metadata.tags != tags else { return }
@@ -173,10 +226,20 @@ final class RootViewModel {
 
     private func sortSessions(_ input: [Session]) -> [Session] {
         input.sorted { lhs, rhs in
+            if lhs.metadata.isArchived != rhs.metadata.isArchived {
+                return !lhs.metadata.isArchived && rhs.metadata.isArchived
+            }
             if lhs.metadata.isPinned != rhs.metadata.isPinned {
                 return lhs.metadata.isPinned && !rhs.metadata.isPinned
             }
             return lhs.metadata.updatedAt > rhs.metadata.updatedAt
         }
+    }
+
+    private func defaultSelectionID(from sessions: [Session]) -> Session.ID? {
+        if let firstActive = sessions.first(where: { !$0.metadata.isArchived }) {
+            return firstActive.id
+        }
+        return sessions.first?.id
     }
 }

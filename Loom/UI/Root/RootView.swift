@@ -218,6 +218,8 @@ struct RootView: View {
     @State private var isShowingStatusPopover: Bool = false
     @State private var renameSessionID: Session.ID?
     @State private var renameDraft: String = ""
+    @State private var searchJumpMessageID: ChatMessage.ID?
+    @State private var isShowingArchivedSessions: Bool = false
 
     private static let exportDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -324,38 +326,85 @@ struct RootView: View {
             Section {
                 newSessionSidebarRow
 
-                if sessionsViewModel.filteredSessions.isEmpty {
-                    Text("No chats yet")
-                        .font(LoomTheme.Typography.body)
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 4)
-                        .listRowBackground(Color.clear)
+                if isGlobalSearchActive {
+                    globalSearchContent
                 } else {
-                    ForEach(sessionsViewModel.filteredSessions) { session in
-                        sessionSidebarRow(session)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                selectedSidebarSelection = .session(session.id)
-                            }
-                            .contextMenu {
-                                Button("Rename") {
-                                    beginRename(session)
-                                }
-
-                                Button(session.metadata.isPinned ? "Unpin" : "Pin") {
-                                    Task { await sessionsViewModel.togglePinned(id: session.id) }
-                                }
-
-                                Divider()
-
-                                Button(role: .destructive) {
-                                    Task { await deleteSession(id: session.id) }
-                                } label: {
-                                    Text("Delete")
-                                }
-                            }
+                    if sessionsViewModel.activeSessions.isEmpty {
+                        Text(sessionsViewModel.archivedSessions.isEmpty ? "No chats yet" : "No active chats")
+                            .font(LoomTheme.Typography.body)
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 4)
                             .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
+                    } else {
+                        ForEach(sessionsViewModel.activeSessions) { session in
+                            sessionSidebarRow(session)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    searchJumpMessageID = nil
+                                    selectedSidebarSelection = .session(session.id)
+                                }
+                                .contextMenu {
+                                    Button("Rename") {
+                                        beginRename(session)
+                                    }
+
+                                    Button(session.metadata.isPinned ? "Unpin" : "Pin") {
+                                        Task { await sessionsViewModel.togglePinned(id: session.id) }
+                                    }
+
+                                    Button("Archive") {
+                                        Task { await sessionsViewModel.toggleArchived(id: session.id) }
+                                    }
+
+                                    Divider()
+
+                                    Button(role: .destructive) {
+                                        Task { await deleteSession(id: session.id) }
+                                    } label: {
+                                        Text("Delete")
+                                    }
+                                }
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                        }
+                    }
+
+                    if !sessionsViewModel.archivedSessions.isEmpty {
+                        archivedDisclosureRow
+
+                        if isShowingArchivedSessions {
+                            ForEach(sessionsViewModel.archivedSessions) { session in
+                                sessionSidebarRow(session)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        searchJumpMessageID = nil
+                                        selectedSidebarSelection = .session(session.id)
+                                    }
+                                    .contextMenu {
+                                        Button("Rename") {
+                                            beginRename(session)
+                                        }
+
+                                        Button("Unarchive") {
+                                            Task { await sessionsViewModel.toggleArchived(id: session.id) }
+                                        }
+
+                                        Button(session.metadata.isPinned ? "Unpin" : "Pin") {
+                                            Task { await sessionsViewModel.togglePinned(id: session.id) }
+                                        }
+
+                                        Divider()
+
+                                        Button(role: .destructive) {
+                                            Task { await deleteSession(id: session.id) }
+                                        } label: {
+                                            Text("Delete")
+                                        }
+                                    }
+                                    .listRowBackground(Color.clear)
+                                    .listRowSeparator(.hidden)
+                            }
+                        }
                     }
                 }
             } header: {
@@ -365,6 +414,7 @@ struct RootView: View {
 
             Section {
                 destinationSidebarRow(.models)
+                destinationSidebarRow(.compare)
                 destinationSidebarRow(.info)
                 destinationSidebarRow(.status)
                 destinationSidebarRow(.trust)
@@ -372,11 +422,100 @@ struct RootView: View {
             }
         }
         .searchable(text: $sessionsViewModel.searchQuery, placement: .sidebar)
+        .onChange(of: sessionsViewModel.searchQuery) { _, _ in
+            Task {
+                await sessionsViewModel.refreshGlobalSearchResults()
+            }
+        }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
         .background(colorScheme == .dark ? Color(red: 0.10, green: 0.10, blue: 0.11) : Color(red: 0.95, green: 0.95, blue: 0.96))
         .navigationSplitViewColumnWidth(min: 208, ideal: 220, max: 232)
         .navigationTitle("")
+    }
+
+    @ViewBuilder
+    private var globalSearchContent: some View {
+        if sessionsViewModel.isSearchingGlobally {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Searching all chats…")
+                    .font(LoomTheme.Typography.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.vertical, 4)
+            .listRowBackground(Color.clear)
+        } else if sessionsViewModel.globalSearchResults.isEmpty {
+            Text("No matches found")
+                .font(LoomTheme.Typography.body)
+                .foregroundStyle(.secondary)
+                .padding(.vertical, 4)
+                .listRowBackground(Color.clear)
+        } else {
+            ForEach(sessionsViewModel.globalSearchResults) { result in
+                globalSearchResultRow(result)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        openSearchResult(result)
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            }
+        }
+    }
+
+    private func globalSearchResultRow(_ result: SessionSearchResult) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(result.sessionTitle)
+                .font(LoomTheme.Typography.bodyStrong)
+                .lineLimit(1)
+
+            Text(result.snippet)
+                .font(LoomTheme.Typography.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+
+            HStack(spacing: 6) {
+                Text(result.source == .title ? "Title" : "Message")
+                if let role = result.messageRole {
+                    Text(role.rawValue.capitalized)
+                }
+            }
+            .font(LoomTheme.Typography.captionTiny)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel(for: result))
+        .accessibilityHint("Open chat and jump to this match")
+    }
+
+    private var archivedDisclosureRow: some View {
+        let title = "Archived (\(sessionsViewModel.archivedSessions.count))"
+        return Button {
+            withAnimation(.easeInOut(duration: 0.16)) {
+                isShowingArchivedSessions.toggle()
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: isShowingArchivedSessions ? "chevron.down" : "chevron.right")
+                    .font(LoomTheme.Typography.captionTiny)
+                    .foregroundStyle(.secondary)
+                Text(title)
+                    .font(LoomTheme.Typography.caption)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 5)
+            .padding(.horizontal, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isShowingArchivedSessions ? "Hide archived sessions" : "Show archived sessions")
+        .loomSidebarItem(selected: false)
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
     }
 
     private var newSessionSidebarRow: some View {
@@ -409,6 +548,10 @@ struct RootView: View {
             )
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("root.detail.models")
+        case .destination(.compare):
+            CompareModeView()
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("root.detail.compare")
         case .destination(.status):
             AIChatbotStatusView()
                 .accessibilityElement(children: .contain)
@@ -438,6 +581,7 @@ struct RootView: View {
             SessionDetailView(
                 session: session,
                 store: store,
+                initialScrollMessageID: searchJumpMessageID,
                 browseModels: {
                     selectedSidebarSelection = .destination(.models)
                 },
@@ -467,6 +611,23 @@ struct RootView: View {
 
     private var selectedSession: Session? {
         sessionsViewModel.session(for: selectedSessionID)
+    }
+
+    private var isGlobalSearchActive: Bool {
+        !sessionsViewModel.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func openSearchResult(_ result: SessionSearchResult) {
+        searchJumpMessageID = result.messageID
+        sessionsViewModel.selectedSessionID = result.sessionID
+        selectedSidebarSelection = .session(result.sessionID)
+    }
+
+    private func accessibilityLabel(for result: SessionSearchResult) -> String {
+        if let role = result.messageRole {
+            return "\(result.sessionTitle), \(result.source == .title ? "title match" : "message match"), \(role.rawValue), \(result.snippet)"
+        }
+        return "\(result.sessionTitle), \(result.source == .title ? "title match" : "message match"), \(result.snippet)"
     }
 
     private var showsSessionToolbarActions: Bool {
@@ -557,6 +718,12 @@ struct RootView: View {
                     .foregroundStyle(LoomTheme.textSecondary(colorScheme))
             }
 
+            if session.metadata.isArchived {
+                Image(systemName: "archivebox")
+                    .font(LoomTheme.Typography.captionTiny)
+                    .foregroundStyle(LoomTheme.textSecondary(colorScheme))
+            }
+
             Spacer(minLength: 0)
         }
         .padding(.vertical, 6)
@@ -631,7 +798,7 @@ struct RootView: View {
             return
         }
 
-        if let first = sessionsViewModel.sessions.first {
+        if let first = sessionsViewModel.activeSessions.first ?? sessionsViewModel.sessions.first {
             sessionsViewModel.selectedSessionID = first.id
             selectedSidebarSelection = .session(first.id)
             return

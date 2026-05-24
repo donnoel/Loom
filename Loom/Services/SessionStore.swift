@@ -214,6 +214,20 @@ actor SessionStore {
         return decodeMessages(from: data)
     }
 
+    func loadScratchpad(sessionID: UUID) throws -> String {
+        let url = try LoomPaths.sessionScratchpadURL(for: sessionID)
+        guard FileManager.default.fileExists(atPath: url.path) else { return "" }
+
+        let data = try Data(contentsOf: url)
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    func saveScratchpad(_ text: String, sessionID: UUID) throws {
+        let url = try LoomPaths.sessionScratchpadURL(for: sessionID)
+        let data = Data(text.utf8)
+        try data.write(to: url, options: [.atomic])
+    }
+
     func loadRecentMessages(sessionID: UUID, limit: Int = 200) throws -> [ChatMessage] {
         let spID = signposter.makeSignpostID()
         let state = signposter.beginInterval("loadRecentMessages", id: spID)

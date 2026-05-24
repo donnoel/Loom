@@ -1141,6 +1141,45 @@ struct SessionMessagesViewModelCoverageTests {
 
     @Test
     @MainActor
+    func quickTransformCreatesDerivedTurnWithoutEditingOriginalAssistantMessage() async throws {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Quick Transform")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let originalAssistant = ChatMessage(role: .assistant, content: "This is a long explanation with several details.")
+        try await store.appendMessage(originalAssistant, sessionID: session.id)
+
+        let chatClient = ScriptedChatClient([.complete(["Summary output"])])
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)),
+            chatClient: chatClient
+        )
+
+        await vm.load()
+        await vm.runAssistantQuickTransform(from: originalAssistant.id, transform: .summarize)
+        await waitUntil { !vm.isGenerating }
+
+        #expect(vm.messages.count == 3)
+        #expect(vm.messages.first?.id == originalAssistant.id)
+        #expect(vm.messages[1].role == .user)
+        #expect(vm.messages[1].content.contains("Summarize the following text"))
+        #expect(vm.messages[2].role == .assistant)
+        #expect(vm.messages[2].content == "Summary output")
+
+        let persisted = try await store.loadMessages(sessionID: session.id)
+        #expect(persisted.count == 3)
+        #expect(persisted.first?.content == originalAssistant.content)
+    }
+
+    @Test
+    @MainActor
     func retryLastReplyConcurrentCallsSubmitOnlyOnce() async throws {
         clearModelSelectionPreference()
         defer { clearModelSelectionPreference() }
@@ -1820,6 +1859,82 @@ struct RootViewModelCoverageTests {
 
     @Test
     @MainActor
+    func archiveStatePersistsThroughStore() async throws {
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Archive Me")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let vm = RootViewModel(store: store)
+        await vm.load()
+
+        await vm.toggleArchived(id: session.id)
+        await vm.load()
+
+        #expect(vm.session(for: session.id)?.metadata.isArchived == true)
+    }
+
+    @Test
+    @MainActor
+    func defaultListsHideArchivedSessionsFromActiveList() async throws {
+        let store = SessionStore()
+        let active = try await store.createSession(title: "Active")
+        let archived = try await store.createSession(title: "Archived")
+        defer {
+            cleanupSessionFolder(id: active.id)
+            cleanupSessionFolder(id: archived.id)
+        }
+
+        var archivedMetadata = archived.metadata
+        archivedMetadata.isArchived = true
+        try await store.updateMetadata(archivedMetadata, for: archived.id)
+
+        let vm = RootViewModel(store: store)
+        await vm.load()
+
+        #expect(vm.activeSessions.contains(where: { $0.id == active.id }))
+        #expect(!vm.activeSessions.contains(where: { $0.id == archived.id }))
+        #expect(vm.archivedSessions.contains(where: { $0.id == archived.id }))
+    }
+
+    @Test
+    @MainActor
+    func sortingKeepsPinnedActiveFirstAndArchivedAfterActive() async throws {
+        let store = SessionStore()
+        let pinnedActive = try await store.createSession(title: "Pinned Active")
+        let recentActive = try await store.createSession(title: "Recent Active")
+        let archivedPinned = try await store.createSession(title: "Archived Pinned")
+        defer {
+            cleanupSessionFolder(id: pinnedActive.id)
+            cleanupSessionFolder(id: recentActive.id)
+            cleanupSessionFolder(id: archivedPinned.id)
+        }
+
+        var pinnedActiveMetadata = pinnedActive.metadata
+        pinnedActiveMetadata.isPinned = true
+        pinnedActiveMetadata.updatedAt = Date(timeIntervalSinceNow: -7200)
+        try await store.updateMetadata(pinnedActiveMetadata, for: pinnedActive.id)
+
+        var recentActiveMetadata = recentActive.metadata
+        recentActiveMetadata.updatedAt = Date()
+        try await store.updateMetadata(recentActiveMetadata, for: recentActive.id)
+
+        var archivedPinnedMetadata = archivedPinned.metadata
+        archivedPinnedMetadata.isPinned = true
+        archivedPinnedMetadata.isArchived = true
+        archivedPinnedMetadata.updatedAt = Date(timeIntervalSinceNow: 3600)
+        try await store.updateMetadata(archivedPinnedMetadata, for: archivedPinned.id)
+
+        let vm = RootViewModel(store: store)
+        await vm.load()
+
+        #expect(vm.activeSessions.first?.id == pinnedActive.id)
+        #expect(vm.activeSessions.dropFirst().first?.id == recentActive.id)
+        #expect(vm.archivedSessions.first?.id == archivedPinned.id)
+        #expect(vm.sessions.last?.id == archivedPinned.id)
+    }
+
+    @Test
+    @MainActor
     func deleteSelectedRemovesSessionAndKeepsSelectionValid() async throws {
         let store = SessionStore()
         let first = try await store.createSession(title: "First")
@@ -1861,5 +1976,70 @@ struct RootViewModelCoverageTests {
         await vm.touchSession(id: session.id)
 
         #expect(vm.session(for: session.id)?.metadata.title == "Weekend Trip")
+    }
+}
+
+@Suite(.serialized)
+struct CompareModeViewModelCoverageTests {
+    @Test
+    @MainActor
+    func compareRejectsSameModelSelection() async {
+        let vm = CompareModeViewModel(
+            ollamaClient: StubOllamaClient(
+                diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+                modelsResult: .success([OllamaModel(tag: "qwen3:8b"), OllamaModel(tag: "mistral:7b")])
+            ),
+            chatClient: ScriptedChatClient([])
+        )
+
+        await vm.loadModels()
+        vm.prompt = "Explain this"
+        vm.leftModelTag = "qwen3:8b"
+        vm.rightModelTag = "qwen3:8b"
+
+        await vm.runCompare()
+
+        #expect(vm.bannerText == "Choose two different models to compare.")
+        #expect(vm.leftState == .idle)
+        #expect(vm.rightState == .idle)
+    }
+
+    @Test
+    @MainActor
+    func compareRunsTwoModelsAndRecordsIndependentResults() async {
+        let chatClient = ScriptedChatClient([
+            .complete(["Left answer"]),
+            .fail([""], .serverError("Right failed"))
+        ])
+
+        let vm = CompareModeViewModel(
+            ollamaClient: StubOllamaClient(
+                diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+                modelsResult: .success([OllamaModel(tag: "qwen3:8b"), OllamaModel(tag: "mistral:7b")])
+            ),
+            chatClient: chatClient
+        )
+
+        await vm.loadModels()
+        vm.prompt = "Compare approaches"
+        vm.leftModelTag = "qwen3:8b"
+        vm.rightModelTag = "mistral:7b"
+
+        await vm.runCompare()
+
+        if case .success(let left) = vm.leftState {
+            #expect(left == "Left answer")
+        } else {
+            Issue.record("Expected left side success")
+        }
+
+        if case .failure(let rightError) = vm.rightState {
+            #expect(rightError.contains("Right failed"))
+        } else {
+            Issue.record("Expected right side failure")
+        }
+
+        let requests = await chatClient.readRecordedRequests()
+        #expect(requests.count == 2)
     }
 }

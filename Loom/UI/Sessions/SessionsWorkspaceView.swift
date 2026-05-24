@@ -24,6 +24,7 @@ struct SessionDetailView: View {
 
     let session: Session
     let store: SessionStore
+    let initialScrollMessageID: ChatMessage.ID?
     let browseModels: () -> Void
     let openOrInstallOllama: () -> Void
     let onActivity: () async -> Void
@@ -48,12 +49,14 @@ struct SessionDetailView: View {
     init(
         session: Session,
         store: SessionStore,
+        initialScrollMessageID: ChatMessage.ID? = nil,
         browseModels: @escaping () -> Void,
         openOrInstallOllama: @escaping () -> Void,
         onActivity: @escaping () async -> Void
     ) {
         self.session = session
         self.store = store
+        self.initialScrollMessageID = initialScrollMessageID
         self.browseModels = browseModels
         self.openOrInstallOllama = openOrInstallOllama
         self.onActivity = onActivity
@@ -104,6 +107,14 @@ struct SessionDetailView: View {
                                             && message.content.isEmpty,
                                         onRegenerate: message.role == .assistant ? {
                                             Task { await vm.retryLastReply() }
+                                        } : nil,
+                                        onQuickTransform: message.role == .assistant ? { transform in
+                                            Task {
+                                                await vm.runAssistantQuickTransform(
+                                                    from: message.id,
+                                                    transform: transform
+                                                )
+                                            }
                                         } : nil
                                     )
                                     .equatable()
@@ -148,8 +159,23 @@ struct SessionDetailView: View {
                         if !didInitialScroll {
                             didInitialScroll = true
                             DispatchQueue.main.async {
-                                scrollToBottom(proxy)
+                                if let initialScrollMessageID,
+                                   vm.messages.contains(where: { $0.id == initialScrollMessageID }) {
+                                    proxy.scrollTo(initialScrollMessageID, anchor: .center)
+                                } else {
+                                    scrollToBottom(proxy)
+                                }
                             }
+                        }
+                    }
+                    .onChange(of: initialScrollMessageID) { _, newValue in
+                        guard let newValue,
+                              vm.messages.contains(where: { $0.id == newValue }) else {
+                            return
+                        }
+
+                        DispatchQueue.main.async {
+                            proxy.scrollTo(newValue, anchor: .center)
                         }
                     }
 
@@ -175,6 +201,8 @@ struct SessionDetailView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
+                    scratchpadSection
+
                     if !vm.pendingAttachments.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
@@ -462,6 +490,49 @@ struct SessionDetailView: View {
             stopDictationIfNeeded()
             speechSynthesizer.stopSpeaking(at: .immediate)
             vm.stopGenerating()
+            Task {
+                await vm.flushScratchpad()
+            }
+        }
+    }
+
+    private var scratchpadSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Scratchpad")
+                .font(LoomTheme.Typography.captionStrong)
+                .foregroundStyle(.secondary)
+
+            ZStack(alignment: .topLeading) {
+                if vm.scratchpadText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("Capture quick notes, conclusions, or takeaways for this session.")
+                        .font(LoomTheme.Typography.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 10)
+                        .allowsHitTesting(false)
+                }
+
+                TextEditor(
+                    text: Binding(
+                        get: { vm.scratchpadText },
+                        set: { vm.updateScratchpadText($0) }
+                    )
+                )
+                .font(LoomTheme.Typography.caption)
+                .scrollContentBackground(.hidden)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .frame(minHeight: 90, maxHeight: 110)
+                .accessibilityIdentifier("session.detail.scratchpad")
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.04) : Color.black.opacity(0.03))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+            )
         }
     }
 
@@ -777,6 +848,7 @@ private struct MessageRowView: View, Equatable {
     let message: ChatMessage
     let isThinking: Bool
     let onRegenerate: (() -> Void)?
+    let onQuickTransform: ((SessionMessagesViewModel.AssistantQuickTransform) -> Void)?
 
     static func == (lhs: MessageRowView, rhs: MessageRowView) -> Bool {
         lhs.message == rhs.message && lhs.isThinking == rhs.isThinking
@@ -793,7 +865,8 @@ private struct MessageRowView: View, Equatable {
                     MessageContentView(
                         content: message.content,
                         role: message.role,
-                        onRegenerate: onRegenerate
+                        onRegenerate: onRegenerate,
+                        onQuickTransform: onQuickTransform
                     )
                 }
             }
@@ -954,6 +1027,7 @@ private struct MessageContentView: View {
     let content: String
     let role: ChatMessage.Role
     let onRegenerate: (() -> Void)?
+    let onQuickTransform: ((SessionMessagesViewModel.AssistantQuickTransform) -> Void)?
 
     var body: some View {
         let displayContent = ChatDisplayFormatter.format(content)
@@ -973,12 +1047,31 @@ private struct MessageContentView: View {
         }
         .textSelection(.enabled)
         .contextMenu {
-            Button("Copy") {
+            Button("Copy as Plain Text") {
+                copyPlainTextToPasteboard(displayContent)
+            }
+
+            Button("Copy as Markdown") {
                 copyTextToPasteboard(displayContent)
             }
 
             if role == .assistant,
-               let onRegenerate {
+               let onRegenerate,
+               let onQuickTransform {
+                Divider()
+                Button("Summarize") {
+                    onQuickTransform(.summarize)
+                }
+                Button("Simplify") {
+                    onQuickTransform(.simplify)
+                }
+                Button("Rewrite in Professional Tone") {
+                    onQuickTransform(.professional)
+                }
+                Button("Turn into Checklist") {
+                    onQuickTransform(.checklist)
+                }
+
                 Divider()
                 Button("Regenerate", action: onRegenerate)
             }
@@ -990,6 +1083,21 @@ private struct MessageContentView: View {
 private func copyTextToPasteboard(_ text: String) {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(text, forType: .string)
+}
+
+@MainActor
+private func copyPlainTextToPasteboard(_ text: String) {
+    if let attributed = try? AttributedString(
+        markdown: text,
+        options: AttributedString.MarkdownParsingOptions(
+            interpretedSyntax: ChatDisplayFormatter.markdownSyntax(for: text)
+        )
+    ) {
+        copyTextToPasteboard(String(attributed.characters))
+        return
+    }
+
+    copyTextToPasteboard(text)
 }
 
 private struct MarkdownTextBlockView: View {

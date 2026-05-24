@@ -9,6 +9,7 @@ nonisolated struct Session: Identifiable, Hashable, Codable, Sendable {
         var updatedAt: Date
         var tags: [String]
         var isPinned: Bool
+        var isArchived: Bool
 
         enum CodingKeys: String, CodingKey {
             case title
@@ -16,6 +17,7 @@ nonisolated struct Session: Identifiable, Hashable, Codable, Sendable {
             case updatedAt
             case tags
             case isPinned
+            case isArchived
         }
 
         init(
@@ -23,13 +25,15 @@ nonisolated struct Session: Identifiable, Hashable, Codable, Sendable {
             createdAt: Date = Date(),
             updatedAt: Date = Date(),
             tags: [String] = [],
-            isPinned: Bool = false
+            isPinned: Bool = false,
+            isArchived: Bool = false
         ) {
             self.title = title
             self.createdAt = createdAt
             self.updatedAt = updatedAt
             self.tags = tags
             self.isPinned = isPinned
+            self.isArchived = isArchived
         }
 
         init(from decoder: Decoder) throws {
@@ -39,6 +43,7 @@ nonisolated struct Session: Identifiable, Hashable, Codable, Sendable {
             updatedAt = try container.decode(Date.self, forKey: .updatedAt)
             tags = try container.decode([String].self, forKey: .tags)
             isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
+            isArchived = try container.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
         }
     }
 
