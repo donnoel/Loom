@@ -518,6 +518,29 @@ actor AIChatbotStatusClient: AIChatbotStatusProviding {
         checkedAt: Date
     ) -> AIChatbotServiceSnapshot {
         let html = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
+        let normalizedHTML = html.lowercased()
+
+        if containsAny(
+            of: [
+                "attention required! | cloudflare",
+                "sorry, you have been blocked",
+                "cloudflare ray id",
+                "please enable cookies"
+            ],
+            in: normalizedHTML
+        ) {
+            return AIChatbotServiceSnapshot(
+                id: serviceID,
+                name: serviceName,
+                homepageURL: homepageURL,
+                statusPageURL: statusPageURL,
+                state: .unknown,
+                summary: "Status page is blocking automated checks right now.",
+                knownIssues: [],
+                checkedAt: checkedAt
+            )
+        }
+
         let cleaned = cleanedStatusPageText(fromHTML: html)
         let normalized = cleaned.lowercased()
         let extractedIssueLines = extractIssueLines(from: cleaned)
