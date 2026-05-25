@@ -704,7 +704,7 @@ struct RootView: View {
 
     private func sessionSidebarRow(_ session: Session) -> some View {
         let isSelected = selectedSidebarSelection == .session(session.id)
-        let sessionTitleColor: Color = isSelected ? LoomTheme.sidebarSelectedText(colorScheme) : .blue
+        let sessionTitleColor: Color = .blue
 
         return HStack(spacing: 10) {
             Text(session.metadata.title)
