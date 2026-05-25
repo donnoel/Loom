@@ -545,7 +545,9 @@ final class SessionMessagesViewModel {
             banner = nil
 
             if let onActivity {
-                await onActivity()
+                Task {
+                    await onActivity()
+                }
             }
         } catch {
             banner = BannerState(

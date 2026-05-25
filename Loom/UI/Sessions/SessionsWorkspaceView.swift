@@ -37,6 +37,7 @@ struct SessionDetailView: View {
     @State private var bottomMarkerFrame: CGRect = .null
     @State private var isShowingFileImporter: Bool = false
     @State private var isDictating: Bool = false
+    @State private var isShowingScratchpad: Bool = false
     @FocusState private var isDraftFieldFocused: Bool
     @AppStorage(LoomPreferenceKeys.voiceReplyVoiceIdentifier)
     private var voiceReplyVoiceIdentifier: String = ""
@@ -201,8 +202,6 @@ struct SessionDetailView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
-                    scratchpadSection
-
                     if !vm.pendingAttachments.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
@@ -494,14 +493,36 @@ struct SessionDetailView: View {
                 await vm.flushScratchpad()
             }
         }
+        .toolbar {
+            ToolbarItem {
+                Button {
+                    isShowingScratchpad.toggle()
+                } label: {
+                    Label("Scratchpad", systemImage: "note.text")
+                }
+                .help("Toggle scratchpad")
+                .accessibilityIdentifier("session.detail.scratchpadToggle")
+            }
+        }
+        .inspector(isPresented: $isShowingScratchpad) {
+            scratchpadSidebar
+        }
+    }
+
+    private var scratchpadSidebar: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Scratchpad")
+                .font(LoomTheme.Typography.bodyStrong)
+                .foregroundStyle(.primary)
+
+            scratchpadSection
+        }
+        .padding(16)
+        .frame(minWidth: 280, idealWidth: 320, maxWidth: 360, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var scratchpadSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Scratchpad")
-                .font(LoomTheme.Typography.captionStrong)
-                .foregroundStyle(.secondary)
-
             ZStack(alignment: .topLeading) {
                 if vm.scratchpadText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text("Capture quick notes, conclusions, or takeaways for this session.")
@@ -522,7 +543,7 @@ struct SessionDetailView: View {
                 .scrollContentBackground(.hidden)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 4)
-                .frame(minHeight: 90, maxHeight: 110)
+                .frame(maxWidth: .infinity, minHeight: 180, maxHeight: .infinity)
                 .accessibilityIdentifier("session.detail.scratchpad")
             }
             .background(

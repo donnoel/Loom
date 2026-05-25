@@ -704,11 +704,12 @@ struct RootView: View {
 
     private func sessionSidebarRow(_ session: Session) -> some View {
         let isSelected = selectedSidebarSelection == .session(session.id)
+        let sessionTitleColor: Color = isSelected ? LoomTheme.sidebarSelectedText(colorScheme) : .blue
 
         return HStack(spacing: 10) {
             Text(session.metadata.title)
                 .font(LoomTheme.Typography.bodyStrong)
-                .foregroundStyle(isSelected ? LoomTheme.sidebarSelectedText(colorScheme) : LoomTheme.textSecondary(colorScheme))
+                .foregroundStyle(sessionTitleColor)
                 .lineLimit(1)
                 .truncationMode(.tail)
 

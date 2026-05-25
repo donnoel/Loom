@@ -1104,6 +1104,40 @@ struct SessionMessagesViewModelCoverageTests {
 
     @Test
     @MainActor
+    func sendDraftDoesNotBlockOnActivityCallback() async throws {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Async Activity")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            onActivity: {
+                try? await Task.sleep(for: .seconds(2))
+            },
+            ollamaClient: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)),
+            chatClient: ScriptedChatClient([.complete(["done"])])
+        )
+
+        await vm.load()
+        vm.draft = "hello"
+
+        let start = ContinuousClock.now
+        await vm.sendDraft()
+        let elapsed = start.duration(to: ContinuousClock.now)
+
+        #expect(elapsed < .seconds(1))
+        #expect(vm.isGenerating)
+        await waitUntil { !vm.isGenerating }
+    }
+
+    @Test
+    @MainActor
     func stopGeneratingPersistsPartialAssistantContent() async throws {
         clearModelSelectionPreference()
         defer { clearModelSelectionPreference() }
