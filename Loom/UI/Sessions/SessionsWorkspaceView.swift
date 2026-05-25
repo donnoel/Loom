@@ -246,6 +246,8 @@ struct SessionDetailView: View {
                     )
                         .autocorrectionDisabled(false)
                         .textFieldStyle(.plain)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .lineLimit(2...8)
                         .foregroundStyle(LoomTheme.textPrimary(colorScheme))
                         .focused($isDraftFieldFocused)
@@ -439,7 +441,6 @@ struct SessionDetailView: View {
                 .padding(.top, 6)
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
-                .frame(maxWidth: 880)
                 .frame(minHeight: 96)
                 .frame(maxWidth: .infinity)
                 .background {
