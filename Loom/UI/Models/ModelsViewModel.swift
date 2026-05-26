@@ -20,7 +20,7 @@ final class ModelsViewModel {
     private var installTask: Task<Void, Never>?
     private var progressFlushTask: Task<Void, Never>?
     private var pendingPullProgress: PullProgress?
-    private static let uiTestResetDefaultsEnvironmentKey = "LOOM_UI_TEST_RESET_DEFAULTS"
+    private nonisolated static let uiTestResetDefaultsEnvironmentKey = "LOOM_UI_TEST_RESET_DEFAULTS"
 
     private nonisolated static func isAutoCheckEnabled() -> Bool {
         if let stored = UserDefaults.standard.object(forKey: LoomPreferenceKeys.modelsAutoCheckEnabled) as? Bool {

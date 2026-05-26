@@ -1062,6 +1062,86 @@ struct SessionMessagesViewModelCoverageTests {
 
     @Test
     @MainActor
+    func sendDraftIncludesEnabledSessionMemoryAsBoundedSystemContext() async throws {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Memory Enabled")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let chatClient = ScriptedChatClient([.complete(["Hello Don"])])
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)),
+            chatClient: chatClient
+        )
+        await vm.saveSessionMemory(
+            SessionMemory(
+                preferredUserName: "Don",
+                preferredAssistantName: "Loom",
+                responseStyle: "Use plain language and keep answers short.",
+                sessionNote: "We are discussing weekend plans."
+            )
+        )
+
+        await sendDraftWithModelRetry(vm, draft: "Help me plan")
+        await waitUntil { !vm.isGenerating }
+
+        let requests = await chatClient.readRecordedRequests()
+        #expect(requests.count == 1)
+        if let request = requests.first {
+            #expect(request.messages.first?.role == .system)
+            #expect(request.messages.first?.content.contains("Session memory for this session only.") == true)
+            #expect(request.messages.first?.content.contains("Preferred name for the user: Don") == true)
+            #expect(request.messages.first?.content.contains("Response style: Use plain language") == true)
+            #expect(request.messages.last?.content == "Help me plan")
+        }
+    }
+
+    @Test
+    @MainActor
+    func sendDraftDoesNotIncludeDisabledSessionMemory() async throws {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+
+        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Memory Disabled")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let chatClient = ScriptedChatClient([.complete(["Hello"])])
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)),
+            chatClient: chatClient
+        )
+        await vm.saveSessionMemory(
+            SessionMemory(
+                preferredUserName: "Don",
+                responseStyle: "Keep answers short.",
+                isEnabled: false
+            )
+        )
+
+        await sendDraftWithModelRetry(vm, draft: "Hello")
+        await waitUntil { !vm.isGenerating }
+
+        let requests = await chatClient.readRecordedRequests()
+        #expect(requests.count == 1)
+        if let request = requests.first {
+            #expect(!request.messages.contains(where: { SessionMemory.isContextMessage($0) }))
+            #expect(request.messages.map(\.content) == ["Hello"])
+        }
+    }
+
+    @Test
+    @MainActor
     func sendDraftConcurrentCallsSubmitOnlyOnce() async throws {
         clearModelSelectionPreference()
         defer { clearModelSelectionPreference() }

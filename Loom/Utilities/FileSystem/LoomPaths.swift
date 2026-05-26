@@ -6,6 +6,7 @@ nonisolated enum LoomPaths {
     static let metadataFileName = "metadata.json"
     static let messagesFileName = "messages.jsonl"
     static let scratchpadFileName = "scratchpad.txt"
+    static let memoryFileName = "memory.json"
     private static let overrideRootEnvironmentKey = "LOOM_APP_SUPPORT_ROOT"
 
     static func applicationSupportRoot() throws -> URL {
@@ -48,5 +49,9 @@ nonisolated enum LoomPaths {
 
     static func sessionScratchpadURL(for id: UUID) throws -> URL {
         try sessionFolder(for: id).appendingPathComponent(scratchpadFileName, isDirectory: false)
+    }
+
+    static func sessionMemoryURL(for id: UUID) throws -> URL {
+        try sessionFolder(for: id).appendingPathComponent(memoryFileName, isDirectory: false)
     }
 }

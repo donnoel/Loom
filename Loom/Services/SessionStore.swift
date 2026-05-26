@@ -228,6 +228,20 @@ actor SessionStore {
         try data.write(to: url, options: [.atomic])
     }
 
+    func loadSessionMemory(sessionID: UUID) throws -> SessionMemory {
+        let url = try LoomPaths.sessionMemoryURL(for: sessionID)
+        guard FileManager.default.fileExists(atPath: url.path) else { return .empty }
+
+        let data = try Data(contentsOf: url)
+        return try decoder.decode(SessionMemory.self, from: data).normalized()
+    }
+
+    func saveSessionMemory(_ memory: SessionMemory, sessionID: UUID) throws {
+        let url = try LoomPaths.sessionMemoryURL(for: sessionID)
+        let data = try encoder.encode(memory.normalized())
+        try data.write(to: url, options: [.atomic])
+    }
+
     func loadRecentMessages(sessionID: UUID, limit: Int = 200) throws -> [ChatMessage] {
         let spID = signposter.makeSignpostID()
         let state = signposter.beginInterval("loadRecentMessages", id: spID)

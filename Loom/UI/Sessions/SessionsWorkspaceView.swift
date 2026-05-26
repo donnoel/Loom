@@ -38,6 +38,7 @@ struct SessionDetailView: View {
     @State private var isShowingFileImporter: Bool = false
     @State private var isDictating: Bool = false
     @State private var isShowingScratchpad: Bool = false
+    @State private var isShowingSessionMemory: Bool = false
     @FocusState private var isDraftFieldFocused: Bool
     @AppStorage(LoomPreferenceKeys.voiceReplyVoiceIdentifier)
     private var voiceReplyVoiceIdentifier: String = ""
@@ -497,6 +498,16 @@ struct SessionDetailView: View {
         .toolbar {
             ToolbarItem {
                 Button {
+                    isShowingSessionMemory = true
+                } label: {
+                    Label("Session Memory", systemImage: "person.text.rectangle")
+                }
+                .help("Edit session memory")
+                .accessibilityIdentifier("session.detail.sessionMemory")
+            }
+
+            ToolbarItem {
+                Button {
                     isShowingScratchpad.toggle()
                 } label: {
                     Label("Scratchpad", systemImage: "note.text")
@@ -507,6 +518,11 @@ struct SessionDetailView: View {
         }
         .inspector(isPresented: $isShowingScratchpad) {
             scratchpadSidebar
+        }
+        .sheet(isPresented: $isShowingSessionMemory) {
+            SessionMemorySheet(memory: vm.sessionMemory) { memory in
+                await vm.saveSessionMemory(memory)
+            }
         }
     }
 

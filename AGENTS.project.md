@@ -26,6 +26,7 @@ We have the V1 local chat spine in place:
 16) **Assistant reply quick actions** now provide context-menu actions for copy-as-plain-text, copy-as-markdown, and model-backed transforms (summarize, simplify, professional rewrite, checklist) that create derived follow-up turns
 17) **Per-session scratchpad** now provides a lightweight local notes area tied to each session for takeaways and working notes outside the main transcript
 18) **Model compare mode** now provides a focused side-by-side tool to run one prompt against two installed local models and compare outputs without altering normal chat flow
+19) **Session memory** now stores a few user-edited, per-session reply preferences locally and optionally inserts them into requests for that session only
 
 Current focus should be reliability, polish, and guardrails (not sweeping architecture rewrites).
 
@@ -40,6 +41,8 @@ Current focus should be reliability, polish, and guardrails (not sweeping archit
 ## Disk layout (Application Support)
 - `~/Library/Application Support/Loom/Sessions/<UUID>/metadata.json`
 - `~/Library/Application Support/Loom/Sessions/<UUID>/messages.jsonl` (append-only)
+- `~/Library/Application Support/Loom/Sessions/<UUID>/scratchpad.txt`
+- `~/Library/Application Support/Loom/Sessions/<UUID>/memory.json`
 
 ## Concurrency rules (important)
 We are using Swift 6 concurrency checks. Do NOT silence them by adding broad `@MainActor`.

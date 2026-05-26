@@ -146,6 +146,7 @@ final class SessionMessagesViewModel {
 
     var messages: [ChatMessage] = []
     var scratchpadText: String = ""
+    var sessionMemory: SessionMemory = .empty
     var draft: String = ""
     var isGenerating: Bool = false
     var generationTask: Task<Void, Never>?
@@ -356,6 +357,12 @@ final class SessionMessagesViewModel {
             scratchpadText = ""
         }
 
+        do {
+            sessionMemory = try await store.loadSessionMemory(sessionID: sessionID)
+        } catch {
+            sessionMemory = .empty
+        }
+
         await refreshInstalledModels()
     }
 
@@ -374,6 +381,21 @@ final class SessionMessagesViewModel {
         scratchpadSaveTask?.cancel()
         scratchpadSaveTask = nil
         await persistScratchpad(scratchpadText)
+    }
+
+    func saveSessionMemory(_ memory: SessionMemory) async {
+        let normalized = memory.normalized()
+        sessionMemory = normalized
+
+        do {
+            try await store.saveSessionMemory(normalized, sessionID: sessionID)
+        } catch {
+            banner = BannerState(
+                text: "Loom couldn’t save session memory.",
+                actionTitle: nil,
+                action: nil
+            )
+        }
     }
 
     func loadFullHistory() async {
@@ -577,6 +599,7 @@ final class SessionMessagesViewModel {
         ) {
             context.append(attachmentContext)
         }
+        context = applyingSessionMemory(to: context)
         lastStreamModel = modelTag
         persistLastStreamModel(modelTag)
         lastStreamContext = context
@@ -626,12 +649,13 @@ final class SessionMessagesViewModel {
             )
             return
         }
-        let effectiveContext: [ChatMessage]
+        var effectiveContext: [ChatMessage]
         if didSwitchModels(from: lastStreamModel, to: model) {
             effectiveContext = contextMessagesForModelSwitch(limit: historyContextLevel.messageLimit)
         } else {
             effectiveContext = context
         }
+        effectiveContext = applyingSessionMemory(to: effectiveContext)
 
         let diagnosis = await ollamaClient.diagnose()
         guard diagnosis.isRunning else {
@@ -743,7 +767,15 @@ final class SessionMessagesViewModel {
             context.append(attachmentContext)
         }
 
-        return context
+        return applyingSessionMemory(to: context)
+    }
+
+    private func applyingSessionMemory(to context: [ChatMessage]) -> [ChatMessage] {
+        let withoutPriorMemory = context.filter { !SessionMemory.isContextMessage($0) }
+        guard let memoryMessage = sessionMemory.contextMessage() else {
+            return withoutPriorMemory
+        }
+        return [memoryMessage] + withoutPriorMemory
     }
 
     private func attachmentContextMessage(

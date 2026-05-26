@@ -285,6 +285,88 @@ struct SessionStoreTests {
 
         #expect(loaded.isEmpty)
     }
+
+    @Test
+    func sessionMemoryPersistsRoundTripAndIsBounded() async throws {
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Remember Preferences")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let memory = SessionMemory(
+            preferredUserName: "  Don  ",
+            preferredAssistantName: "Loom",
+            responseStyle: String(repeating: "brief ", count: 50),
+            sessionNote: "Talk through the launch plan.",
+            isEnabled: true
+        )
+
+        try await store.saveSessionMemory(memory, sessionID: session.id)
+        let loaded = try await store.loadSessionMemory(sessionID: session.id)
+
+        #expect(loaded.preferredUserName == "Don")
+        #expect(loaded.preferredAssistantName == "Loom")
+        #expect(loaded.responseStyle.count == SessionMemory.responseStyleLimit)
+        #expect(loaded.sessionNote == "Talk through the launch plan.")
+        #expect(loaded.isEnabled)
+    }
+
+    @Test
+    func sessionMemoryIsIsolatedBySession() async throws {
+        let store = SessionStore()
+        let first = try await store.createSession(title: "Memory One")
+        let second = try await store.createSession(title: "Memory Two")
+        defer {
+            cleanupSessionFolder(id: first.id)
+            cleanupSessionFolder(id: second.id)
+        }
+
+        try await store.saveSessionMemory(
+            SessionMemory(preferredUserName: "Don"),
+            sessionID: first.id
+        )
+        try await store.saveSessionMemory(
+            SessionMemory(preferredUserName: "Alex", isEnabled: false),
+            sessionID: second.id
+        )
+
+        let loadedFirst = try await store.loadSessionMemory(sessionID: first.id)
+        let loadedSecond = try await store.loadSessionMemory(sessionID: second.id)
+
+        #expect(loadedFirst.preferredUserName == "Don")
+        #expect(loadedFirst.isEnabled)
+        #expect(loadedSecond.preferredUserName == "Alex")
+        #expect(!loadedSecond.isEnabled)
+    }
+
+    @Test
+    func loadSessionMemoryReturnsEmptyForMissingFile() async throws {
+        let store = SessionStore()
+        let session = try await store.createSession(title: "No Memory Yet")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let loaded = try await store.loadSessionMemory(sessionID: session.id)
+
+        #expect(loaded == .empty)
+        #expect(loaded.contextMessage() == nil)
+    }
+
+    @Test
+    func deleteSessionRemovesStoredMemoryWithSessionFolder() async throws {
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Delete Memory")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        try await store.saveSessionMemory(
+            SessionMemory(preferredUserName: "Don"),
+            sessionID: session.id
+        )
+        let memoryURL = try LoomPaths.sessionMemoryURL(for: session.id)
+        #expect(FileManager.default.fileExists(atPath: memoryURL.path))
+
+        try await store.deleteSession(id: session.id)
+
+        #expect(!FileManager.default.fileExists(atPath: memoryURL.path))
+    }
 }
 
 struct LoomStatusSnapshotTests {
