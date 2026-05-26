@@ -7,9 +7,9 @@ struct ModelCatalogTests {
         let catalog = ModelCatalog.load()
 
         #expect(!catalog.all.isEmpty)
-        #expect(catalog.all.count == 5)
-        #expect(catalog.all.contains(where: { $0.tag == "qwen3:8b" }))
-        #expect(catalog.lastRefreshedAt == "2026-03-18")
+        #expect(catalog.all.count == 4)
+        #expect(catalog.all.contains(where: { $0.tag == "qwen3.5:9b" }))
+        #expect(catalog.lastRefreshedAt == "2026-05-26")
     }
 
     @Test
@@ -18,34 +18,34 @@ struct ModelCatalogTests {
 
         #expect(!catalog.recommended.isEmpty)
         #expect(catalog.recommended.filter { !$0.recommended }.isEmpty)
-        #expect(catalog.recommended.contains(where: { $0.tag == "qwen3:8b" }))
+        #expect(catalog.recommended.contains(where: { $0.tag == "qwen3.5:9b" }))
         #expect(catalog.recommended.contains(where: { $0.tag == "deepseek-r1:8b" }))
         #expect(catalog.recommended.contains(where: { $0.tag == "gemma3:4b" }))
-        #expect(catalog.recommended.contains(where: { $0.tag == "gemma3:12b" }))
-        #expect(!catalog.recommended.contains(where: { $0.tag == "mistral-small:24b" }))
+        #expect(catalog.recommended.contains(where: { $0.tag == "gemma4:e4b" }))
+        #expect(!catalog.all.contains(where: { $0.tag == "mistral-small:24b" }))
     }
 
     @Test
     func byTagReturnsMatchingModel() {
         let catalog = ModelCatalog.load()
 
-        let model = catalog.byTag("qwen3:8b")
-        #expect(model?.displayName == "Qwen 3 (8B)")
+        let model = catalog.byTag("qwen3.5:9b")
+        #expect(model?.displayName == "Qwen 3.5 (9B)")
         #expect(model?.vendor == "Qwen")
         #expect(model?.country == "China")
-        #expect(model?.lastTrained == "2025")
+        #expect(model?.lastTrained == nil)
     }
 
     @Test
     func modelCapabilitiesLoadFromCatalog() {
         let catalog = ModelCatalog.load()
 
-        let fullMultimodal = catalog.byTag("qwen3:8b")?.resolvedCapabilities
+        let fullMultimodal = catalog.byTag("qwen3.5:9b")?.resolvedCapabilities
         #expect(fullMultimodal?.speechInput == true)
         #expect(fullMultimodal?.speechOutput == true)
         #expect(fullMultimodal?.fileUploads == true)
 
-        let highEnd = catalog.byTag("mistral-small:24b")?.resolvedCapabilities
+        let highEnd = catalog.byTag("gemma4:e4b")?.resolvedCapabilities
         #expect(highEnd?.speechInput == true)
         #expect(highEnd?.speechOutput == true)
         #expect(highEnd?.fileUploads == true)

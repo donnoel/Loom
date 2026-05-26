@@ -21,7 +21,7 @@ We have the V1 local chat spine in place:
 11) **AI service monitoring** now includes an App-level status screen (including Grok) that checks public chatbot status feeds, surfaces known incidents, and supports drag-and-drop card reordering with persisted order
 12) **Composer context controls** now let users choose concise/balanced/extended history and off/compact/full file context from a compact Tools menu
 13) **Trust Center** now provides a local-only panel for sessions-data location, local storage footprint, attachment retention footprint, and recent local runtime health history
-14) **Curated model catalog refresh** now focuses on five models only: Qwen 3 8B, DeepSeek R1 8B, Gemma 3 4B, Gemma 3 12B, and Mistral Small 24B
+14) **Curated model catalog refresh** now focuses on four models only: Qwen 3.5 9B, DeepSeek R1 8B, Gemma 3 4B, and Gemma 4 E4B
 15) **Session organization controls** now support pinned sessions and archived sessions with local persistence, keeping archived chats out of the default active list without deleting them
 16) **Assistant reply quick actions** now provide context-menu actions for copy-as-plain-text, copy-as-markdown, and model-backed transforms (summarize, simplify, professional rewrite, checklist) that create derived follow-up turns
 17) **Per-session scratchpad** now provides a lightweight local notes area tied to each session for takeaways and working notes outside the main transcript

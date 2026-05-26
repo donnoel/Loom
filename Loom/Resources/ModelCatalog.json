@@ -1,22 +1,20 @@
 {
-  "lastRefreshedAt": "2026-03-18",
+  "lastRefreshedAt": "2026-05-26",
   "models": [
     {
-      "id": "qwen3:8b",
-      "tag": "qwen3:8b",
-      "displayName": "Qwen 3 (8B)",
+      "id": "qwen3.5:9b",
+      "tag": "qwen3.5:9b",
+      "displayName": "Qwen 3.5 (9B)",
       "vendor": "Qwen",
       "country": "China",
-      "lastTrained": "2025",
-      "summary": "Current balanced default for coding, analysis, and general chat.",
+      "summary": "Modern balanced default for general chat, coding, and long-context local work.",
       "bestAt": [
         "Coding help",
         "Reasoning",
         "General chat"
       ],
-      "approxDownloadBytes": 5200000000,
-      "approxDiskBytes": 5800000000,
-      "notes": "Best starting point for most Macs.",
+      "approxDownloadBytes": 6600000000,
+      "notes": "Best starting point for modern Macs with enough memory for a 9B model.",
       "recommended": true,
       "capabilities": {
         "speechInput": true,
@@ -71,45 +69,20 @@
       }
     },
     {
-      "id": "gemma3:12b",
-      "tag": "gemma3:12b",
-      "displayName": "Gemma 3 (12B)",
+      "id": "gemma4:e4b",
+      "tag": "gemma4:e4b",
+      "displayName": "Gemma 4 (E4B)",
       "vendor": "Google",
       "country": "United States",
-      "lastTrained": "2025",
-      "summary": "Higher-quality Gemma 3 option for users with more RAM.",
+      "summary": "Current Gemma option with improved reasoning and agentic capabilities.",
       "bestAt": [
-        "Long-form answers",
+        "Reasoning",
         "Summaries",
         "General chat"
       ],
-      "approxDownloadBytes": 8100000000,
-      "approxDiskBytes": 9000000000,
-      "notes": "Great quality jump from 4B if your Mac can handle it.",
+      "approxDownloadBytes": 9600000000,
+      "notes": "Modern higher-quality option for Macs with more available memory.",
       "recommended": true,
-      "capabilities": {
-        "speechInput": true,
-        "speechOutput": true,
-        "fileUploads": true
-      }
-    },
-    {
-      "id": "mistral-small:24b",
-      "tag": "mistral-small:24b",
-      "displayName": "Mistral Small (24B)",
-      "vendor": "Mistral AI",
-      "country": "France",
-      "lastTrained": "2025",
-      "summary": "High-capability local model for users prioritizing quality over speed.",
-      "bestAt": [
-        "Complex prompts",
-        "Reasoning",
-        "Agent-style tasks"
-      ],
-      "approxDownloadBytes": 14000000000,
-      "approxDiskBytes": 15500000000,
-      "notes": "Recommended for 32GB+ memory setups.",
-      "recommended": false,
       "capabilities": {
         "speechInput": true,
         "speechOutput": true,

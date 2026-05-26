@@ -93,7 +93,7 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             : nil
     }
 
-    private static let fallbackLastRefreshedAt = "2026-03-18"
+    private static let fallbackLastRefreshedAt = "2026-05-26"
 
     private struct CatalogPayload: Codable {
         let lastRefreshedAt: String?
@@ -102,17 +102,17 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
 
     private static let fallbackModels: [CatalogModel] = [
         CatalogModel(
-            id: "qwen3:8b",
-            tag: "qwen3:8b",
-            displayName: "Qwen 3 (8B)",
+            id: "qwen3.5:9b",
+            tag: "qwen3.5:9b",
+            displayName: "Qwen 3.5 (9B)",
             vendor: "Qwen",
             country: "China",
-            lastTrained: "2025",
-            summary: "Current balanced default for coding, analysis, and general chat.",
+            lastTrained: nil,
+            summary: "Modern balanced default for general chat, coding, and long-context local work.",
             bestAt: ["Coding help", "Reasoning", "General chat"],
-            approxDownloadBytes: 5_200_000_000,
-            approxDiskBytes: 5_800_000_000,
-            notes: "Best starting point for most Macs.",
+            approxDownloadBytes: 6_600_000_000,
+            approxDiskBytes: nil,
+            notes: "Best starting point for modern Macs with enough memory for a 9B model.",
             recommended: true,
             capabilities: CatalogModelCapabilities(
                 speechInput: true,
@@ -159,37 +159,18 @@ nonisolated struct ModelCatalog: Equatable, Sendable {
             )
         ),
         CatalogModel(
-            id: "gemma3:12b",
-            tag: "gemma3:12b",
-            displayName: "Gemma 3 (12B)",
+            id: "gemma4:e4b",
+            tag: "gemma4:e4b",
+            displayName: "Gemma 4 (E4B)",
             vendor: "Google",
             country: "United States",
-            lastTrained: "2025",
-            summary: "Higher-quality Gemma 3 option for users with more RAM.",
-            bestAt: ["Long-form answers", "Summaries", "General chat"],
-            approxDownloadBytes: 8_100_000_000,
-            approxDiskBytes: 9_000_000_000,
-            notes: "Great quality jump from 4B if your Mac can handle it.",
+            lastTrained: nil,
+            summary: "Current Gemma option with improved reasoning and agentic capabilities.",
+            bestAt: ["Reasoning", "Summaries", "General chat"],
+            approxDownloadBytes: 9_600_000_000,
+            approxDiskBytes: nil,
+            notes: "Modern higher-quality option for Macs with more available memory.",
             recommended: true,
-            capabilities: CatalogModelCapabilities(
-                speechInput: true,
-                speechOutput: true,
-                fileUploads: true
-            )
-        ),
-        CatalogModel(
-            id: "mistral-small:24b",
-            tag: "mistral-small:24b",
-            displayName: "Mistral Small (24B)",
-            vendor: "Mistral AI",
-            country: "France",
-            lastTrained: "2025",
-            summary: "High-capability local model for users prioritizing quality over speed.",
-            bestAt: ["Complex prompts", "Reasoning", "Agent-style tasks"],
-            approxDownloadBytes: 14_000_000_000,
-            approxDiskBytes: 15_500_000_000,
-            notes: "Recommended for 32GB+ memory setups.",
-            recommended: false,
             capabilities: CatalogModelCapabilities(
                 speechInput: true,
                 speechOutput: true,
