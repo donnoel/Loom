@@ -7,14 +7,21 @@ actor SessionSearchService {
         self.store = store
     }
 
-    func search(query: String, in sessions: [Session]) async -> [SessionSearchResult] {
+    func search(
+        query: String,
+        in sessions: [Session],
+        maxResults: Int = 50
+    ) async -> [SessionSearchResult] {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedQuery.isEmpty else { return [] }
+        guard maxResults > 0 else { return [] }
 
         var results: [SessionSearchResult] = []
-        results.reserveCapacity(32)
+        results.reserveCapacity(min(32, maxResults))
 
         for session in sessions {
+            guard !Task.isCancelled else { return results }
+
             if let titleRange = Self.firstMatchRange(in: session.metadata.title, for: trimmedQuery) {
                 results.append(
                     SessionSearchResult(
@@ -26,10 +33,13 @@ actor SessionSearchService {
                         messageRole: nil
                     )
                 )
+                if results.count >= maxResults { return results }
             }
 
             do {
                 let messages = try await store.loadMessages(sessionID: session.id)
+                guard !Task.isCancelled else { return results }
+
                 for message in messages {
                     guard let messageRange = Self.firstMatchRange(in: message.content, for: trimmedQuery) else {
                         continue
@@ -45,6 +55,7 @@ actor SessionSearchService {
                             messageRole: message.role
                         )
                     )
+                    if results.count >= maxResults { return results }
                 }
             } catch {
                 // Ignore per-session read failures to keep global search resilient.

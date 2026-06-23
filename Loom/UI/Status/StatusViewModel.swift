@@ -20,6 +20,7 @@ final class StatusViewModel {
     private var refreshTask: Task<Void, Never>?
     private var activationObserver: NSObjectProtocol?
     private let runtimeHistoryLimit = 12
+    private nonisolated static let localRuntimeAutoRefreshInterval: Duration = .seconds(60)
 
     private nonisolated static func isAutoRefreshEnabled() -> Bool {
         if let stored = UserDefaults.standard.object(forKey: LoomPreferenceKeys.statusAutoRefreshEnabled) as? Bool {
@@ -61,7 +62,7 @@ final class StatusViewModel {
                 guard let self else { return }
 
                 while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(20))
+                    try? await Task.sleep(for: Self.localRuntimeAutoRefreshInterval)
                     guard Self.isAutoRefreshEnabled() else { continue }
                     await self.refresh()
                 }
@@ -910,6 +911,7 @@ final class AIChatbotStatusViewModel {
     private let client: any AIChatbotStatusProviding
     private var refreshTask: Task<Void, Never>?
     private var activationObserver: NSObjectProtocol?
+    private nonisolated static let aiStatusAutoRefreshInterval: Duration = .seconds(300)
 
     var services: [AIChatbotServiceSnapshot]
     var isRefreshing: Bool = false
@@ -948,7 +950,7 @@ final class AIChatbotStatusViewModel {
                 guard let self else { return }
 
                 while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(60))
+                    try? await Task.sleep(for: Self.aiStatusAutoRefreshInterval)
                     guard Self.isAutoRefreshEnabled() else { continue }
                     await self.refresh()
                 }

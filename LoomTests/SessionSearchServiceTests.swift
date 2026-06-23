@@ -73,4 +73,21 @@ struct SessionSearchServiceTests {
             #expect(results.isEmpty)
         }
     }
+
+    @Test
+    func searchHonorsResultLimit() async throws {
+        try await withTemporarySessionsRoot { store, service in
+            let session = try await store.createSession(title: "Planning")
+            for index in 0..<5 {
+                try await store.appendMessage(
+                    ChatMessage(role: .user, content: "planning note \(index)"),
+                    sessionID: session.id
+                )
+            }
+
+            let results = await service.search(query: "planning", in: [session], maxResults: 3)
+
+            #expect(results.count == 3)
+        }
+    }
 }

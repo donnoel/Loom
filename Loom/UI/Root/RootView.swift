@@ -427,9 +427,7 @@ struct RootView: View {
         }
         .searchable(text: $sessionsViewModel.searchQuery, placement: .sidebar)
         .onChange(of: sessionsViewModel.searchQuery) { _, _ in
-            Task {
-                await sessionsViewModel.refreshGlobalSearchResults()
-            }
+            sessionsViewModel.scheduleGlobalSearchRefresh()
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)

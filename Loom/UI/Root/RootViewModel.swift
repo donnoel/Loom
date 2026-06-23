@@ -13,6 +13,8 @@ final class RootViewModel {
     private let store: SessionStore
     private let searchService: SessionSearchService
     private let log = Logger(subsystem: "com.loom.app", category: "RootViewModel")
+    private nonisolated static let globalSearchDebounceDelay: Duration = .milliseconds(250)
+    private nonisolated static let globalSearchResultLimit = 50
 
     var sessions: [Session] = []
     var selectedSessionID: Session.ID?
@@ -21,6 +23,7 @@ final class RootViewModel {
     var globalSearchResults: [SessionSearchResult] = []
     var isSearchingGlobally: Bool = false
     private var searchGeneration: UInt64 = 0
+    private var searchTask: Task<Void, Never>?
 
     var activeSessions: [Session] {
         sessions.filter { !$0.metadata.isArchived }
@@ -73,6 +76,7 @@ final class RootViewModel {
     }
 
     func refreshGlobalSearchResults() async {
+        searchTask?.cancel()
         let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         searchGeneration &+= 1
         let currentGeneration = searchGeneration
@@ -80,16 +84,66 @@ final class RootViewModel {
         guard !query.isEmpty else {
             globalSearchResults = []
             isSearchingGlobally = false
+            searchTask = nil
             return
         }
 
         isSearchingGlobally = true
         let sessionSnapshot = sessions
-        let results = await searchService.search(query: query, in: sessionSnapshot)
+        await performGlobalSearch(
+            query: query,
+            sessions: sessionSnapshot,
+            generation: currentGeneration
+        )
+    }
 
-        guard currentGeneration == searchGeneration else { return }
+    func scheduleGlobalSearchRefresh() {
+        searchTask?.cancel()
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        searchGeneration &+= 1
+        let currentGeneration = searchGeneration
+
+        guard !query.isEmpty else {
+            globalSearchResults = []
+            isSearchingGlobally = false
+            searchTask = nil
+            return
+        }
+
+        isSearchingGlobally = true
+        let sessionSnapshot = sessions
+
+        searchTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: Self.globalSearchDebounceDelay)
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled else { return }
+            await self?.performGlobalSearch(
+                query: query,
+                sessions: sessionSnapshot,
+                generation: currentGeneration
+            )
+        }
+    }
+
+    private func performGlobalSearch(
+        query: String,
+        sessions sessionSnapshot: [Session],
+        generation currentGeneration: UInt64
+    ) async {
+        let results = await searchService.search(
+            query: query,
+            in: sessionSnapshot,
+            maxResults: Self.globalSearchResultLimit
+        )
+
+        guard !Task.isCancelled, currentGeneration == searchGeneration else { return }
         globalSearchResults = results
         isSearchingGlobally = false
+        searchTask = nil
     }
 
     func newSession() async {

@@ -105,6 +105,8 @@ struct SessionDetailView: View {
                                         isThinking: vm.isGenerating
                                             && vm.generatingMessageID == message.id
                                             && message.content.isEmpty,
+                                        isStreaming: vm.isGenerating
+                                            && vm.generatingMessageID == message.id,
                                         onRegenerate: message.role == .assistant ? {
                                             Task { await vm.retryLastReply() }
                                         } : nil,
@@ -962,11 +964,14 @@ private final class SpeechInputController {
 private struct MessageRowView: View, Equatable {
     let message: ChatMessage
     let isThinking: Bool
+    let isStreaming: Bool
     let onRegenerate: (() -> Void)?
     let onQuickTransform: ((SessionMessagesViewModel.AssistantQuickTransform) -> Void)?
 
     static func == (lhs: MessageRowView, rhs: MessageRowView) -> Bool {
-        lhs.message == rhs.message && lhs.isThinking == rhs.isThinking
+        lhs.message == rhs.message
+            && lhs.isThinking == rhs.isThinking
+            && lhs.isStreaming == rhs.isStreaming
     }
 
     var body: some View {
@@ -980,6 +985,7 @@ private struct MessageRowView: View, Equatable {
                     MessageContentView(
                         content: message.content,
                         role: message.role,
+                        isStreaming: isStreaming,
                         onRegenerate: onRegenerate,
                         onQuickTransform: onQuickTransform
                     )
@@ -1156,25 +1162,14 @@ private struct TypingPulseView: View {
 private struct MessageContentView: View {
     let content: String
     let role: ChatMessage.Role
+    let isStreaming: Bool
     let onRegenerate: (() -> Void)?
     let onQuickTransform: ((SessionMessagesViewModel.AssistantQuickTransform) -> Void)?
 
     var body: some View {
-        let displayContent = ChatDisplayFormatter.format(content)
-        let blocks = ChatMarkdownBlockParser.parse(displayContent)
+        let displayContent = isStreaming ? content : ChatDisplayFormatter.format(content)
 
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(blocks.enumerated()), id: \.offset) { item in
-                switch item.element {
-                case .markdown(let markdown):
-                    MarkdownTextBlockView(markdown: markdown)
-                case .code(let language, let code):
-                    MarkdownCodeBlockView(language: language, code: code)
-                case .table(let table):
-                    MarkdownTableBlockView(tableText: table)
-                }
-            }
-        }
+        renderedContent(displayContent)
         .textSelection(.enabled)
         .contextMenu {
             Button("Copy as Plain Text") {
@@ -1206,6 +1201,40 @@ private struct MessageContentView: View {
                 Button("Regenerate", action: onRegenerate)
             }
         }
+    }
+
+    @ViewBuilder
+    private func renderedContent(_ displayContent: String) -> some View {
+        if isStreaming {
+            StreamingPlainTextMessageView(content: content)
+        } else {
+            let blocks = ChatMarkdownBlockParser.parse(displayContent)
+
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(Array(blocks.enumerated()), id: \.offset) { item in
+                    switch item.element {
+                    case .markdown(let markdown):
+                        MarkdownTextBlockView(markdown: markdown)
+                    case .code(let language, let code):
+                        MarkdownCodeBlockView(language: language, code: code)
+                    case .table(let table):
+                        MarkdownTableBlockView(tableText: table)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct StreamingPlainTextMessageView: View {
+    let content: String
+
+    var body: some View {
+        Text(content.isEmpty ? " " : content)
+            .font(LoomTheme.Typography.chatBubbleBody)
+            .lineSpacing(4)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("session.message.streamingPlainText")
     }
 }
 
