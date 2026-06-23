@@ -13,7 +13,7 @@ We have the V1 local chat spine in place:
 3) **Local Ollama model selection + status** are integrated
 4) **Streaming assistant responses** are integrated end-to-end
 5) **Stop/cancel generation** keeps partial output and persists it
-6) **Multimodal chat controls** now include optional speech input/output and uploaded file context for supported models, with guardrails on attachment size/count/context budget and user-configurable voice quality controls (voice/rate preview)
+6) **Multimodal chat controls** now include optional speech input/output and uploaded file context for supported models, with guardrails on attachment size/count/context budget and user-configurable voice picker/preview controls
 7) **Model Library UX** now supports drag-and-drop reordering of installed models with persisted order across refresh/relaunch
 8) **Session UX polish** now includes a cleaner chat-first dark visual treatment with calmer selected-session emphasis (bold + color cue), clearer chat bubble readability, a simplified composer panel (including preserved macOS autocorrect behavior while typing), friendly empty-state onboarding, starter prompt chips for non-technical users, and an always-visible `New Session` entry at the top of the Chats sidebar
 9) **In-session model switching** is available from the chat composer so users can change models without leaving their active session
@@ -95,7 +95,7 @@ Use plain language and actionable buttons.
 
 ## Build/run notes
 - Target: macOS app (SwiftUI).
-- Maintain **clean build**: no warnings.
+- Maintain **clean build**: no warnings. CI and project build settings treat warnings as errors.
 - App Intents metadata generation is disabled in build settings to keep builds warning-clean for this target set.
 - If you introduce new files, ensure they are included in the correct target.
 

@@ -10,13 +10,11 @@ struct SessionSearchServiceTests {
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
 
-        setenv("LOOM_SESSIONS_ROOT", tempRoot.path, 1)
         defer {
-            unsetenv("LOOM_SESSIONS_ROOT")
             try? FileManager.default.removeItem(at: tempRoot)
         }
 
-        let store = SessionStore()
+        let store = SessionStore(sessionsRoot: tempRoot)
         let service = SessionSearchService(store: store)
         try await body(store, service)
     }

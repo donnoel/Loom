@@ -137,6 +137,7 @@ final class SessionMessagesViewModel {
     private let chatClient: any OllamaChatStreaming
     private let catalog: ModelCatalog
     private let attachmentImporter: SessionAttachmentImporter
+    private let defaults: UserDefaults
     private let streamUpdateInterval: Duration = .milliseconds(60)
     private static let maxPendingAttachmentCount = 8
     private static let roughCharactersPerToken = 4
@@ -158,13 +159,13 @@ final class SessionMessagesViewModel {
     var historyContextLevel: HistoryContextLevel {
         didSet {
             guard historyContextLevel != oldValue else { return }
-            UserDefaults.standard.set(historyContextLevel.rawValue, forKey: LoomPreferenceKeys.composerHistoryContextLevel)
+            defaults.set(historyContextLevel.rawValue, forKey: LoomPreferenceKeys.composerHistoryContextLevel)
         }
     }
     var fileContextLevel: FileContextLevel {
         didSet {
             guard fileContextLevel != oldValue else { return }
-            UserDefaults.standard.set(fileContextLevel.rawValue, forKey: LoomPreferenceKeys.composerFileContextLevel)
+            defaults.set(fileContextLevel.rawValue, forKey: LoomPreferenceKeys.composerFileContextLevel)
         }
     }
     private var isPreparingGeneration: Bool = false
@@ -183,16 +184,18 @@ final class SessionMessagesViewModel {
         ollamaClient: OllamaClient = OllamaClient(),
         chatClient: OllamaChatClient? = nil,
         catalog: ModelCatalog = .load(),
-        attachmentImporter: SessionAttachmentImporter = SessionAttachmentImporter()
+        attachmentImporter: SessionAttachmentImporter = SessionAttachmentImporter(),
+        defaults: UserDefaults = .standard
     ) {
         self.store = store
         self.sessionID = sessionID
         self.onActivity = onActivity
         self.catalog = catalog
         self.attachmentImporter = attachmentImporter
+        self.defaults = defaults
 
-        if let scenario = Self.uiTestChatScenario() {
-            let uiTestModelTag = Self.uiTestActiveModelTag()
+        if let scenario = Self.uiTestChatScenario(defaults: defaults) {
+            let uiTestModelTag = Self.uiTestActiveModelTag(defaults: defaults)
             self.ollamaClient = UITestOllamaStatusClient(modelTag: uiTestModelTag)
             self.chatClient = UITestOllamaChatClient(scenario: scenario)
         } else {
@@ -200,10 +203,10 @@ final class SessionMessagesViewModel {
             self.chatClient = chatClient ?? OllamaChatClient(ollamaClient: ollamaClient)
         }
 
-        self.activeModelTagStorage = Self.storedActiveModelTag()
-        self.lastStreamModel = Self.storedLastStreamModel(for: sessionID)
-        self.historyContextLevel = Self.storedHistoryContextLevel()
-        self.fileContextLevel = Self.storedFileContextLevel()
+        self.activeModelTagStorage = Self.storedActiveModelTag(defaults: defaults)
+        self.lastStreamModel = Self.storedLastStreamModel(for: sessionID, defaults: defaults)
+        self.historyContextLevel = Self.storedHistoryContextLevel(defaults: defaults)
+        self.fileContextLevel = Self.storedFileContextLevel(defaults: defaults)
     }
 
     init(
@@ -213,7 +216,8 @@ final class SessionMessagesViewModel {
         ollamaClient: any OllamaStatusProviding,
         chatClient: any OllamaChatStreaming,
         catalog: ModelCatalog = .load(),
-        attachmentImporter: SessionAttachmentImporter = SessionAttachmentImporter()
+        attachmentImporter: SessionAttachmentImporter = SessionAttachmentImporter(),
+        defaults: UserDefaults = .standard
     ) {
         self.store = store
         self.sessionID = sessionID
@@ -222,10 +226,11 @@ final class SessionMessagesViewModel {
         self.chatClient = chatClient
         self.catalog = catalog
         self.attachmentImporter = attachmentImporter
-        self.activeModelTagStorage = Self.storedActiveModelTag()
-        self.lastStreamModel = Self.storedLastStreamModel(for: sessionID)
-        self.historyContextLevel = Self.storedHistoryContextLevel()
-        self.fileContextLevel = Self.storedFileContextLevel()
+        self.defaults = defaults
+        self.activeModelTagStorage = Self.storedActiveModelTag(defaults: defaults)
+        self.lastStreamModel = Self.storedLastStreamModel(for: sessionID, defaults: defaults)
+        self.historyContextLevel = Self.storedHistoryContextLevel(defaults: defaults)
+        self.fileContextLevel = Self.storedFileContextLevel(defaults: defaults)
     }
 
     var activeModelSupportsSpeechInput: Bool {
@@ -247,10 +252,10 @@ final class SessionMessagesViewModel {
         set {
             if let value = newValue?.nonEmptyTrimmed {
                 activeModelTagStorage = value
-                UserDefaults.standard.set(value, forKey: LoomPreferenceKeys.activeModelTag)
+                defaults.set(value, forKey: LoomPreferenceKeys.activeModelTag)
             } else {
                 activeModelTagStorage = nil
-                UserDefaults.standard.removeObject(forKey: LoomPreferenceKeys.activeModelTag)
+                defaults.removeObject(forKey: LoomPreferenceKeys.activeModelTag)
             }
         }
     }
@@ -292,13 +297,13 @@ final class SessionMessagesViewModel {
 
     var isVoiceReplyEnabled: Bool {
         get {
-            if let stored = UserDefaults.standard.object(forKey: LoomPreferenceKeys.voiceReplyEnabled) as? Bool {
+            if let stored = defaults.object(forKey: LoomPreferenceKeys.voiceReplyEnabled) as? Bool {
                 return stored
             }
             return false
         }
         set {
-            UserDefaults.standard.set(newValue, forKey: LoomPreferenceKeys.voiceReplyEnabled)
+            defaults.set(newValue, forKey: LoomPreferenceKeys.voiceReplyEnabled)
         }
     }
 
@@ -738,7 +743,7 @@ final class SessionMessagesViewModel {
     }
 
     private var storedModelOrder: [String] {
-        guard let stored = UserDefaults.standard.array(forKey: LoomPreferenceKeys.modelLibraryOrder) as? [String] else {
+        guard let stored = defaults.array(forKey: LoomPreferenceKeys.modelLibraryOrder) as? [String] else {
             return []
         }
         return stored.compactMap(\.nonEmptyTrimmed)
@@ -828,52 +833,52 @@ final class SessionMessagesViewModel {
 
     private func persistLastStreamModel(_ model: String) {
         guard let model = model.nonEmptyTrimmed else { return }
-        UserDefaults.standard.set(model, forKey: LoomPreferenceKeys.sessionLastStreamModelKey(for: sessionID))
+        defaults.set(model, forKey: LoomPreferenceKeys.sessionLastStreamModelKey(for: sessionID))
     }
 
-    private static func storedLastStreamModel(for sessionID: UUID) -> String? {
-        UserDefaults.standard.string(forKey: LoomPreferenceKeys.sessionLastStreamModelKey(for: sessionID))?.nonEmptyTrimmed
+    private static func storedLastStreamModel(for sessionID: UUID, defaults: UserDefaults) -> String? {
+        defaults.string(forKey: LoomPreferenceKeys.sessionLastStreamModelKey(for: sessionID))?.nonEmptyTrimmed
     }
 
-    private static func storedHistoryContextLevel() -> HistoryContextLevel {
-        guard let raw = UserDefaults.standard.string(forKey: LoomPreferenceKeys.composerHistoryContextLevel),
+    private static func storedHistoryContextLevel(defaults: UserDefaults) -> HistoryContextLevel {
+        guard let raw = defaults.string(forKey: LoomPreferenceKeys.composerHistoryContextLevel),
               let level = HistoryContextLevel(rawValue: raw) else {
             return .balanced
         }
         return level
     }
 
-    private static func storedFileContextLevel() -> FileContextLevel {
-        guard let raw = UserDefaults.standard.string(forKey: LoomPreferenceKeys.composerFileContextLevel),
+    private static func storedFileContextLevel(defaults: UserDefaults) -> FileContextLevel {
+        guard let raw = defaults.string(forKey: LoomPreferenceKeys.composerFileContextLevel),
               let level = FileContextLevel(rawValue: raw) else {
             return .full
         }
         return level
     }
 
-    private static func storedActiveModelTag() -> String? {
-        UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag)?.nonEmptyTrimmed
+    private static func storedActiveModelTag(defaults: UserDefaults) -> String? {
+        defaults.string(forKey: LoomPreferenceKeys.activeModelTag)?.nonEmptyTrimmed
     }
 
     private func synchronizeActiveModelSelectionFromPreferences() {
-        activeModelTagStorage = Self.storedActiveModelTag()
+        activeModelTagStorage = Self.storedActiveModelTag(defaults: defaults)
     }
 
-    private static func uiTestChatScenario() -> UITestOllamaChatClient.Scenario? {
+    private static func uiTestChatScenario(defaults: UserDefaults) -> UITestOllamaChatClient.Scenario? {
         if let raw = ProcessInfo.processInfo.environment[uiTestChatScenarioEnvironmentKey]?.nonEmptyTrimmed {
             return UITestOllamaChatClient.Scenario(rawValue: raw.lowercased())
         }
-        if let raw = UserDefaults.standard.string(forKey: uiTestChatScenarioDefaultsKey)?.nonEmptyTrimmed {
+        if let raw = defaults.string(forKey: uiTestChatScenarioDefaultsKey)?.nonEmptyTrimmed {
             return UITestOllamaChatClient.Scenario(rawValue: raw.lowercased())
         }
         return nil
     }
 
-    private static func uiTestActiveModelTag() -> String {
+    private static func uiTestActiveModelTag(defaults: UserDefaults) -> String {
         if let tag = ProcessInfo.processInfo.environment[uiTestActiveModelTagEnvironmentKey]?.nonEmptyTrimmed {
             return tag
         }
-        if let tag = UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag)?.nonEmptyTrimmed {
+        if let tag = defaults.string(forKey: LoomPreferenceKeys.activeModelTag)?.nonEmptyTrimmed {
             return tag
         }
         return "ui-test-model"

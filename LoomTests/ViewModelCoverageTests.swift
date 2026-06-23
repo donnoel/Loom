@@ -224,6 +224,18 @@ private func cleanupSessionFolder(id: UUID) {
     try? FileManager.default.removeItem(at: folder)
 }
 
+private func makeTemporarySessionsRoot(prefix: String = "loom-view-model-tests") throws -> URL {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent(prefix, isDirectory: true)
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    return root
+}
+
+private func sessionFolderURL(root: URL, id: UUID) -> URL {
+    root.appendingPathComponent(id.uuidString, isDirectory: true)
+}
+
 private func makeTemporaryTextFile(contents: String, fileName: String) throws -> URL {
     try makeTemporaryFile(data: Data(contents.utf8), fileName: fileName)
 }
@@ -272,6 +284,15 @@ private func clearAIStatusOrderPreference() {
     UserDefaults.standard.removeObject(forKey: LoomPreferenceKeys.aiStatusServiceOrder)
 }
 
+private func makeTemporaryUserDefaults(prefix: String = "loom-view-model-tests") -> (UserDefaults, String) {
+    let suiteName = "\(prefix)-\(UUID().uuidString)"
+    guard let defaults = UserDefaults(suiteName: suiteName) else {
+        fatalError("Unable to create temporary UserDefaults suite: \(suiteName)")
+    }
+    defaults.removePersistentDomain(forName: suiteName)
+    return (defaults, suiteName)
+}
+
 @MainActor
 private func sendDraftWithModelRetry(
     _ viewModel: SessionMessagesViewModel,
@@ -282,7 +303,7 @@ private func sendDraftWithModelRetry(
     viewModel.draft = draft
 
     for _ in 0..<maxAttempts {
-        UserDefaults.standard.set(modelTag, forKey: LoomPreferenceKeys.activeModelTag)
+        viewModel.activeModelTag = modelTag
         await viewModel.sendDraft()
 
         if viewModel.banner?.action != .browseModels {
@@ -533,9 +554,9 @@ struct StatusViewModelCoverageTests {
     @MainActor
     func installedModelBestForTextUsesCatalogHighlights() {
         let vm = ModelsViewModel(client: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)))
-        let model = OllamaModel(tag: "qwen3:8b")
+        let model = OllamaModel(tag: "deepseek-r1:8b")
 
-        #expect(vm.installedModelBestForText(for: model) == "Good for: Coding help, Reasoning.")
+        #expect(vm.installedModelBestForText(for: model) == "Good for: Reasoning, Math and logic.")
     }
 
     @Test
@@ -551,9 +572,9 @@ struct StatusViewModelCoverageTests {
     @MainActor
     func installedModelCompanyCountryTextUsesCatalogData() {
         let vm = ModelsViewModel(client: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)))
-        let model = OllamaModel(tag: "qwen3:8b")
+        let model = OllamaModel(tag: "deepseek-r1:8b")
 
-        #expect(vm.installedModelCompanyCountryText(for: model) == "Made by Qwen in China.")
+        #expect(vm.installedModelCompanyCountryText(for: model) == "Made by DeepSeek in China.")
     }
 
     @Test
@@ -569,7 +590,7 @@ struct StatusViewModelCoverageTests {
     @MainActor
     func installedModelLastTrainedTextUsesCatalogData() {
         let vm = ModelsViewModel(client: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: true)))
-        let model = OllamaModel(tag: "qwen3:8b")
+        let model = OllamaModel(tag: "deepseek-r1:8b")
 
         #expect(vm.installedModelLastTrainedText(for: model) == "Last trained: 2025.")
     }
@@ -934,10 +955,10 @@ struct SessionMessagesViewModelCoverageTests {
         }
 
         UserDefaults.standard.set(
-            ["phi4:latest", "qwen3:8b"],
+            ["phi4:latest", "qwen3.5:9b"],
             forKey: LoomPreferenceKeys.modelLibraryOrder
         )
-        UserDefaults.standard.set("qwen3:8b", forKey: LoomPreferenceKeys.activeModelTag)
+        UserDefaults.standard.set("qwen3.5:9b", forKey: LoomPreferenceKeys.activeModelTag)
 
         let store = SessionStore()
         let session = try await store.createSession(title: "Session Model Ordering")
@@ -949,7 +970,7 @@ struct SessionMessagesViewModelCoverageTests {
             ollamaClient: StubOllamaClient(
                 diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
                 modelsResult: .success([
-                    OllamaModel(tag: "qwen3:8b"),
+                    OllamaModel(tag: "qwen3.5:9b"),
                     OllamaModel(tag: "mistral:7b"),
                     OllamaModel(tag: "phi4:latest")
                 ])
@@ -959,8 +980,8 @@ struct SessionMessagesViewModelCoverageTests {
 
         await vm.load()
 
-        #expect(vm.availableModelTags == ["phi4:latest", "qwen3:8b", "mistral:7b"])
-        #expect(vm.activeModelSelectionLabel == "Qwen 3 (8B)")
+        #expect(vm.availableModelTags == ["phi4:latest", "qwen3.5:9b", "mistral:7b"])
+        #expect(vm.activeModelSelectionLabel == "Qwen 3.5 (9B)")
     }
 
     @Test
@@ -982,12 +1003,12 @@ struct SessionMessagesViewModelCoverageTests {
             chatClient: ScriptedChatClient([])
         )
 
-        vm.activeModelTag = "  qwen3:8b  "
-        #expect(vm.activeModelTag == "qwen3:8b")
+        vm.activeModelTag = "  qwen3.5:9b  "
+        #expect(vm.activeModelTag == "qwen3.5:9b")
         #expect(
-            UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag) == "qwen3:8b"
+            UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag) == "qwen3.5:9b"
         )
-        #expect(vm.activeModelSelectionLabel == "Qwen 3 (8B) (Unavailable)")
+        #expect(vm.activeModelSelectionLabel == "Qwen 3.5 (9B) (Unavailable)")
 
         vm.activeModelTag = "   "
         #expect(vm.activeModelTag == nil)
@@ -1143,10 +1164,9 @@ struct SessionMessagesViewModelCoverageTests {
     @Test
     @MainActor
     func sendDraftConcurrentCallsSubmitOnlyOnce() async throws {
-        clearModelSelectionPreference()
-        defer { clearModelSelectionPreference() }
-
-        UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+        let (defaults, suiteName) = makeTemporaryUserDefaults(prefix: "loom-concurrent-send")
+        defaults.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
+        defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let store = SessionStore()
         let session = try await store.createSession(title: "Concurrent Send")
@@ -1160,7 +1180,8 @@ struct SessionMessagesViewModelCoverageTests {
                 diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
                 diagnosisDelay: .milliseconds(120)
             ),
-            chatClient: chatClient
+            chatClient: chatClient,
+            defaults: defaults
         )
 
         vm.draft = "Hello"
@@ -1922,14 +1943,12 @@ struct RootViewModelCoverageTests {
     @Test
     @MainActor
     func loadFiltersAndSelectsMostRecentSession() async throws {
-        let store = SessionStore()
+        let sessionsRoot = try makeTemporarySessionsRoot()
+        defer { try? FileManager.default.removeItem(at: sessionsRoot) }
+        let store = SessionStore(sessionsRoot: sessionsRoot)
         let uniqueTag = "design-\(UUID().uuidString)"
         let first = try await store.createSession(title: "Design Notes")
         let second = try await store.createSession(title: "Roadmap")
-        defer {
-            cleanupSessionFolder(id: first.id)
-            cleanupSessionFolder(id: second.id)
-        }
 
         var firstMeta = first.metadata
         firstMeta.tags = [uniqueTag, "ux"]
@@ -1952,9 +1971,10 @@ struct RootViewModelCoverageTests {
     @Test
     @MainActor
     func renamePinAndTagsPersistThroughStore() async throws {
-        let store = SessionStore()
+        let sessionsRoot = try makeTemporarySessionsRoot()
+        defer { try? FileManager.default.removeItem(at: sessionsRoot) }
+        let store = SessionStore(sessionsRoot: sessionsRoot)
         let session = try await store.createSession(title: "Original")
-        defer { cleanupSessionFolder(id: session.id) }
 
         let vm = RootViewModel(store: store)
         await vm.load()
@@ -1974,9 +1994,10 @@ struct RootViewModelCoverageTests {
     @Test
     @MainActor
     func archiveStatePersistsThroughStore() async throws {
-        let store = SessionStore()
+        let sessionsRoot = try makeTemporarySessionsRoot()
+        defer { try? FileManager.default.removeItem(at: sessionsRoot) }
+        let store = SessionStore(sessionsRoot: sessionsRoot)
         let session = try await store.createSession(title: "Archive Me")
-        defer { cleanupSessionFolder(id: session.id) }
 
         let vm = RootViewModel(store: store)
         await vm.load()
@@ -1990,13 +2011,11 @@ struct RootViewModelCoverageTests {
     @Test
     @MainActor
     func defaultListsHideArchivedSessionsFromActiveList() async throws {
-        let store = SessionStore()
+        let sessionsRoot = try makeTemporarySessionsRoot()
+        defer { try? FileManager.default.removeItem(at: sessionsRoot) }
+        let store = SessionStore(sessionsRoot: sessionsRoot)
         let active = try await store.createSession(title: "Active")
         let archived = try await store.createSession(title: "Archived")
-        defer {
-            cleanupSessionFolder(id: active.id)
-            cleanupSessionFolder(id: archived.id)
-        }
 
         var archivedMetadata = archived.metadata
         archivedMetadata.isArchived = true
@@ -2013,15 +2032,12 @@ struct RootViewModelCoverageTests {
     @Test
     @MainActor
     func sortingKeepsPinnedActiveFirstAndArchivedAfterActive() async throws {
-        let store = SessionStore()
+        let sessionsRoot = try makeTemporarySessionsRoot()
+        defer { try? FileManager.default.removeItem(at: sessionsRoot) }
+        let store = SessionStore(sessionsRoot: sessionsRoot)
         let pinnedActive = try await store.createSession(title: "Pinned Active")
         let recentActive = try await store.createSession(title: "Recent Active")
         let archivedPinned = try await store.createSession(title: "Archived Pinned")
-        defer {
-            cleanupSessionFolder(id: pinnedActive.id)
-            cleanupSessionFolder(id: recentActive.id)
-            cleanupSessionFolder(id: archivedPinned.id)
-        }
 
         var pinnedActiveMetadata = pinnedActive.metadata
         pinnedActiveMetadata.isPinned = true
@@ -2050,13 +2066,11 @@ struct RootViewModelCoverageTests {
     @Test
     @MainActor
     func deleteSelectedRemovesSessionAndKeepsSelectionValid() async throws {
-        let store = SessionStore()
+        let sessionsRoot = try makeTemporarySessionsRoot()
+        defer { try? FileManager.default.removeItem(at: sessionsRoot) }
+        let store = SessionStore(sessionsRoot: sessionsRoot)
         let first = try await store.createSession(title: "First")
-        let second = try await store.createSession(title: "Second")
-        defer {
-            cleanupSessionFolder(id: first.id)
-            cleanupSessionFolder(id: second.id)
-        }
+        _ = try await store.createSession(title: "Second")
 
         let vm = RootViewModel(store: store)
         await vm.load()
@@ -2067,16 +2081,17 @@ struct RootViewModelCoverageTests {
         #expect(vm.session(for: first.id) == nil)
         #expect(vm.selectedSessionID != first.id)
 
-        let firstFolder = try LoomPaths.sessionFolder(for: first.id)
+        let firstFolder = sessionFolderURL(root: sessionsRoot, id: first.id)
         #expect(!FileManager.default.fileExists(atPath: firstFolder.path))
     }
 
     @Test
     @MainActor
     func touchSessionRefreshesInMemoryTitleFromStore() async throws {
-        let store = SessionStore()
+        let sessionsRoot = try makeTemporarySessionsRoot()
+        defer { try? FileManager.default.removeItem(at: sessionsRoot) }
+        let store = SessionStore(sessionsRoot: sessionsRoot)
         let session = try await store.createSession(title: Session.Metadata.defaultTitle)
-        defer { cleanupSessionFolder(id: session.id) }
 
         let vm = RootViewModel(store: store)
         await vm.load()
@@ -2101,15 +2116,15 @@ struct CompareModeViewModelCoverageTests {
         let vm = CompareModeViewModel(
             ollamaClient: StubOllamaClient(
                 diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
-                modelsResult: .success([OllamaModel(tag: "qwen3:8b"), OllamaModel(tag: "mistral:7b")])
+                modelsResult: .success([OllamaModel(tag: "qwen3.5:9b"), OllamaModel(tag: "mistral:7b")])
             ),
             chatClient: ScriptedChatClient([])
         )
 
         await vm.loadModels()
         vm.prompt = "Explain this"
-        vm.leftModelTag = "qwen3:8b"
-        vm.rightModelTag = "qwen3:8b"
+        vm.leftModelTag = "qwen3.5:9b"
+        vm.rightModelTag = "qwen3.5:9b"
 
         await vm.runCompare()
 
@@ -2129,14 +2144,14 @@ struct CompareModeViewModelCoverageTests {
         let vm = CompareModeViewModel(
             ollamaClient: StubOllamaClient(
                 diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
-                modelsResult: .success([OllamaModel(tag: "qwen3:8b"), OllamaModel(tag: "mistral:7b")])
+                modelsResult: .success([OllamaModel(tag: "qwen3.5:9b"), OllamaModel(tag: "mistral:7b")])
             ),
             chatClient: chatClient
         )
 
         await vm.loadModels()
         vm.prompt = "Compare approaches"
-        vm.leftModelTag = "qwen3:8b"
+        vm.leftModelTag = "qwen3.5:9b"
         vm.rightModelTag = "mistral:7b"
 
         await vm.runCompare()

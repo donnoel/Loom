@@ -5,6 +5,7 @@ import os.signpost
 actor SessionStore {
     private let log = Logger(subsystem: "com.loom.app", category: "SessionStore")
     private let signposter = OSSignposter(subsystem: "com.loom.app", category: "SessionStore")
+    private let sessionsRootOverride: URL?
 
     private let encoder: JSONEncoder = {
         let e = JSONEncoder()
@@ -31,11 +32,15 @@ actor SessionStore {
         return d
     }()
 
+    init(sessionsRoot: URL? = nil) {
+        self.sessionsRootOverride = sessionsRoot
+    }
+
     func bootstrap() throws {
         let spID = signposter.makeSignpostID()
         let state = signposter.beginInterval("bootstrap", id: spID)
         defer { signposter.endInterval("bootstrap", state) }
-        let root = try LoomPaths.sessionsRoot()
+        let root = try sessionsRoot()
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     }
 
@@ -45,7 +50,7 @@ actor SessionStore {
         defer { signposter.endInterval("listSessions", state) }
         try bootstrap()
 
-        let root = try LoomPaths.sessionsRoot()
+        let root = try sessionsRoot()
         let urls = try FileManager.default.contentsOfDirectory(
             at: root,
             includingPropertiesForKeys: [.isDirectoryKey],
@@ -62,7 +67,7 @@ actor SessionStore {
 
                     guard let id = UUID(uuidString: url.lastPathComponent) else { return }
 
-                    let metaURL = try LoomPaths.sessionMetadataURL(for: id)
+                    let metaURL = try sessionMetadataURL(for: id)
                     guard FileManager.default.fileExists(atPath: metaURL.path) else { return }
 
                     let data = try Data(contentsOf: metaURL)
@@ -87,13 +92,13 @@ actor SessionStore {
         try bootstrap()
 
         let session = Session(metadata: .init(title: title))
-        let folder = try LoomPaths.sessionFolder(for: session.id)
+        let folder = try sessionFolder(for: session.id)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 
         try writeMetadata(session.metadata, for: session.id)
 
         // 3B: Ensure an empty messages.jsonl exists for this session.
-        let messagesURL = try LoomPaths.sessionMessagesURL(for: session.id)
+        let messagesURL = try sessionMessagesURL(for: session.id)
         if !FileManager.default.fileExists(atPath: messagesURL.path) {
             FileManager.default.createFile(atPath: messagesURL.path, contents: nil)
         }
@@ -124,7 +129,7 @@ actor SessionStore {
         let spID = signposter.makeSignpostID()
         let state = signposter.beginInterval("deleteSession", id: spID)
         defer { signposter.endInterval("deleteSession", state) }
-        let folder = try LoomPaths.sessionFolder(for: id)
+        let folder = try sessionFolder(for: id)
         do {
             if FileManager.default.fileExists(atPath: folder.path) {
                 try FileManager.default.removeItem(at: folder)
@@ -143,7 +148,7 @@ actor SessionStore {
         defer { signposter.endInterval("deleteAllSessions", state) }
         try bootstrap()
 
-        let root = try LoomPaths.sessionsRoot()
+        let root = try sessionsRoot()
         let urls = try FileManager.default.contentsOfDirectory(
             at: root,
             includingPropertiesForKeys: nil,
@@ -169,7 +174,7 @@ actor SessionStore {
         let spID = signposter.makeSignpostID()
         let state = signposter.beginInterval("appendMessage", id: spID)
         defer { signposter.endInterval("appendMessage", state) }
-        let url = try LoomPaths.sessionMessagesURL(for: sessionID)
+        let url = try sessionMessagesURL(for: sessionID)
 
         if !FileManager.default.fileExists(atPath: url.path) {
             FileManager.default.createFile(atPath: url.path, contents: nil)
@@ -205,7 +210,7 @@ actor SessionStore {
         let spID = signposter.makeSignpostID()
         let state = signposter.beginInterval("loadMessages", id: spID)
         defer { signposter.endInterval("loadMessages", state) }
-        let url = try LoomPaths.sessionMessagesURL(for: sessionID)
+        let url = try sessionMessagesURL(for: sessionID)
         guard FileManager.default.fileExists(atPath: url.path) else { return [] }
 
         let data = try Data(contentsOf: url)
@@ -215,7 +220,7 @@ actor SessionStore {
     }
 
     func loadScratchpad(sessionID: UUID) throws -> String {
-        let url = try LoomPaths.sessionScratchpadURL(for: sessionID)
+        let url = try sessionScratchpadURL(for: sessionID)
         guard FileManager.default.fileExists(atPath: url.path) else { return "" }
 
         let data = try Data(contentsOf: url)
@@ -223,13 +228,13 @@ actor SessionStore {
     }
 
     func saveScratchpad(_ text: String, sessionID: UUID) throws {
-        let url = try LoomPaths.sessionScratchpadURL(for: sessionID)
+        let url = try sessionScratchpadURL(for: sessionID)
         let data = Data(text.utf8)
         try data.write(to: url, options: [.atomic])
     }
 
     func loadSessionMemory(sessionID: UUID) throws -> SessionMemory {
-        let url = try LoomPaths.sessionMemoryURL(for: sessionID)
+        let url = try sessionMemoryURL(for: sessionID)
         guard FileManager.default.fileExists(atPath: url.path) else { return .empty }
 
         let data = try Data(contentsOf: url)
@@ -237,7 +242,7 @@ actor SessionStore {
     }
 
     func saveSessionMemory(_ memory: SessionMemory, sessionID: UUID) throws {
-        let url = try LoomPaths.sessionMemoryURL(for: sessionID)
+        let url = try sessionMemoryURL(for: sessionID)
         let data = try encoder.encode(memory.normalized())
         try data.write(to: url, options: [.atomic])
     }
@@ -249,7 +254,7 @@ actor SessionStore {
 
         guard limit > 0 else { return [] }
 
-        let url = try LoomPaths.sessionMessagesURL(for: sessionID)
+        let url = try sessionMessagesURL(for: sessionID)
         guard FileManager.default.fileExists(atPath: url.path) else { return [] }
 
         let handle = try FileHandle(forReadingFrom: url)
@@ -335,7 +340,7 @@ actor SessionStore {
     }
 
     private func writeMetadata(_ metadata: Session.Metadata, for id: UUID, touchUpdatedAt: Bool = true) throws {
-        let metaURL = try LoomPaths.sessionMetadataURL(for: id)
+        let metaURL = try sessionMetadataURL(for: id)
         var copy = metadata
         if touchUpdatedAt {
             copy.updatedAt = Date()
@@ -346,7 +351,7 @@ actor SessionStore {
     }
 
     private func loadMetadata(for id: UUID) throws -> Session.Metadata {
-        let metaURL = try LoomPaths.sessionMetadataURL(for: id)
+        let metaURL = try sessionMetadataURL(for: id)
         let data = try Data(contentsOf: metaURL)
         return try decoder.decode(Session.Metadata.self, from: data)
     }
@@ -357,6 +362,33 @@ actor SessionStore {
             return false
         }
         return fileSize == 0
+    }
+
+    private func sessionsRoot() throws -> URL {
+        if let sessionsRootOverride {
+            return sessionsRootOverride
+        }
+        return try LoomPaths.sessionsRoot()
+    }
+
+    private func sessionFolder(for id: UUID) throws -> URL {
+        try sessionsRoot().appendingPathComponent(id.uuidString, isDirectory: true)
+    }
+
+    private func sessionMetadataURL(for id: UUID) throws -> URL {
+        try sessionFolder(for: id).appendingPathComponent(LoomPaths.metadataFileName, isDirectory: false)
+    }
+
+    private func sessionMessagesURL(for id: UUID) throws -> URL {
+        try sessionFolder(for: id).appendingPathComponent(LoomPaths.messagesFileName, isDirectory: false)
+    }
+
+    private func sessionScratchpadURL(for id: UUID) throws -> URL {
+        try sessionFolder(for: id).appendingPathComponent(LoomPaths.scratchpadFileName, isDirectory: false)
+    }
+
+    private func sessionMemoryURL(for id: UUID) throws -> URL {
+        try sessionFolder(for: id).appendingPathComponent(LoomPaths.memoryFileName, isDirectory: false)
     }
 
     private nonisolated static func isDefaultSessionTitle(_ title: String) -> Bool {

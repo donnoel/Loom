@@ -26,12 +26,6 @@ nonisolated enum LoomPaths {
     }
 
     static func sessionsRoot() throws -> URL {
-        if let override = ProcessInfo.processInfo.environment["LOOM_SESSIONS_ROOT"]?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-           !override.isEmpty {
-            return URL(fileURLWithPath: NSString(string: override).expandingTildeInPath, isDirectory: true)
-        }
-
         return try applicationSupportRoot().appendingPathComponent(sessionsFolderName, isDirectory: true)
     }
 

@@ -626,19 +626,16 @@ struct OllamaClientNetworkTests {
 struct SessionStoreTailReadTests {
     @Test
     func loadRecentMessagesReadsAcrossMultipleChunksAndReturnsLastNInOrder() async throws {
-        // Arrange: force SessionStore to write into a temp root via LoomPaths.sessionsRoot() override.
         let tempRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("LoomTests", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
 
-        setenv("LOOM_SESSIONS_ROOT", tempRoot.path, 1)
         defer {
-            unsetenv("LOOM_SESSIONS_ROOT")
             try? FileManager.default.removeItem(at: tempRoot)
         }
 
-        let store = SessionStore()
+        let store = SessionStore(sessionsRoot: tempRoot)
         let session = try await store.createSession(title: "Tail Read Test")
 
         // Write enough messages to exceed the 64KB tail-read chunk size (and then some).

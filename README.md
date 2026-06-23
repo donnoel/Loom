@@ -31,7 +31,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 💾 **Disk-Backed Persistence** | Each session stores `metadata.json` + append-only `messages.jsonl`. |
 | ⚡ **Streaming Assistant Replies** | Assistant responses stream live into the UI as tokens arrive. |
 | 🎙️ **Speech Input (Push-to-Talk)** | Use the mic button to dictate directly into the draft field with on-device speech recognition. |
-| 🔊 **Optional Voice Replies** | Toggle read-aloud mode so new assistant replies are spoken after generation completes, using your chosen voice + speaking rate from Settings. |
+| 🔊 **Optional Voice Replies** | Toggle read-aloud mode so new assistant replies are spoken after generation completes, using your chosen voice from Settings. |
 | 📎 **File Upload Grounding** | Attach local text/PDF files and Loom injects extracted excerpts as context for the next turn, with size/count guardrails and automatic context-budget trimming. |
 | 🎚️ **Composer Context Controls** | Choose concise/balanced/extended history and off/compact/full file context from the composer, with quieter UI defaults. |
 | 🛡️ **Trust Center** | Dedicated local-only panel showing where data lives, local storage footprint, attachment retention footprint, and recent local runtime health checks. |
@@ -49,7 +49,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 🧩 **Model Picker** | View installed Ollama models with plain-language "good for" guidance plus maker/country and last-trained details, use streamlined actions (Set Active / Update / Delete), and keep model selection across launches until you change it. |
 | ↕️ **Drag-Reorder Models** | Reorder installed models in Model Library with drag-and-drop, and Loom remembers your order across refresh/relaunch. |
 | ℹ️ **System Info Sheet** | Open **App → Info** in the sidebar to see a plain-language walkthrough of how Loom, Ollama, and local models work together, with official source links per company. |
-| 📥 **In-App Model Install** | Use **Add Model…** to browse a focused curated catalog (Qwen 3 8B, DeepSeek R1 8B, Gemma 3 4B/12B, Mistral Small 24B), review friendly summaries, and install with live progress + cancel support. |
+| 📥 **In-App Model Install** | Use **Add Model…** to browse a focused curated catalog (Qwen 3.5 9B, DeepSeek R1 8B, Gemma 3 4B, Gemma 4 E4B), review friendly summaries, and install with live progress + cancel support. |
 | 🧹 **Model Cleanup** | Delete installed models directly from Loom (with confirmation and active-model safety checks). |
 | 💽 **Disk Awareness** | Model Library shows local free-space info and warns when free space is below 10%. |
 | 🩺 **Readiness Status** | Model Library + toolbar pill show ready/setup/not-ready state in plain language. |
@@ -73,7 +73,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Switch Models In Session** from the combined model/tools menu above the composer
 - **Tune Context Before Send** from the same `Tools` menu (history + file inclusion)
 - **Open Trust Center** from **App → Trust Center** for local data location, footprint, and runtime health visibility
-- **Tune Voice Quality** in Settings with a voice picker, speaking-rate slider, and preview button
+- **Tune Voice Quality** in Settings with a voice picker and preview button
 - **Auto-Correct + Spell Check** in the message field (uses your macOS Keyboard settings)
 - **Stop** to cancel streaming while keeping partial text
 - **Jump to Bottom** with the floating down-arrow when you scroll up in long chats
@@ -218,7 +218,7 @@ Also included:
 
 1. Install **Ollama** on your Mac (`https://ollama.com/download`)  
 2. Start Ollama (app launch or `ollama serve`)  
-3. Pull at least one model (example: `ollama pull llama3.2`)  
+3. Pull at least one model from Loom's current catalog (example: `ollama pull qwen3.5:9b`)
 4. Open `Loom.xcodeproj` in Xcode  
 5. Build and run the **Loom** scheme  
 6. In Loom, open **Models** and select an active model  

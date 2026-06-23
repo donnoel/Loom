@@ -1077,6 +1077,7 @@ private struct ComposerUtilityIconButton: View {
             )
         }
         .help(helpText)
+        .accessibilityLabel(helpText)
         .buttonStyle(.plain)
         .disabled(isDisabled)
         .padding(2)

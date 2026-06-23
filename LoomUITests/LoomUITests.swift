@@ -167,22 +167,29 @@ final class LoomUITests: XCTestCase {
     }
 
     private func clickButton(_ identifier: String, app: XCUIApplication) {
-        let toolbarCandidates = app.toolbars.buttons.matching(identifier: identifier)
-        let toolbarElements = toolbarCandidates.allElementsBoundByIndex
-        if let hittableToolbarButton = toolbarElements.first(where: { $0.exists && $0.isHittable }) {
-            hittableToolbarButton.click()
-            return
-        }
-        if let toolbarButton = toolbarElements.first(where: { $0.exists }) {
-            toolbarButton.click()
-            return
+        let deadline = Date().addingTimeInterval(Self.mediumTimeout)
+
+        while Date() < deadline {
+            let toolbarCandidates = app.toolbars.buttons.matching(identifier: identifier)
+            if let toolbarButton = toolbarCandidates.allElementsBoundByIndex.first(where: { $0.exists && $0.isHittable }) {
+                toolbarButton.click()
+                return
+            }
+
+            let candidates = app.descendants(matching: .button).matching(identifier: identifier)
+            if let candidate = candidates.allElementsBoundByIndex.first(where: { $0.exists && $0.isHittable }) {
+                candidate.click()
+                return
+            }
+
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
 
-        let candidates = app.descendants(matching: .button).matching(identifier: identifier)
-        let firstCandidate = candidates.firstMatch
-        XCTAssertTrue(firstCandidate.waitForExistence(timeout: Self.mediumTimeout), "Missing button: \(identifier)")
-        let hittableCandidate = candidates.allElementsBoundByIndex.first(where: { $0.exists && $0.isHittable })
-        (hittableCandidate ?? firstCandidate).click()
+        let firstCandidate = app.descendants(matching: .button)
+            .matching(identifier: identifier)
+            .firstMatch
+        XCTAssertTrue(firstCandidate.waitForExistence(timeout: Self.shortTimeout), "Missing button: \(identifier)")
+        XCTAssertTrue(firstCandidate.isHittable, "Button exists but is not hittable: \(identifier)")
     }
 
     private func typeMessage(_ text: String, app: XCUIApplication) {
