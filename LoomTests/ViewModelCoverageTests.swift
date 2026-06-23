@@ -347,6 +347,27 @@ struct StatusViewModelCoverageTests {
 
     @Test
     @MainActor
+    func refreshTreatsMissingActiveModelAsNeedsSetup() async {
+        clearModelSelectionPreference()
+        defer { clearModelSelectionPreference() }
+        UserDefaults.standard.set("missing-model", forKey: LoomPreferenceKeys.activeModelTag)
+
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            modelsResult: .success([OllamaModel(tag: "llama3")])
+        )
+        let vm = StatusViewModel(client: client)
+
+        await vm.refresh()
+
+        #expect(vm.snapshot.activeModelTag == nil)
+        #expect(!vm.snapshot.offlineAvailable)
+        #expect(vm.snapshot.readiness == .needsSetup)
+        #expect(vm.snapshot.issues == [.noModelSelected])
+    }
+
+    @Test
+    @MainActor
     func refreshRecordsRecentRuntimeHealth() async {
         let client = StubOllamaClient(
             diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
@@ -1039,6 +1060,29 @@ struct SessionMessagesViewModelCoverageTests {
         #expect(vm.activeModelTag == nil)
         #expect(UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag) == nil)
         #expect(vm.activeModelSelectionLabel == "Choose Model")
+    }
+
+    @Test
+    @MainActor
+    func loadSurfacesCorruptSessionMemoryRecoveryBanner() async throws {
+        let store = SessionStore()
+        let session = try await store.createSession(title: "Corrupt Memory")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        let memoryURL = try LoomPaths.sessionMemoryURL(for: session.id)
+        try Data("not-json".utf8).write(to: memoryURL, options: [.atomic])
+
+        let vm = SessionMessagesViewModel(
+            store: store,
+            sessionID: session.id,
+            ollamaClient: StubOllamaClient(diagnosis: makeDiagnosis(isInstalled: true, isRunning: false)),
+            chatClient: ScriptedChatClient([])
+        )
+
+        await vm.load()
+
+        #expect(vm.sessionMemory == .empty)
+        #expect(vm.banner?.text == "Loom couldn’t load session memory. You can edit it again.")
     }
 
     @Test

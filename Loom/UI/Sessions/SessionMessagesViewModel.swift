@@ -366,6 +366,11 @@ final class SessionMessagesViewModel {
             sessionMemory = try await store.loadSessionMemory(sessionID: sessionID)
         } catch {
             sessionMemory = .empty
+            banner = BannerState(
+                text: "Loom couldn’t load session memory. You can edit it again.",
+                actionTitle: nil,
+                action: nil
+            )
         }
 
         await refreshInstalledModels()

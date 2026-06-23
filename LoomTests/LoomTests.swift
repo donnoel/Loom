@@ -220,6 +220,36 @@ struct SessionStoreTests {
     }
 
     @Test
+    func listSessionsKeepsLegacyMetadataVisibleWithFallbackDefaults() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LoomLegacyMetadataTests", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let store = SessionStore(sessionsRoot: tempRoot)
+        let session = try await store.createSession(title: "Legacy")
+        let metadataURL = tempRoot
+            .appendingPathComponent(session.id.uuidString, isDirectory: true)
+            .appendingPathComponent(LoomPaths.metadataFileName, isDirectory: false)
+        let legacyMetadata = """
+        {
+          "createdAt": "2026-01-01T00:00:00Z",
+          "updatedAt": "2026-01-02T00:00:00Z"
+        }
+        """
+        try Data(legacyMetadata.utf8).write(to: metadataURL, options: [.atomic])
+
+        let loaded = try await store.loadSession(id: session.id)
+        #expect(loaded?.metadata.title == Session.Metadata.defaultTitle)
+        #expect(loaded?.metadata.tags == [])
+        #expect(loaded?.metadata.isPinned == false)
+        #expect(loaded?.metadata.isArchived == false)
+
+        let listed = try await store.listSessions()
+        #expect(listed.contains(where: { $0.id == session.id }))
+    }
+
+    @Test
     func deleteSessionRemovesSessionFolder() async throws {
         let store = SessionStore()
         let session = try await store.createSession(title: "Delete \(UUID().uuidString)")

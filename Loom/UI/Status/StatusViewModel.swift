@@ -105,7 +105,13 @@ final class StatusViewModel {
             }
         }
 
-        let activeModelTag = UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag)?.nonEmptyTrimmed
+        let storedActiveModelTag = UserDefaults.standard.string(forKey: LoomPreferenceKeys.activeModelTag)?.nonEmptyTrimmed
+        let activeModelTag: String?
+        if let storedActiveModelTag, models.contains(where: { $0.tag == storedActiveModelTag }) {
+            activeModelTag = storedActiveModelTag
+        } else {
+            activeModelTag = nil
+        }
 
         snapshot = LoomStatusSnapshot(
             ollamaReachable: isReachable,

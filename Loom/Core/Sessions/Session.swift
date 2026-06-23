@@ -38,10 +38,16 @@ nonisolated struct Session: Identifiable, Hashable, Codable, Sendable {
 
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            title = try container.decode(String.self, forKey: .title)
-            createdAt = try container.decode(Date.self, forKey: .createdAt)
-            updatedAt = try container.decode(Date.self, forKey: .updatedAt)
-            tags = try container.decode([String].self, forKey: .tags)
+            if let decodedTitle = try container.decodeIfPresent(String.self, forKey: .title)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+               !decodedTitle.isEmpty {
+                title = decodedTitle
+            } else {
+                title = Self.defaultTitle
+            }
+            createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? .distantPast
+            updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
+            tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
             isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
             isArchived = try container.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
         }
