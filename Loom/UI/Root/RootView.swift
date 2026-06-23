@@ -324,6 +324,10 @@ struct RootView: View {
     private var sidebar: some View {
         List {
             Section {
+                if let banner = sessionsViewModel.sidebarBanner {
+                    sidebarBannerRow(banner)
+                }
+
                 newSessionSidebarRow
 
                 if isGlobalSearchActive {
@@ -432,6 +436,29 @@ struct RootView: View {
         .background(colorScheme == .dark ? Color(red: 0.10, green: 0.10, blue: 0.11) : Color(red: 0.95, green: 0.95, blue: 0.96))
         .navigationSplitViewColumnWidth(min: 208, ideal: 220, max: 232)
         .navigationTitle("")
+    }
+
+    private func sidebarBannerRow(_ banner: RootViewModel.SidebarBannerState) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(banner.text)
+                .font(LoomTheme.Typography.caption)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button(banner.actionTitle) {
+                Task { await reloadSessionsFromSidebarBanner() }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .loomCard(cornerRadius: 10)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("sidebar.session.banner")
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
     }
 
     @ViewBuilder
@@ -747,6 +774,13 @@ struct RootView: View {
         sessionsViewModel.selectedSessionID = id
         await sessionsViewModel.deleteSelected()
         synchronizeSelectionAfterSessionReload(preferredSessionID: sessionsViewModel.selectedSessionID)
+    }
+
+    private func reloadSessionsFromSidebarBanner() async {
+        await sessionsViewModel.load()
+        synchronizeSelectionAfterSessionReload(
+            preferredSessionID: sessionsViewModel.selectedSessionID
+        )
     }
 
     private func beginRenameForSelectedSession() {

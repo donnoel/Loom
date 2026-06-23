@@ -2057,6 +2057,7 @@ private struct SessionInlineBanner: View {
                     performAction(action)
                 }
                 .buttonStyle(.bordered)
+                .accessibilityIdentifier("session.banner.action")
             }
         }
         .padding(12)

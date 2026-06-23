@@ -36,6 +36,23 @@ final class LoomUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Choose a model to chat with."].waitForExistence(timeout: Self.mediumTimeout))
     }
 
+    func testNoModelGuidanceOpensModelsRecovery() throws {
+        let app = launchApp()
+        XCTAssertTrue(createSessionAndWaitForDetail(app: app))
+
+        typeMessage("Help me get set up", app: app)
+
+        clickButton("session.detail.sendButton", app: app)
+
+        XCTAssertTrue(app.staticTexts["Choose a model to chat with."].waitForExistence(timeout: Self.mediumTimeout))
+
+        clickButton("session.banner.action", app: app)
+
+        XCTAssertTrue(element("root.detail.models", app: app).waitForExistence(timeout: Self.mediumTimeout))
+        XCTAssertTrue(app.staticTexts["ui-test-model"].waitForExistence(timeout: Self.mediumTimeout))
+        XCTAssertTrue(app.buttons["Set Active"].firstMatch.waitForExistence(timeout: Self.mediumTimeout))
+    }
+
     func testSendStreamsAssistantReply() throws {
         let app = launchApp(
             activeModelTag: "ui-test-model",
@@ -92,11 +109,12 @@ final class LoomUITests: XCTestCase {
 
         clickButton("session.detail.sendButton", app: app)
 
-        let typingState = element("session.message.assistant.typing", app: app)
         let stopButton = button("session.detail.stopButton", app: app)
-        let sawStreamingState = stopButton.waitForExistence(timeout: Self.longTimeout)
-            || typingState.waitForExistence(timeout: Self.longTimeout)
-        XCTAssertTrue(sawStreamingState, "Expected assistant streaming state to appear.")
+        XCTAssertTrue(
+            waitForAssistantBubbleContaining("partial", app: app, timeout: Self.longTimeout),
+            "Expected partial assistant content before stopping."
+        )
+        XCTAssertTrue(stopButton.waitForExistence(timeout: Self.mediumTimeout), "Expected stop button to remain available.")
 
         clickButton("session.detail.stopButton", app: app)
         _ = waitForNotExists(stopButton, timeout: Self.mediumTimeout)
@@ -109,6 +127,10 @@ final class LoomUITests: XCTestCase {
             chatScenario: .cancelablePartial
         )
         XCTAssertTrue(createSessionAndWaitForDetail(app: relaunched))
+        XCTAssertTrue(
+            waitForAssistantBubbleContaining("partial", app: relaunched, timeout: Self.longTimeout),
+            "Expected canceled partial assistant content to survive relaunch."
+        )
     }
 
     private func launchApp(
