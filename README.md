@@ -26,9 +26,9 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 
 | Feature | Description |
 |--------|-------------|
-| 🗂️ **Session Workspace** | Create, rename, delete, and sort sessions by recent activity. |
+| 🗂️ **Session Workspace** | Create, rename, delete, search, pin, archive, and sort sessions by recent activity. |
 | 🏷️ **Auto Session Titles** | New sessions are renamed from your first prompt so conversations are easier to scan later. |
-| 💾 **Disk-Backed Persistence** | Each session stores `metadata.json` + append-only `messages.jsonl`. |
+| 💾 **Disk-Backed Persistence** | Each session stores `metadata.json`, append-only `messages.jsonl`, optional `scratchpad.txt`, and optional `memory.json`. |
 | ⚡ **Streaming Assistant Replies** | Assistant responses stream live into the UI as tokens arrive. |
 | 🎙️ **Speech Input (Push-to-Talk)** | Use the mic button to dictate directly into the draft field with on-device speech recognition. |
 | 🔊 **Optional Voice Replies** | Toggle read-aloud mode so new assistant replies are spoken after generation completes, using your chosen voice from Settings. |
@@ -40,6 +40,11 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | ✍️ **Readable Chat Formatting** | Assistant text is normalized for paragraph/list readability when raw output arrives as a dense block, while keeping stable whitespace-preserving rendering during streaming to avoid visual "snap back." |
 | 🎨 **Chat-First Workspace Styling** | The app uses a cleaner dark workspace with flatter surfaces, calmer sidebar emphasis, and a simplified composer to keep focus on conversation content. |
 | 💡 **Starter Prompt Chips** | New sessions include one-tap prompt suggestions that prefill the composer to help non-technical users get started quickly. |
+| 📌 **Session Organization** | Pin important chats, archive old ones without deleting them, and use sidebar search across chat titles and messages. |
+| 📝 **Per-Session Scratchpad** | Keep lightweight notes beside a chat without adding them to the transcript. |
+| 🧾 **Session Memory** | Save a few user-edited reply preferences for a session and optionally include them in future turns. |
+| 🔀 **Model Compare Mode** | Run one prompt against two installed local models side by side without changing the active chat. |
+| 🪄 **Assistant Quick Actions** | Copy replies as plain text/Markdown or create follow-up turns that summarize, simplify, professionalize, or checklist a response. |
 | ⏹️ **Stop Generation** | Cancel generation any time and keep the partial assistant response. |
 | 🧠 **Helpful Setup Gating** | Clear in-context guidance if no active model is selected or Ollama is unavailable. |
 | 🌐 **AI Service Monitor** | App → AI Status checks public status feeds for major chatbots (including Grok) and shows uptime + known issues in one place. |
@@ -63,7 +68,8 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Create Session** with the `+` toolbar button
 - **Auto-Name New Sessions** by sending your first message (title is derived from the opening request)
 - **Browse Chats** directly in the sidebar
-- **Rename/Delete** from toolbar or session context menu
+- **Search Chats** from the sidebar to find matching chat titles or message snippets
+- **Rename/Pin/Archive/Delete** from toolbar or session context menu
 - **Type + Send** in the message field to start a local model response
 - **Tap Starter Prompts** in a new session to prefill a question instantly
 - **Attach Files** with the paperclip button to add local text/PDF context
@@ -72,6 +78,10 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Read Replies Aloud** with the speaker toggle (when supported by the active model)
 - **Switch Models In Session** from the combined model/tools menu above the composer
 - **Tune Context Before Send** from the same `Tools` menu (history + file inclusion)
+- **Compare Models** from the sidebar to send one prompt to two installed models side by side
+- **Use Session Memory** from the session toolbar to edit local reply preferences for that chat
+- **Open Scratchpad** from the session toolbar to keep notes beside the transcript
+- **Use Assistant Quick Actions** from an assistant message context menu to copy or transform a reply
 - **Open Trust Center** from **App → Trust Center** for local data location, footprint, and runtime health visibility
 - **Tune Voice Quality** in Settings with a voice picker and preview button
 - **Auto-Correct + Spell Check** in the message field (uses your macOS Keyboard settings)
@@ -94,7 +104,14 @@ Persistence owner for sessions and messages:
 - Bootstraps app storage folders
 - CRUD for session metadata
 - Append-only JSONL writes for chat messages
+- Atomic scratchpad and session memory writes
 - Deterministic session sorting via `updatedAt`
+
+### **SessionSearchService (actor)**
+Search coordinator for saved sessions:
+- Searches session titles and message contents
+- Returns snippets that can jump back into the matching chat
+- Keeps per-session read failures isolated so one bad transcript does not break search
 
 ### **OllamaClient (actor)**
 Connectivity + model discovery:
@@ -120,12 +137,20 @@ Chat interaction coordinator:
 - Supports retry/regenerate and model-switch-safe context behavior
 - Adds local attachment excerpts into request context for file-aware turns
 - Enforces attachment guardrails (file count, file size, and total context budget) with plain-language skip guidance
+- Loads and saves per-session scratchpad notes
+- Applies optional per-session memory preferences to request context
 - Loads installed-model choices for in-session switching and keeps active-model preference in sync
 - Exposes model capability gating for speech/file tools and inline guidance
 - Exposes inline banner state for guidance
 
+### **CompareModeViewModel (@MainActor)**
+Side-by-side local model comparison coordinator:
+- Loads installed Ollama models for left/right selection
+- Runs the same prompt against two different models
+- Keeps compare output separate from normal chat transcripts
+
 ### **Root UI (SwiftUI + NavigationSplitView)**
-- Sidebar areas: Sessions, Models, Info, AI Status, Trust Center, Settings
+- Sidebar areas: Sessions, Models, Compare, Info, AI Status, Trust Center, Settings
 - Status pill in toolbar with quick readiness visibility (shows `Checking…` until initial local status refresh completes)
 - Session detail optimized for steady, low-jank streaming updates
 
@@ -140,12 +165,15 @@ Loom stores data in Application Support:
 └── Sessions/
     └── <UUID>/
         ├── metadata.json
-        └── messages.jsonl
+        ├── messages.jsonl
+        ├── scratchpad.txt
+        └── memory.json
 ```
 
 Notes:
 - `metadata.json` writes are atomic
 - `messages.jsonl` is append-only (one JSON message per line)
+- `scratchpad.txt` and `memory.json` are per-session local files and write atomically when saved
 
 ---
 
@@ -158,22 +186,27 @@ Loom/
 ├── Core/
 │   └── Sessions/
 │       ├── Session.swift
-│       └── ChatMessage.swift
+│       ├── ChatMessage.swift
+│       ├── SessionMemory.swift
+│       └── SessionSearchResult.swift
 ├── Services/
 │   ├── SessionStore.swift
+│   ├── SessionSearchService.swift
 │   └── Ollama/
 │       ├── OllamaClient.swift
 │       └── OllamaChatClient.swift
 ├── Models/
 │   └── ModelCatalog.swift
 ├── UI/
+│   ├── Compare/
 │   ├── Root/
 │   ├── Sessions/
 │   ├── Models/
 │   ├── Status/
 │   ├── Trust/
 │   ├── Settings/
-│   └── Sidebar/
+│   ├── Sidebar/
+│   └── Theme/
 ├── Utilities/
 │   └── FileSystem/
 │       ├── LoomPaths.swift
@@ -193,14 +226,17 @@ Also included:
 
 `LoomTests` includes focused coverage across persistence, formatting, services, and view models:
 - `SessionStore` create/update/delete + append/load JSONL behavior
+- `SessionStore` scratchpad and session memory persistence
+- `SessionSearchService` title and message search
 - `ChatDisplayFormatter` dense-text paragraph/list normalization behavior
 - `ModelCatalog` loading and curated model lookups
 - `DiskSpaceSnapshot` probe-path ordering/deduplication rules
 - `SessionMessagesViewModel` send/stream/cancel/retry/failure/model-switch context flows
 - `SessionMessagesViewModel` context controls (history/file modes), context budgeting, and attachment-context toggles
 - `ModelsViewModel` refresh/install/update/delete and safety rails
-- `RootViewModel` load/rename/pin/tags/delete flows
+- `RootViewModel` load/rename/pin/archive/tags/delete flows
 - `StatusViewModel` local runtime-health history snapshots for Trust Center
+- `CompareModeViewModel` two-model compare behavior and validation
 - `OllamaChatClient` stream-line parsing and transport-level stream error mapping
 - `OllamaClient` diagnosis/list/delete/pull network-path behavior via mocked transport
 
@@ -219,7 +255,7 @@ Also included:
 1. Install **Ollama** on your Mac (`https://ollama.com/download`)  
 2. Start Ollama (app launch or `ollama serve`)  
 3. Pull at least one model from Loom's current catalog (example: `ollama pull qwen3.5:9b`)
-4. Open `Loom.xcodeproj` in Xcode  
+4. Open `Loom.xcodeproj` in a current Xcode with the macOS 26.2 SDK available
 5. Build and run the **Loom** scheme  
 6. In Loom, open **Models** and select an active model  
 7. Open/create a session and start chatting
@@ -228,7 +264,7 @@ Also included:
 
 ## 🗺️ Roadmap
 
-- [ ] Expand session search/filtering tools
+- [ ] Refine session search/filtering polish
 - [ ] Improve message rendering polish (bubbles + richer markdown)
 - [ ] Add chat export enhancements
 - [ ] Deepen trust center + model update workflows
