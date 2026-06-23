@@ -669,9 +669,10 @@ struct StatusViewModelCoverageTests {
         let vm = ModelsViewModel(client: client)
         await vm.refresh()
 
-        await vm.checkForUpdates()
+        let completed = await vm.checkForUpdates()
 
         let pulled = await client.readPulledModelNames()
+        #expect(completed)
         #expect(Set(pulled) == Set([firstTag, secondTag]))
         #expect(pulled.count == 2)
         #expect(vm.lastUpdateCheckAt != nil)
@@ -899,6 +900,30 @@ struct StatusViewModelCoverageTests {
 
         #expect(vm.pullProgress(for: tag) == nil)
         #expect(vm.installErrorMessage == nil)
+        #expect(await client.readPulledModelNames() == [tag])
+    }
+
+    @Test
+    @MainActor
+    func cancelModelOperationsCancelsUpdateTask() async {
+        let tag = "llama3.2:3b"
+        let client = StubOllamaClient(
+            diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+            modelsResult: .success([OllamaModel(tag: tag)]),
+            pullWaitsForCancellation: true
+        )
+        let vm = ModelsViewModel(client: client)
+        await vm.refresh()
+
+        let updateTask = Task { await vm.updateInstalledModel(tag: tag) }
+        await waitUntil { vm.updatingTag == tag }
+
+        vm.cancelModelOperations()
+
+        let completed = await updateTask.value
+        #expect(!completed)
+        #expect(vm.updatingTag == nil)
+        #expect(!vm.isCheckingUpdates)
         #expect(await client.readPulledModelNames() == [tag])
     }
 
@@ -2126,7 +2151,7 @@ struct CompareModeViewModelCoverageTests {
         vm.leftModelTag = "qwen3.5:9b"
         vm.rightModelTag = "qwen3.5:9b"
 
-        await vm.runCompare()
+        vm.runCompare()
 
         #expect(vm.bannerText == "Choose two different models to compare.")
         #expect(vm.leftState == .idle)
@@ -2154,7 +2179,8 @@ struct CompareModeViewModelCoverageTests {
         vm.leftModelTag = "qwen3.5:9b"
         vm.rightModelTag = "mistral:7b"
 
-        await vm.runCompare()
+        vm.runCompare()
+        await waitUntil { !vm.isRunningCompare }
 
         if case .success(let left) = vm.leftState {
             #expect(left == "Left answer")
@@ -2167,6 +2193,46 @@ struct CompareModeViewModelCoverageTests {
         } else {
             Issue.record("Expected right side failure")
         }
+
+        let requests = await chatClient.readRecordedRequests()
+        #expect(requests.count == 2)
+    }
+
+    @Test
+    @MainActor
+    func cancelCompareClearsRunningStateAndStopsStreams() async {
+        let chatClient = ScriptedChatClient([
+            .waitForCancellation(["Left partial"]),
+            .waitForCancellation(["Right partial"])
+        ])
+
+        let vm = CompareModeViewModel(
+            ollamaClient: StubOllamaClient(
+                diagnosis: makeDiagnosis(isInstalled: true, isRunning: true),
+                modelsResult: .success([OllamaModel(tag: "qwen3.5:9b"), OllamaModel(tag: "mistral:7b")])
+            ),
+            chatClient: chatClient
+        )
+
+        await vm.loadModels()
+        vm.prompt = "Compare approaches"
+        vm.leftModelTag = "qwen3.5:9b"
+        vm.rightModelTag = "mistral:7b"
+
+        vm.runCompare()
+        await waitUntil { vm.isRunningCompare }
+
+        let clock = ContinuousClock()
+        let deadline = clock.now + .seconds(2)
+        while await chatClient.readRecordedRequests().count < 2 && clock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+
+        vm.cancelCompare()
+
+        await waitUntil { !vm.isRunningCompare }
+        #expect(vm.leftState == .idle)
+        #expect(vm.rightState == .idle)
 
         let requests = await chatClient.readRecordedRequests()
         #expect(requests.count == 2)

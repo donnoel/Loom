@@ -13,6 +13,8 @@ final class CompareModeViewModel {
 
     private let ollamaClient: any OllamaStatusProviding
     private let chatClient: any OllamaChatStreaming
+    private var compareTask: Task<Void, Never>?
+    private var compareGeneration: UInt64 = 0
 
     var availableModelTags: [String] = []
     var leftModelTag: String?
@@ -58,7 +60,7 @@ final class CompareModeViewModel {
         }
     }
 
-    func runCompare() async {
+    func runCompare() {
         guard !isRunningCompare else { return }
 
         let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -87,21 +89,48 @@ final class CompareModeViewModel {
         leftState = .loading
         rightState = .loading
 
-        async let leftResult = compareOnce(modelTag: leftModelTag, prompt: trimmedPrompt)
-        async let rightResult = compareOnce(modelTag: rightModelTag, prompt: trimmedPrompt)
+        compareGeneration &+= 1
+        let generation = compareGeneration
 
-        leftState = await leftResult
-        rightState = await rightResult
+        compareTask = Task { [weak self] in
+            guard let self else { return }
+
+            async let leftResult = self.compareOnce(modelTag: leftModelTag, prompt: trimmedPrompt)
+            async let rightResult = self.compareOnce(modelTag: rightModelTag, prompt: trimmedPrompt)
+
+            let (resolvedLeftState, resolvedRightState) = await (leftResult, rightResult)
+
+            guard !Task.isCancelled, self.compareGeneration == generation else { return }
+
+            self.leftState = resolvedLeftState
+            self.rightState = resolvedRightState
+            self.finishCompare(generation: generation)
+
+            if case .failure = self.leftState, case .failure = self.rightState {
+                self.bannerText = "Both model responses failed. Try again or choose different models."
+            }
+        }
+    }
+
+    func cancelCompare() {
+        compareGeneration &+= 1
+        compareTask?.cancel()
+        compareTask = nil
+
+        guard isRunningCompare else { return }
         isRunningCompare = false
-
-        if case .failure = leftState, case .failure = rightState {
-            bannerText = "Both model responses failed. Try again or choose different models."
+        if leftState == .loading {
+            leftState = .idle
+        }
+        if rightState == .loading {
+            rightState = .idle
         }
     }
 
     private func compareOnce(modelTag: String, prompt: String) async -> ResponseState {
         let accumulator = ResponseAccumulator()
         do {
+            try Task.checkCancellation()
             try await chatClient.streamChat(
                 model: modelTag,
                 messages: [ChatMessage(role: .user, content: prompt)],
@@ -109,11 +138,20 @@ final class CompareModeViewModel {
                     await accumulator.append(delta)
                 }
             )
+            try Task.checkCancellation()
             let value = await accumulator.value().trimmingCharacters(in: .whitespacesAndNewlines)
             return .success(value.isEmpty ? "(No response content)" : value)
+        } catch is CancellationError {
+            return .idle
         } catch {
             return .failure(error.localizedDescription)
         }
+    }
+
+    private func finishCompare(generation: UInt64) {
+        guard compareGeneration == generation else { return }
+        compareTask = nil
+        isRunningCompare = false
     }
 }
 

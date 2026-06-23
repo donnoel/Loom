@@ -18,6 +18,8 @@ final class ModelsViewModel {
     private let activeModelDeleteBlockedMessage = "This model is currently active. Choose another model before deleting."
     private let progressUpdateInterval: Duration = .milliseconds(100)
     private var installTask: Task<Void, Never>?
+    private var updateTask: Task<Bool, Never>?
+    private var updateGeneration: UInt64 = 0
     private var progressFlushTask: Task<Void, Never>?
     private var pendingPullProgress: PullProgress?
     private nonisolated static let uiTestResetDefaultsEnvironmentKey = "LOOM_UI_TEST_RESET_DEFAULTS"
@@ -331,47 +333,89 @@ final class ModelsViewModel {
         installTask?.cancel()
     }
 
+    func cancelModelOperations() {
+        cancelLowSpaceInstallRequest()
+        cancelInstall()
+        cancelUpdateTask()
+    }
+
     func updateInstalledModel(tag: String) async -> Bool {
         guard let normalizedTag = tag.nonEmptyTrimmed else { return false }
         guard canUpdateModel(tag: normalizedTag) else { return false }
 
-        updateErrorMessage = nil
-        let didUpdate = await runModelUpdate(tag: normalizedTag)
-        lastUpdateCheckAt = Date()
+        updateGeneration &+= 1
+        let generation = updateGeneration
 
-        if didUpdate {
-            await refresh()
+        let task = Task { [weak self] in
+            guard let self else { return false }
+
+            self.updateErrorMessage = nil
+            let didUpdate = await self.runModelUpdate(tag: normalizedTag)
+            self.lastUpdateCheckAt = Date()
+
+            if didUpdate, !Task.isCancelled {
+                await self.refresh()
+            }
+
+            return didUpdate && !Task.isCancelled
+        }
+        updateTask = task
+
+        let didUpdate = await task.value
+        if updateGeneration == generation {
+            updateTask = nil
         }
 
         return didUpdate
     }
 
-    func checkForUpdates() async {
-        guard diagnosis.isRunning else { return }
-        guard !isCheckingUpdates else { return }
-        guard installingTag == nil else { return }
+    @discardableResult
+    func checkForUpdates() async -> Bool {
+        guard diagnosis.isRunning else { return false }
+        guard !isCheckingUpdates else { return false }
+        guard installingTag == nil else { return false }
+        guard updateTask == nil else { return false }
 
-        isCheckingUpdates = true
-        updateErrorMessage = nil
+        updateGeneration &+= 1
+        let generation = updateGeneration
 
-        defer {
-            isCheckingUpdates = false
-            lastUpdateCheckAt = Date()
-        }
+        let task = Task { [weak self] in
+            guard let self else { return false }
 
-        let installedTags = models.map(\.tag)
-        guard !installedTags.isEmpty else { return }
+            self.isCheckingUpdates = true
+            self.updateErrorMessage = nil
 
-        var didUpdateAny = false
-        for tag in installedTags {
-            if await runModelUpdate(tag: tag) {
-                didUpdateAny = true
+            defer {
+                self.isCheckingUpdates = false
+                self.lastUpdateCheckAt = Date()
             }
-        }
 
-        if didUpdateAny {
-            await refresh()
+            let installedTags = self.models.map(\.tag)
+            guard !installedTags.isEmpty else { return true }
+
+            var didUpdateAny = false
+            for tag in installedTags {
+                guard !Task.isCancelled else { return false }
+                if await self.runModelUpdate(tag: tag) {
+                    didUpdateAny = true
+                }
+            }
+
+            guard !Task.isCancelled else { return false }
+
+            if didUpdateAny {
+                await self.refresh()
+            }
+
+            return true
         }
+        updateTask = task
+
+        let completed = await task.value
+        if updateGeneration == generation {
+            updateTask = nil
+        }
+        return completed
     }
 
     func requestDelete(modelTag: String) {
@@ -448,6 +492,7 @@ final class ModelsViewModel {
         guard isModelInstalled(tag: tag) else { return false }
         guard !isCheckingUpdates else { return false }
         guard installingTag == nil else { return false }
+        guard updateTask == nil else { return false }
         return updatingTag == nil || updatingTag == tag
     }
 
@@ -548,6 +593,14 @@ final class ModelsViewModel {
         if installingTag == tag {
             installingTag = nil
         }
+    }
+
+    private func cancelUpdateTask() {
+        updateGeneration &+= 1
+        updateTask?.cancel()
+        updateTask = nil
+        isCheckingUpdates = false
+        updatingTag = nil
     }
 
     private func installFailureMessage(for error: Error, modelTag: String) -> String {
@@ -741,4 +794,3 @@ private actor UITestModelsStatusClient: OllamaStatusProviding {
 
     func pullModel(name: String, onProgress: @Sendable (PullProgress) -> Void) async throws {}
 }
-

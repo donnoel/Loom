@@ -20,6 +20,9 @@ struct CompareModeView: View {
         .task {
             await vm.loadModels()
         }
+        .onDisappear {
+            vm.cancelCompare()
+        }
     }
 
     private var headerCard: some View {
@@ -94,12 +97,17 @@ struct CompareModeView: View {
     private var actionRow: some View {
         HStack(spacing: 10) {
             Button("Compare") {
-                Task { await vm.runCompare() }
+                vm.runCompare()
             }
             .buttonStyle(.borderedProminent)
             .disabled(vm.isRunningCompare || vm.availableModelTags.count < 2)
 
             if vm.isRunningCompare {
+                Button("Cancel") {
+                    vm.cancelCompare()
+                }
+                .buttonStyle(.bordered)
+
                 ProgressView()
                     .controlSize(.small)
             }

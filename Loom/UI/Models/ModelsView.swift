@@ -39,6 +39,7 @@ struct ModelsView: View {
         }
         .onDisappear {
             viewModel.stopMonitoring()
+            viewModel.cancelModelOperations()
         }
         .sheet(isPresented: $isShowingServeHelp) {
             serveHelpSheet
@@ -123,8 +124,9 @@ struct ModelsView: View {
 
                 Button(viewModel.isCheckingUpdates ? "Checking…" : "Check for Updates") {
                     Task {
-                        await viewModel.checkForUpdates()
-                        await onModelSelectionChanged()
+                        if await viewModel.checkForUpdates() {
+                            await onModelSelectionChanged()
+                        }
                     }
                 }
                 .buttonStyle(.bordered)
@@ -422,6 +424,7 @@ struct ModelsView: View {
             && !viewModel.models.isEmpty
             && !viewModel.isCheckingUpdates
             && viewModel.installingTag == nil
+            && viewModel.updatingTag == nil
     }
 
     private func updateButtonTitle(for model: OllamaModel) -> String {
