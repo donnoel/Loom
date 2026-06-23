@@ -450,21 +450,51 @@ struct StringTrimmingTests {
 
 struct VoiceReplyPreferencesTests {
     @Test
-    func normalizedRateReturnsDefaultForInvalidValues() {
-        #expect(VoiceReplyPreferences.normalizedRate(.nan) == VoiceReplyPreferences.defaultRate)
-        #expect(VoiceReplyPreferences.normalizedRate(.infinity) == VoiceReplyPreferences.defaultRate)
+    func recommendedVoicesUseCuratedFemaleVoicesOnly() {
+        let voices = [
+            VoiceReplyVoiceCandidate(identifier: "in-female", name: "Lekha", language: "hi-IN", qualityRank: 1),
+            VoiceReplyVoiceCandidate(identifier: "us-female", name: "Samantha", language: "en-US", qualityRank: 1),
+            VoiceReplyVoiceCandidate(identifier: "in-male", name: "Rishi", language: "en-IN", qualityRank: 1),
+            VoiceReplyVoiceCandidate(identifier: "us-novelty", name: "Bad News", language: "en-US", qualityRank: 1)
+        ]
+
+        let recommended = VoiceReplyVoiceCatalog.recommendedCandidates(
+            from: voices,
+            selectedIdentifier: nil,
+            limit: 2
+        )
+
+        #expect(recommended.map(\.identifier) == ["in-female", "us-female"])
     }
 
     @Test
-    func normalizedRateClampsToBounds() {
-        #expect(VoiceReplyPreferences.normalizedRate(0.1) == VoiceReplyPreferences.minRate)
-        #expect(VoiceReplyPreferences.normalizedRate(0.95) == VoiceReplyPreferences.maxRate)
+    func defaultVoicePrefersFemaleIndianVoice() {
+        let voices = [
+            VoiceReplyVoiceCandidate(identifier: "us-female", name: "Samantha", language: "en-US", qualityRank: 1),
+            VoiceReplyVoiceCandidate(identifier: "in-female", name: "Lekha", language: "hi-IN", qualityRank: 1)
+        ]
+
+        let defaultVoice = VoiceReplyVoiceCatalog.defaultCandidate(
+            from: voices,
+            selectedIdentifier: nil
+        )
+
+        #expect(defaultVoice?.identifier == "in-female")
     }
 
     @Test
-    func normalizedRateKeepsInRangeValues() {
-        #expect(VoiceReplyPreferences.normalizedRate(0.46) == 0.46)
-        #expect(VoiceReplyPreferences.normalizedRate(0.59) == 0.59)
+    func defaultVoiceKeepsSelectedFemaleVoiceVisible() {
+        let voices = [
+            VoiceReplyVoiceCandidate(identifier: "us-female", name: "Samantha", language: "en-US", qualityRank: 1),
+            VoiceReplyVoiceCandidate(identifier: "in-female", name: "Lekha", language: "hi-IN", qualityRank: 1)
+        ]
+
+        let defaultVoice = VoiceReplyVoiceCatalog.defaultCandidate(
+            from: voices,
+            selectedIdentifier: "us-female"
+        )
+
+        #expect(defaultVoice?.identifier == "us-female")
     }
 }
 

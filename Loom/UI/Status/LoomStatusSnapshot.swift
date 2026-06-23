@@ -88,7 +88,6 @@ nonisolated enum LoomPreferenceKeys {
     static let aiStatusServiceOrder = "aiStatusServiceOrder"
     static let voiceReplyEnabled = "voiceReplyEnabled"
     static let voiceReplyVoiceIdentifier = "voiceReplyVoiceIdentifier"
-    static let voiceReplyRate = "voiceReplyRate"
     static let composerHistoryContextLevel = "composerHistoryContextLevel"
     static let composerFileContextLevel = "composerFileContextLevel"
     static let sessionLastStreamModelKeyPrefix = "sessionLastStreamModel."
@@ -99,15 +98,7 @@ nonisolated enum LoomPreferenceKeys {
 }
 
 nonisolated enum VoiceReplyPreferences {
-    static let defaultRate: Double = 0.46
-    static let minRate: Double = 0.35
-    static let maxRate: Double = 0.60
-    static let previewText = "This is Loom. Adjust my voice and speaking speed until it sounds right to you."
-
-    static func normalizedRate(_ value: Double) -> Double {
-        guard value.isFinite else { return defaultRate }
-        return min(max(value, minRate), maxRate)
-    }
+    static let previewText = "This is Loom. Choose the voice that sounds best for reading assistant replies aloud."
 }
 
 nonisolated extension String {

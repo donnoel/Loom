@@ -42,8 +42,6 @@ struct SessionDetailView: View {
     @FocusState private var isDraftFieldFocused: Bool
     @AppStorage(LoomPreferenceKeys.voiceReplyVoiceIdentifier)
     private var voiceReplyVoiceIdentifier: String = ""
-    @AppStorage(LoomPreferenceKeys.voiceReplyRate)
-    private var voiceReplyRate: Double = VoiceReplyPreferences.defaultRate
     @State private var lastSpokenAssistantMessageID: UUID?
     @State private var speechInputController = SpeechInputController()
     @State private var speechSynthesizer = AVSpeechSynthesizer()
@@ -281,17 +279,7 @@ struct SessionDetailView: View {
                                 toggleDictation()
                             }
 
-                            composerUtilityButton(
-                                symbolName: vm.isVoiceReplyEnabled ? "speaker.wave.2.fill" : "speaker.slash",
-                                helpText: vm.activeModelSupportsSpeechOutput ? "Read replies aloud" : "Current model does not support speech output",
-                                isActive: vm.isVoiceReplyEnabled,
-                                isDisabled: !vm.activeModelSupportsSpeechOutput
-                            ) {
-                                vm.isVoiceReplyEnabled.toggle()
-                                if !vm.isVoiceReplyEnabled {
-                                    speechSynthesizer.stopSpeaking(at: .immediate)
-                                }
-                            }
+                            voiceReplyMenu
                         }
 
                         Menu {
@@ -595,6 +583,91 @@ struct SessionDetailView: View {
         )
     }
 
+    private var voiceReplyMenu: some View {
+        Menu {
+            Button {
+                vm.isVoiceReplyEnabled.toggle()
+                if !vm.isVoiceReplyEnabled {
+                    speechSynthesizer.stopSpeaking(at: .immediate)
+                }
+            } label: {
+                Label(
+                    vm.isVoiceReplyEnabled ? "Turn Voice Replies Off" : "Turn Voice Replies On",
+                    systemImage: vm.isVoiceReplyEnabled ? "speaker.slash" : "speaker.wave.2"
+                )
+            }
+
+            Button {
+                speechSynthesizer.stopSpeaking(at: .immediate)
+            } label: {
+                Label("Stop Reading", systemImage: "stop.circle")
+            }
+            .disabled(!speechSynthesizer.isSpeaking)
+
+            Divider()
+
+            Section("Voice") {
+                ForEach(recommendedVoiceReplyVoices, id: \.identifier) { voice in
+                    Button {
+                        selectVoiceReplyVoice(voice.identifier)
+                    } label: {
+                        voiceMenuLabel(
+                            title: voiceReplyDisplayName(for: voice),
+                            isSelected: selectedVoiceReplyIdentifier == voice.identifier
+                        )
+                    }
+                }
+            }
+        } label: {
+            ComposerUtilityIconChrome(
+                symbolName: vm.isVoiceReplyEnabled ? "speaker.wave.2.fill" : "speaker.wave.2",
+                isActive: vm.isVoiceReplyEnabled,
+                isDisabled: !vm.activeModelSupportsSpeechOutput
+            )
+        }
+        .help(vm.activeModelSupportsSpeechOutput ? "Voice replies" : "Current model does not support speech output")
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .disabled(!vm.activeModelSupportsSpeechOutput)
+        .padding(2)
+        .contentShape(Rectangle())
+        .accessibilityIdentifier("session.detail.voiceRepliesMenu")
+        .accessibilityLabel(vm.isVoiceReplyEnabled ? "Voice replies on" : "Voice replies off")
+    }
+
+    private var recommendedVoiceReplyVoices: [AVSpeechSynthesisVoice] {
+        VoiceReplyVoiceCatalog.recommendedVoices(
+            from: AVSpeechSynthesisVoice.speechVoices(),
+            selectedIdentifier: voiceReplyVoiceIdentifier.nonEmptyTrimmed
+        )
+    }
+
+    private var selectedVoiceReplyIdentifier: String? {
+        VoiceReplyVoiceCatalog.defaultVoice(
+            from: AVSpeechSynthesisVoice.speechVoices(),
+            selectedIdentifier: voiceReplyVoiceIdentifier.nonEmptyTrimmed
+        )?.identifier
+    }
+
+    @ViewBuilder
+    private func voiceMenuLabel(title: String, isSelected: Bool) -> some View {
+        if isSelected {
+            Label(title, systemImage: "checkmark")
+        } else {
+            Text(title)
+        }
+    }
+
+    private func selectVoiceReplyVoice(_ identifier: String) {
+        voiceReplyVoiceIdentifier = identifier
+        vm.isVoiceReplyEnabled = true
+    }
+
+    private func voiceReplyDisplayName(for voice: AVSpeechSynthesisVoice) -> String {
+        let languageName = Locale.current.localizedString(forIdentifier: voice.language) ?? voice.language
+        return "\(voice.name) (\(languageName))"
+    }
+
     private func sendAndScroll(_ proxy: ScrollViewProxy) {
         Task {
             await vm.sendDraft()
@@ -697,12 +770,16 @@ struct SessionDetailView: View {
         lastSpokenAssistantMessageID = latestAssistant.id
 
         let utterance = AVSpeechUtterance(string: latestAssistant.content)
-        utterance.rate = Float(VoiceReplyPreferences.normalizedRate(voiceReplyRate))
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
         if let configuredIdentifier = voiceReplyVoiceIdentifier.nonEmptyTrimmed,
-           let configuredVoice = AVSpeechSynthesisVoice(identifier: configuredIdentifier) {
+           let configuredVoice = AVSpeechSynthesisVoice(identifier: configuredIdentifier),
+           VoiceReplyVoiceCatalog.isSupportedVoice(configuredVoice) {
             utterance.voice = configuredVoice
         } else {
-            utterance.voice = AVSpeechSynthesisVoice(language: Locale.current.identifier)
+            utterance.voice = VoiceReplyVoiceCatalog.defaultVoice(
+                from: AVSpeechSynthesisVoice.speechVoices(),
+                selectedIdentifier: nil
+            )
         }
 
         speechSynthesizer.stopSpeaking(at: .immediate)
@@ -985,8 +1062,6 @@ private struct StarterPromptChip: View {
 }
 
 private struct ComposerUtilityIconButton: View {
-    @Environment(\.colorScheme) private var colorScheme
-
     let symbolName: String
     let helpText: String
     let isActive: Bool
@@ -995,28 +1070,44 @@ private struct ComposerUtilityIconButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: symbolName)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(
-                    isDisabled
-                        ? LoomTheme.textMuted(colorScheme)
-                        : (isActive ? Color.accentColor : LoomTheme.textPrimary(colorScheme).opacity(0.88))
-                )
-                .frame(width: 28, height: 28)
-                .background(
-                    Circle()
-                        .fill(
-                            isActive
-                                ? (colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.10))
-                                : (colorScheme == .dark ? Color.white.opacity(0.03) : Color.black.opacity(0.04))
-                        )
-                )
+            ComposerUtilityIconChrome(
+                symbolName: symbolName,
+                isActive: isActive,
+                isDisabled: isDisabled
+            )
         }
         .help(helpText)
         .buttonStyle(.plain)
         .disabled(isDisabled)
         .padding(2)
         .contentShape(Rectangle())
+    }
+}
+
+private struct ComposerUtilityIconChrome: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    let symbolName: String
+    let isActive: Bool
+    let isDisabled: Bool
+
+    var body: some View {
+        Image(systemName: symbolName)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(
+                isDisabled
+                    ? LoomTheme.textMuted(colorScheme)
+                    : (isActive ? Color.accentColor : LoomTheme.textPrimary(colorScheme).opacity(0.88))
+            )
+            .frame(width: 28, height: 28)
+            .background(
+                Circle()
+                    .fill(
+                        isActive
+                            ? (colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.10))
+                            : (colorScheme == .dark ? Color.white.opacity(0.03) : Color.black.opacity(0.04))
+                    )
+            )
     }
 }
 
