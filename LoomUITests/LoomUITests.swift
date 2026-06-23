@@ -176,7 +176,7 @@ final class LoomUITests: XCTestCase {
                 return true
             }
 
-            let newSessionTitle = app.staticTexts["New Session"].firstMatch
+            let newSessionTitle = app.staticTexts["New Chat"].firstMatch
             if newSessionTitle.waitForExistence(timeout: Self.shortTimeout) {
                 newSessionTitle.click()
                 if waitForSessionDetailReady(app: app, timeout: Self.mediumTimeout) {

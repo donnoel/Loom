@@ -796,7 +796,7 @@ struct SessionDetailView: View {
                     .foregroundStyle(Color.accentColor)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Welcome to your new session")
+                    Text("Welcome to your new chat")
                         .font(LoomTheme.Typography.sectionTitle)
                     Text("Ask Loom anything in everyday language. You can also attach files or use your mic.")
                         .font(LoomTheme.Typography.body)

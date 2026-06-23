@@ -97,6 +97,26 @@ struct SessionStoreTests {
     }
 
     @Test
+    func firstUserMessageAutoTitlesLegacyNewSessionTitle() async throws {
+        let store = SessionStore()
+        let session = try await store.createSession(title: "New Session")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        try await store.appendMessage(
+            ChatMessage(
+                role: .user,
+                content: "Help me compare local privacy tools.",
+                createdAt: fixedDate("2026-01-01T00:00:00Z")
+            ),
+            sessionID: session.id
+        )
+
+        let metadataURL = try LoomPaths.sessionMetadataURL(for: session.id)
+        let metadata = try decodeMetadata(at: metadataURL)
+        #expect(metadata.title == "Compare Local Privacy Tools")
+    }
+
+    @Test
     func firstUserMessageAutoTitlePullsMainTopic() async throws {
         let store = SessionStore()
         let session = try await store.createSession(title: Session.Metadata.defaultTitle)

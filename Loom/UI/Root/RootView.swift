@@ -254,7 +254,7 @@ struct RootView: View {
                         } label: {
                             Image(systemName: "square.and.pencil")
                         }
-                        .help("New Session")
+                        .help("New Chat")
                         .accessibilityIdentifier("sessions.toolbar.new")
                         .controlSize(.small)
 
@@ -547,7 +547,7 @@ struct RootView: View {
         Button {
             Task { await createSession() }
         } label: {
-            Label("New Session", systemImage: "square.and.pencil")
+            Label("New Chat", systemImage: "square.and.pencil")
                 .font(LoomTheme.Typography.bodyStrong)
                 .foregroundStyle(Color.accentColor)
                 .padding(.vertical, 6)

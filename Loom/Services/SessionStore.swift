@@ -392,7 +392,8 @@ actor SessionStore {
     }
 
     private nonisolated static func isDefaultSessionTitle(_ title: String) -> Bool {
-        title.trimmingCharacters(in: .whitespacesAndNewlines) == Session.Metadata.defaultTitle
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedTitle == Session.Metadata.defaultTitle || trimmedTitle == "New Session"
     }
 
     private nonisolated static func suggestedSessionTitle(from request: String) -> String? {

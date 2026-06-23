@@ -2,7 +2,7 @@ import Foundation
 
 nonisolated struct Session: Identifiable, Hashable, Codable, Sendable {
     struct Metadata: Hashable, Codable, Sendable {
-        static let defaultTitle = "New Session"
+        static let defaultTitle = "New Chat"
 
         var title: String
         var createdAt: Date
