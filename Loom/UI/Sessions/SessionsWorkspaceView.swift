@@ -40,6 +40,7 @@ struct SessionDetailView: View {
     @State private var isShowingScratchpad: Bool = false
     @State private var isShowingSessionMemory: Bool = false
     @State private var chatTemplates: [ChatTemplate] = ChatTemplateLibrary.load()
+    @State private var composerTextHeight: CGFloat = 42
     @FocusState private var isDraftFieldFocused: Bool
     @AppStorage(LoomPreferenceKeys.voiceReplyVoiceIdentifier)
     private var voiceReplyVoiceIdentifier: String = ""
@@ -246,9 +247,10 @@ struct SessionDetailView: View {
                             textColor: NSColor(LoomTheme.textPrimary(colorScheme)),
                             isSendEnabled: !vm.isGenerating && !draftIsEmpty,
                             onFocusChange: { isDraftFieldFocused = $0 },
+                            onHeightChange: { composerTextHeight = $0 },
                             onSubmit: { sendAndScroll(proxy) }
                         )
-                        .frame(minHeight: 42, maxHeight: 140)
+                        .frame(height: composerTextHeight)
                         .accessibilityIdentifier("session.detail.messageField")
 
                         if vm.draft.isEmpty {
@@ -1013,6 +1015,7 @@ private struct ComposerTextView: NSViewRepresentable {
     let textColor: NSColor
     let isSendEnabled: Bool
     let onFocusChange: (Bool) -> Void
+    let onHeightChange: (CGFloat) -> Void
     let onSubmit: () -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -1073,6 +1076,7 @@ private struct ComposerTextView: NSViewRepresentable {
             textView.string = text
             textView.setSelectedRange(NSRange(location: textView.string.utf16.count, length: 0))
         }
+        context.coordinator.updateHeight(for: textView)
 
         if isFocused, textView.window?.firstResponder !== textView {
             textView.window?.makeFirstResponder(textView)
@@ -1082,6 +1086,7 @@ private struct ComposerTextView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: ComposerTextView
         weak var textView: NSTextView?
+        private var lastMeasuredHeight: CGFloat = 42
 
         init(_ parent: ComposerTextView) {
             self.parent = parent
@@ -1090,6 +1095,7 @@ private struct ComposerTextView: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             parent.text = textView.string
+            updateHeight(for: textView)
         }
 
         func textDidBeginEditing(_ notification: Notification) {
@@ -1103,6 +1109,26 @@ private struct ComposerTextView: NSViewRepresentable {
         func submit() {
             guard parent.isSendEnabled else { return }
             parent.onSubmit()
+        }
+
+        func updateHeight(for textView: NSTextView) {
+            guard let layoutManager = textView.layoutManager,
+                  let textContainer = textView.textContainer else {
+                setMeasuredHeight(42)
+                return
+            }
+
+            layoutManager.ensureLayout(for: textContainer)
+            let usedHeight = layoutManager.usedRect(for: textContainer).height + 2
+            setMeasuredHeight(min(max(42, ceil(usedHeight)), 140))
+        }
+
+        private func setMeasuredHeight(_ measuredHeight: CGFloat) {
+            guard measuredHeight != lastMeasuredHeight else { return }
+            lastMeasuredHeight = measuredHeight
+            DispatchQueue.main.async { [parent] in
+                parent.onHeightChange(measuredHeight)
+            }
         }
     }
 }

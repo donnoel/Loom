@@ -93,8 +93,10 @@ final class LoomUITests: XCTestCase {
 
         let messageField = element("session.detail.messageField", app: app)
         XCTAssertTrue(messageField.waitForExistence(timeout: Self.mediumTimeout))
+        XCTAssertLessThanOrEqual(messageField.frame.height, 70, "Expected the empty composer to stay compact.")
         messageField.click()
         messageField.typeText("return-key-send")
+        XCTAssertLessThanOrEqual(messageField.frame.height, 70, "Expected single-line composer text to stay compact.")
         messageField.typeKey(.return, modifierFlags: [])
 
         XCTAssertTrue(
@@ -106,6 +108,7 @@ final class LoomUITests: XCTestCase {
             "Expected Return to submit the composer without leaving the chat."
         )
         XCTAssertTrue(messageField.exists, "Expected the composer to remain available after sending.")
+        XCTAssertLessThanOrEqual(messageField.frame.height, 70, "Expected the composer to remain compact after sending.")
     }
 
     func testLongModelLabelKeepsSendButtonHittable() throws {
