@@ -2039,7 +2039,7 @@ struct RootViewModelCoverageTests {
 
     @Test
     @MainActor
-    func renamePinAndTagsPersistThroughStore() async throws {
+    func renamePinTagsAndCollectionPersistThroughStore() async throws {
         let sessionsRoot = try makeTemporarySessionsRoot()
         defer { try? FileManager.default.removeItem(at: sessionsRoot) }
         let store = SessionStore(sessionsRoot: sessionsRoot)
@@ -2052,12 +2052,25 @@ struct RootViewModelCoverageTests {
         await vm.renameSession(id: session.id, to: "Renamed")
         await vm.togglePinned(id: session.id)
         await vm.updateTags(id: session.id, tags: ["alpha", "beta"])
+        await vm.updateCollection(id: session.id, name: "Client Work")
         await vm.load()
 
         let updated = vm.session(for: session.id)
         #expect(updated?.metadata.title == "Renamed")
         #expect(updated?.metadata.isPinned == true)
         #expect(updated?.metadata.tags == ["alpha", "beta"])
+        #expect(updated?.metadata.collectionName == "Client Work")
+        #expect(vm.filteredSessions.contains(where: { $0.id == session.id }))
+
+        vm.searchQuery = "client"
+        #expect(vm.filteredSessions.contains(where: { $0.id == session.id }))
+        #expect(vm.activeSessionGroups.contains(where: { group in
+            group.collectionName == "Client Work" && group.sessions.contains(where: { $0.id == session.id })
+        }))
+
+        await vm.updateCollection(id: session.id, name: "   ")
+        await vm.load()
+        #expect(vm.session(for: session.id)?.metadata.collectionName == nil)
     }
 
     @Test

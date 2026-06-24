@@ -240,6 +240,25 @@ struct SessionStoreTests {
     }
 
     @Test
+    func chatTemplateLibraryPersistsEditsAndResets() throws {
+        let suiteName = "LoomChatTemplateTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        var templates = ChatTemplateLibrary.load(userDefaults: defaults)
+        templates[0].prompt = "Make a practical weekend plan."
+
+        let saved = ChatTemplateLibrary.save(templates, userDefaults: defaults)
+        let loaded = ChatTemplateLibrary.load(userDefaults: defaults)
+        #expect(saved[0].prompt == "Make a practical weekend plan.")
+        #expect(loaded[0].prompt == "Make a practical weekend plan.")
+
+        let reset = ChatTemplateLibrary.reset(userDefaults: defaults)
+        #expect(reset == ChatTemplateLibrary.defaultTemplates)
+        #expect(ChatTemplateLibrary.load(userDefaults: defaults) == ChatTemplateLibrary.defaultTemplates)
+    }
+
+    @Test
     func listSessionsKeepsLegacyMetadataVisibleWithFallbackDefaults() async throws {
         let tempRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("LoomLegacyMetadataTests", isDirectory: true)
@@ -264,6 +283,7 @@ struct SessionStoreTests {
         #expect(loaded?.metadata.tags == [])
         #expect(loaded?.metadata.isPinned == false)
         #expect(loaded?.metadata.isArchived == false)
+        #expect(loaded?.metadata.collectionName == nil)
 
         let listed = try await store.listSessions()
         #expect(listed.contains(where: { $0.id == session.id }))

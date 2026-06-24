@@ -141,9 +141,9 @@ final class SessionMessagesViewModel {
     private let streamUpdateInterval: Duration = .milliseconds(60)
     private static let maxPendingAttachmentCount = 8
     private static let roughCharactersPerToken = 4
+    private static let uiTestResetDefaultsEnvironmentKey = "LOOM_UI_TEST_RESET_DEFAULTS"
     private static let uiTestChatScenarioEnvironmentKey = "LOOM_UI_TEST_CHAT_STUB_SCENARIO"
     private static let uiTestActiveModelTagEnvironmentKey = "LOOM_UI_TEST_ACTIVE_MODEL_TAG"
-    private static let uiTestChatScenarioDefaultsKey = "loom.uiTest.chatScenario"
 
     var messages: [ChatMessage] = []
     var scratchpadText: String = ""
@@ -870,10 +870,10 @@ final class SessionMessagesViewModel {
     }
 
     private static func uiTestChatScenario(defaults: UserDefaults) -> UITestOllamaChatClient.Scenario? {
-        if let raw = ProcessInfo.processInfo.environment[uiTestChatScenarioEnvironmentKey]?.nonEmptyTrimmed {
-            return UITestOllamaChatClient.Scenario(rawValue: raw.lowercased())
+        guard ProcessInfo.processInfo.environment[uiTestResetDefaultsEnvironmentKey] == "1" else {
+            return nil
         }
-        if let raw = defaults.string(forKey: uiTestChatScenarioDefaultsKey)?.nonEmptyTrimmed {
+        if let raw = ProcessInfo.processInfo.environment[uiTestChatScenarioEnvironmentKey]?.nonEmptyTrimmed {
             return UITestOllamaChatClient.Scenario(rawValue: raw.lowercased())
         }
         return nil

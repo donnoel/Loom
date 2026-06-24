@@ -10,6 +10,7 @@ nonisolated struct Session: Identifiable, Hashable, Codable, Sendable {
         var tags: [String]
         var isPinned: Bool
         var isArchived: Bool
+        var collectionName: String?
 
         enum CodingKeys: String, CodingKey {
             case title
@@ -18,6 +19,7 @@ nonisolated struct Session: Identifiable, Hashable, Codable, Sendable {
             case tags
             case isPinned
             case isArchived
+            case collectionName
         }
 
         init(
@@ -26,7 +28,8 @@ nonisolated struct Session: Identifiable, Hashable, Codable, Sendable {
             updatedAt: Date = Date(),
             tags: [String] = [],
             isPinned: Bool = false,
-            isArchived: Bool = false
+            isArchived: Bool = false,
+            collectionName: String? = nil
         ) {
             self.title = title
             self.createdAt = createdAt
@@ -34,6 +37,7 @@ nonisolated struct Session: Identifiable, Hashable, Codable, Sendable {
             self.tags = tags
             self.isPinned = isPinned
             self.isArchived = isArchived
+            self.collectionName = collectionName?.nonEmptyTrimmed
         }
 
         init(from decoder: Decoder) throws {
@@ -50,6 +54,7 @@ nonisolated struct Session: Identifiable, Hashable, Codable, Sendable {
             tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
             isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
             isArchived = try container.decodeIfPresent(Bool.self, forKey: .isArchived) ?? false
+            collectionName = try container.decodeIfPresent(String.self, forKey: .collectionName)?.nonEmptyTrimmed
         }
     }
 

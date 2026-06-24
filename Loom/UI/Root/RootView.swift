@@ -218,6 +218,8 @@ struct RootView: View {
     @State private var isShowingStatusPopover: Bool = false
     @State private var renameSessionID: Session.ID?
     @State private var renameDraft: String = ""
+    @State private var collectionSessionID: Session.ID?
+    @State private var collectionDraft: String = ""
     @State private var searchJumpMessageID: ChatMessage.ID?
     @State private var isShowingArchivedSessions: Bool = false
 
@@ -316,6 +318,9 @@ struct RootView: View {
         .sheet(isPresented: isShowingRenameSheet) {
             renameSheet
         }
+        .sheet(isPresented: isShowingCollectionSheet) {
+            collectionSheet
+        }
         .onDisappear {
             statusViewModel.stopMonitoring()
         }
@@ -340,44 +345,12 @@ struct RootView: View {
                             .padding(.vertical, 4)
                             .listRowBackground(Color.clear)
                     } else {
-                        ForEach(sessionsViewModel.activeSessions) { session in
-                            sessionSidebarRow(session)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    searchJumpMessageID = nil
-                                    selectedSidebarSelection = .session(session.id)
-                                }
-                                .contextMenu {
-                                    Button("Rename") {
-                                        beginRename(session)
-                                    }
+                        ForEach(sessionsViewModel.activeSessionGroups) { group in
+                            if sessionsViewModel.activeSessionGroups.count > 1 {
+                                collectionHeaderRow(title: group.title, count: group.sessions.count)
+                            }
 
-                                    Button(session.metadata.isPinned ? "Unpin" : "Pin") {
-                                        Task { await sessionsViewModel.togglePinned(id: session.id) }
-                                    }
-
-                                    Button("Archive") {
-                                        Task { await sessionsViewModel.toggleArchived(id: session.id) }
-                                    }
-
-                                    Divider()
-
-                                    Button(role: .destructive) {
-                                        Task { await deleteSession(id: session.id) }
-                                    } label: {
-                                        Text("Delete")
-                                    }
-                                }
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
-                        }
-                    }
-
-                    if !sessionsViewModel.archivedSessions.isEmpty {
-                        archivedDisclosureRow
-
-                        if isShowingArchivedSessions {
-                            ForEach(sessionsViewModel.archivedSessions) { session in
+                            ForEach(group.sessions) { session in
                                 sessionSidebarRow(session)
                                     .contentShape(Rectangle())
                                     .onTapGesture {
@@ -385,28 +358,36 @@ struct RootView: View {
                                         selectedSidebarSelection = .session(session.id)
                                     }
                                     .contextMenu {
-                                        Button("Rename") {
-                                            beginRename(session)
-                                        }
-
-                                        Button("Unarchive") {
-                                            Task { await sessionsViewModel.toggleArchived(id: session.id) }
-                                        }
-
-                                        Button(session.metadata.isPinned ? "Unpin" : "Pin") {
-                                            Task { await sessionsViewModel.togglePinned(id: session.id) }
-                                        }
-
-                                        Divider()
-
-                                        Button(role: .destructive) {
-                                            Task { await deleteSession(id: session.id) }
-                                        } label: {
-                                            Text("Delete")
-                                        }
+                                        sessionContextMenu(for: session, isArchived: false)
                                     }
                                     .listRowBackground(Color.clear)
                                     .listRowSeparator(.hidden)
+                                }
+                        }
+                    }
+
+                    if !sessionsViewModel.archivedSessions.isEmpty {
+                        archivedDisclosureRow
+
+                        if isShowingArchivedSessions {
+                            ForEach(sessionsViewModel.archivedSessionGroups) { group in
+                                if sessionsViewModel.archivedSessionGroups.count > 1 {
+                                    collectionHeaderRow(title: group.title, count: group.sessions.count)
+                                }
+
+                                ForEach(group.sessions) { session in
+                                    sessionSidebarRow(session)
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            searchJumpMessageID = nil
+                                            selectedSidebarSelection = .session(session.id)
+                                        }
+                                        .contextMenu {
+                                            sessionContextMenu(for: session, isArchived: true)
+                                        }
+                                        .listRowBackground(Color.clear)
+                                        .listRowSeparator(.hidden)
+                                    }
                             }
                         }
                     }
@@ -488,6 +469,28 @@ struct RootView: View {
                     .listRowSeparator(.hidden)
             }
         }
+    }
+
+    private func collectionHeaderRow(title: String, count: Int) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "folder")
+                .font(LoomTheme.Typography.captionTiny)
+                .foregroundStyle(.secondary)
+            Text(title)
+                .font(LoomTheme.Typography.captionStrong)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Text("\(count)")
+                .font(LoomTheme.Typography.captionTiny)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+        }
+        .padding(.top, 6)
+        .padding(.horizontal, 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title), \(count) chats")
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
     }
 
     private func globalSearchResultRow(_ result: SessionSearchResult) -> some View {
@@ -680,6 +683,17 @@ struct RootView: View {
         )
     }
 
+    private var isShowingCollectionSheet: Binding<Bool> {
+        Binding(
+            get: { collectionSessionID != nil },
+            set: { isPresented in
+                if !isPresented {
+                    cancelCollectionEdit()
+                }
+            }
+        )
+    }
+
     private var renameSheet: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Rename Session")
@@ -703,6 +717,40 @@ struct RootView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(renameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(20)
+        .frame(minWidth: 420)
+    }
+
+    private var collectionSheet: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Set Collection")
+                .font(LoomTheme.Typography.sectionTitle)
+
+            TextField("Collection name", text: $collectionDraft)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit {
+                    commitCollectionEdit()
+                }
+
+            HStack {
+                Button("Remove") {
+                    clearCollection()
+                }
+                .disabled(selectedCollectionSession?.metadata.collectionName == nil)
+
+                Spacer()
+
+                Button("Cancel", role: .cancel) {
+                    cancelCollectionEdit()
+                }
+
+                Button("Save") {
+                    commitCollectionEdit()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(collectionDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding(20)
@@ -755,7 +803,42 @@ struct RootView: View {
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
         .accessibilityIdentifier("sidebar.session.\(session.id.uuidString)")
+        .accessibilityLabel(accessibilityLabel(for: session))
         .loomSidebarItem(selected: isSelected)
+    }
+
+    @ViewBuilder
+    private func sessionContextMenu(for session: Session, isArchived: Bool) -> some View {
+        Button("Rename") {
+            beginRename(session)
+        }
+
+        Button("Set Collection…") {
+            beginCollectionEdit(session)
+        }
+
+        Button(session.metadata.isPinned ? "Unpin" : "Pin") {
+            Task { await sessionsViewModel.togglePinned(id: session.id) }
+        }
+
+        Button(isArchived ? "Unarchive" : "Archive") {
+            Task { await sessionsViewModel.toggleArchived(id: session.id) }
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            Task { await deleteSession(id: session.id) }
+        } label: {
+            Text("Delete")
+        }
+    }
+
+    private func accessibilityLabel(for session: Session) -> String {
+        if let collectionName = session.metadata.collectionName {
+            return "\(session.metadata.title), \(collectionName)"
+        }
+        return session.metadata.title
     }
 
     private func createSession() async {
@@ -803,6 +886,41 @@ struct RootView: View {
 
         Task {
             await sessionsViewModel.renameSession(id: id, to: title)
+            synchronizeSelectionAfterSessionReload(preferredSessionID: id)
+        }
+    }
+
+    private var selectedCollectionSession: Session? {
+        sessionsViewModel.session(for: collectionSessionID)
+    }
+
+    private func beginCollectionEdit(_ session: Session) {
+        collectionSessionID = session.id
+        collectionDraft = session.metadata.collectionName ?? ""
+    }
+
+    private func cancelCollectionEdit() {
+        collectionSessionID = nil
+        collectionDraft = ""
+    }
+
+    private func commitCollectionEdit() {
+        guard let id = collectionSessionID else { return }
+        let name = collectionDraft
+        cancelCollectionEdit()
+
+        Task {
+            await sessionsViewModel.updateCollection(id: id, name: name)
+            synchronizeSelectionAfterSessionReload(preferredSessionID: id)
+        }
+    }
+
+    private func clearCollection() {
+        guard let id = collectionSessionID else { return }
+        cancelCollectionEdit()
+
+        Task {
+            await sessionsViewModel.updateCollection(id: id, name: nil)
             synchronizeSelectionAfterSessionReload(preferredSessionID: id)
         }
     }
@@ -866,6 +984,9 @@ struct RootView: View {
         lines.append("Updated: \(formatDate(session.metadata.updatedAt))")
         if !session.metadata.tags.isEmpty {
             lines.append("Tags: \(session.metadata.tags.joined(separator: ", "))")
+        }
+        if let collectionName = session.metadata.collectionName {
+            lines.append("Collection: \(collectionName)")
         }
         lines.append("")
         lines.append("---")

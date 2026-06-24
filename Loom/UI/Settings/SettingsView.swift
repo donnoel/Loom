@@ -17,6 +17,7 @@ struct SettingsView: View {
 
     @State private var previewSynthesizer = AVSpeechSynthesizer()
     @State private var isShowingDeleteAllConfirmation: Bool = false
+    @State private var chatTemplates: [ChatTemplate] = ChatTemplateLibrary.load()
 
     private var sessionsRootURL: URL? {
         try? LoomPaths.sessionsRoot()
@@ -32,6 +33,7 @@ struct SettingsView: View {
                 introCard
                 automationCard
                 voiceRepliesCard
+                chatTemplatesCard
                 localDataCard
                 dangerCard
             }
@@ -168,6 +170,56 @@ struct SettingsView: View {
         .loomCard(cornerRadius: 12)
     }
 
+    private var chatTemplatesCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Chat Templates")
+                .font(LoomTheme.Typography.sectionTitle)
+
+            ForEach($chatTemplates) { $template in
+                VStack(alignment: .leading, spacing: 6) {
+                    TextField("Template name", text: $template.title)
+                        .textFieldStyle(.roundedBorder)
+
+                    TextEditor(text: $template.prompt)
+                        .font(LoomTheme.Typography.body)
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 76)
+                        .padding(6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(colorScheme == .dark ? Color.white.opacity(0.04) : Color.black.opacity(0.03))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+                        )
+                        .accessibilityLabel("\(template.title) prompt")
+                }
+            }
+
+            HStack {
+                Button("Reset") {
+                    chatTemplates = ChatTemplateLibrary.reset()
+                    NotificationCenter.default.post(name: .loomChatTemplatesDidChange, object: nil)
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
+
+                Button("Save Templates") {
+                    chatTemplates = ChatTemplateLibrary.save(chatTemplates)
+                    NotificationCenter.default.post(name: .loomChatTemplatesDidChange, object: nil)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!canSaveChatTemplates)
+                .accessibilityIdentifier("settings.saveChatTemplates")
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .loomCard(cornerRadius: 12)
+    }
+
     private var dangerCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Danger Zone")
@@ -234,6 +286,12 @@ struct SettingsView: View {
             from: AVSpeechSynthesisVoice.speechVoices(),
             selectedIdentifier: nil
         )?.identifier ?? ""
+    }
+
+    private var canSaveChatTemplates: Bool {
+        chatTemplates.allSatisfy { template in
+            template.title.nonEmptyTrimmed != nil && template.prompt.nonEmptyTrimmed != nil
+        }
     }
 
     private func localizedLanguageName(for identifier: String) -> String {

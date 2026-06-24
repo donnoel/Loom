@@ -90,6 +90,7 @@ nonisolated enum LoomPreferenceKeys {
     static let voiceReplyVoiceIdentifier = "voiceReplyVoiceIdentifier"
     static let composerHistoryContextLevel = "composerHistoryContextLevel"
     static let composerFileContextLevel = "composerFileContextLevel"
+    static let chatTemplates = "chatTemplates"
     static let sessionLastStreamModelKeyPrefix = "sessionLastStreamModel."
 
     static func sessionLastStreamModelKey(for sessionID: UUID) -> String {

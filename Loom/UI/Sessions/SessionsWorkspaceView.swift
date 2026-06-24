@@ -39,6 +39,7 @@ struct SessionDetailView: View {
     @State private var isDictating: Bool = false
     @State private var isShowingScratchpad: Bool = false
     @State private var isShowingSessionMemory: Bool = false
+    @State private var chatTemplates: [ChatTemplate] = ChatTemplateLibrary.load()
     @FocusState private var isDraftFieldFocused: Bool
     @AppStorage(LoomPreferenceKeys.voiceReplyVoiceIdentifier)
     private var voiceReplyVoiceIdentifier: String = ""
@@ -238,28 +239,28 @@ struct SessionDetailView: View {
                         }
                     }
 
-                    TextField(
-                        "",
-                        text: $vm.draft,
-                        prompt: Text("Ask anything")
-                            .foregroundStyle(LoomTheme.inputPlaceholder(colorScheme)),
-                        axis: .vertical
-                    )
-                        .autocorrectionDisabled(false)
-                        .textFieldStyle(.plain)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .lineLimit(2...8)
-                        .foregroundStyle(LoomTheme.textPrimary(colorScheme))
-                        .focused($isDraftFieldFocused)
+                    ZStack(alignment: .topLeading) {
+                        ComposerTextView(
+                            text: $vm.draft,
+                            isFocused: isDraftFieldFocused,
+                            textColor: NSColor(LoomTheme.textPrimary(colorScheme)),
+                            isSendEnabled: !vm.isGenerating && !draftIsEmpty,
+                            onFocusChange: { isDraftFieldFocused = $0 },
+                            onSubmit: { sendAndScroll(proxy) }
+                        )
+                        .frame(minHeight: 42, maxHeight: 140)
                         .accessibilityIdentifier("session.detail.messageField")
-                        .onSubmit {
-                            guard !vm.isGenerating else { return }
-                            sendAndScroll(proxy)
+
+                        if vm.draft.isEmpty {
+                            Text("Ask anything")
+                                .font(LoomTheme.Typography.body)
+                                .foregroundStyle(LoomTheme.inputPlaceholder(colorScheme))
+                                .allowsHitTesting(false)
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.top, 8)
-                        .padding(.bottom, 6)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.top, 8)
+                    .padding(.bottom, 6)
 
                     HStack(alignment: .center, spacing: 8) {
                         HStack(spacing: 4) {
@@ -282,6 +283,8 @@ struct SessionDetailView: View {
                             }
 
                             voiceReplyMenu
+
+                            chatTemplateMenu
                         }
 
                         Menu {
@@ -477,6 +480,9 @@ struct SessionDetailView: View {
                 vm.isVoiceReplyEnabled = false
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .loomChatTemplatesDidChange)) { _ in
+            chatTemplates = ChatTemplateLibrary.load()
+        }
         .onDisappear {
             stopDictationIfNeeded()
             speechSynthesizer.stopSpeaking(at: .immediate)
@@ -637,6 +643,35 @@ struct SessionDetailView: View {
         .accessibilityLabel(vm.isVoiceReplyEnabled ? "Voice replies on" : "Voice replies off")
     }
 
+    private var chatTemplateMenu: some View {
+        Menu {
+            if chatTemplates.isEmpty {
+                Button("No templates") {}
+                    .disabled(true)
+            } else {
+                ForEach(chatTemplates) { template in
+                    Button(template.title) {
+                        applyChatTemplate(template.prompt)
+                    }
+                }
+            }
+        } label: {
+            ComposerUtilityIconChrome(
+                symbolName: "text.badge.plus",
+                isActive: false,
+                isDisabled: chatTemplates.isEmpty || vm.isGenerating
+            )
+        }
+        .help("Chat templates")
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .disabled(chatTemplates.isEmpty || vm.isGenerating)
+        .padding(2)
+        .contentShape(Rectangle())
+        .accessibilityIdentifier("session.detail.chatTemplates")
+        .accessibilityLabel("Chat templates")
+    }
+
     private var recommendedVoiceReplyVoices: [AVSpeechSynthesisVoice] {
         VoiceReplyVoiceCatalog.recommendedVoices(
             from: AVSpeechSynthesisVoice.speechVoices(),
@@ -677,6 +712,16 @@ struct SessionDetailView: View {
                 scrollToBottom(proxy)
             }
         }
+    }
+
+    private func applyChatTemplate(_ prompt: String) {
+        guard let normalizedPrompt = prompt.nonEmptyTrimmed else { return }
+        if vm.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            vm.draft = normalizedPrompt
+        } else {
+            vm.draft += "\n\n\(normalizedPrompt)"
+        }
+        isDraftFieldFocused = true
     }
 
     private func loadEarlierAndPreservePosition(_ proxy: ScrollViewProxy) {
@@ -958,6 +1003,125 @@ private final class SpeechInputController {
                 continuation.resume(returning: granted)
             }
         }
+    }
+}
+
+private struct ComposerTextView: NSViewRepresentable {
+    @Binding var text: String
+
+    let isFocused: Bool
+    let textColor: NSColor
+    let isSendEnabled: Bool
+    let onFocusChange: (Bool) -> Void
+    let onSubmit: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
+        scrollView.hasHorizontalScroller = false
+        scrollView.hasVerticalScroller = false
+        scrollView.autohidesScrollers = true
+
+        let textView = ComposerNSTextView()
+        textView.delegate = context.coordinator
+        textView.drawsBackground = false
+        textView.isRichText = false
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.allowsUndo = true
+        textView.font = .preferredFont(forTextStyle: .body)
+        textView.textColor = textColor
+        textView.insertionPointColor = NSColor.controlAccentColor
+        textView.textContainerInset = NSSize(width: 0, height: 0)
+        textView.textContainer?.lineFragmentPadding = 0
+        textView.textContainer?.widthTracksTextView = true
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.isHorizontallyResizable = false
+        textView.isVerticallyResizable = true
+        textView.autoresizingMask = [.width]
+        textView.isAutomaticQuoteSubstitutionEnabled = true
+        textView.isAutomaticDashSubstitutionEnabled = true
+        textView.isAutomaticTextReplacementEnabled = true
+        textView.isAutomaticSpellingCorrectionEnabled = true
+        textView.setAccessibilityIdentifier("session.detail.messageField")
+        textView.setAccessibilityLabel("Message")
+        textView.onSubmit = { [weak coordinator = context.coordinator] in
+            coordinator?.submit()
+        }
+
+        scrollView.documentView = textView
+        scrollView.setAccessibilityIdentifier("session.detail.messageField")
+        scrollView.setAccessibilityLabel("Message")
+        context.coordinator.textView = textView
+
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        context.coordinator.parent = self
+
+        guard let textView = scrollView.documentView as? ComposerNSTextView else { return }
+        textView.textColor = textColor
+
+        if textView.string != text {
+            textView.string = text
+            textView.setSelectedRange(NSRange(location: textView.string.utf16.count, length: 0))
+        }
+
+        if isFocused, textView.window?.firstResponder !== textView {
+            textView.window?.makeFirstResponder(textView)
+        }
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: ComposerTextView
+        weak var textView: NSTextView?
+
+        init(_ parent: ComposerTextView) {
+            self.parent = parent
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            parent.text = textView.string
+        }
+
+        func textDidBeginEditing(_ notification: Notification) {
+            parent.onFocusChange(true)
+        }
+
+        func textDidEndEditing(_ notification: Notification) {
+            parent.onFocusChange(false)
+        }
+
+        func submit() {
+            guard parent.isSendEnabled else { return }
+            parent.onSubmit()
+        }
+    }
+}
+
+private final class ComposerNSTextView: NSTextView {
+    var onSubmit: (() -> Void)?
+
+    override func doCommand(by selector: Selector) {
+        if selector == #selector(insertNewline(_:)) || selector == #selector(insertNewlineIgnoringFieldEditor(_:)) {
+            let isShiftPressed = NSApp.currentEvent?.modifierFlags.contains(.shift) == true
+            if isShiftPressed {
+                super.doCommand(by: selector)
+            } else {
+                onSubmit?()
+            }
+            return
+        }
+
+        super.doCommand(by: selector)
     }
 }
 

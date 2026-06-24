@@ -84,6 +84,30 @@ final class LoomUITests: XCTestCase {
         )
     }
 
+    func testReturnKeySendsMessageFromComposer() throws {
+        let app = launchApp(
+            activeModelTag: "ui-test-model",
+            chatScenario: .streamSuccess
+        )
+        XCTAssertTrue(createSessionAndWaitForDetail(app: app))
+
+        let messageField = element("session.detail.messageField", app: app)
+        XCTAssertTrue(messageField.waitForExistence(timeout: Self.mediumTimeout))
+        messageField.click()
+        messageField.typeText("return-key-send")
+        messageField.typeKey(.return, modifierFlags: [])
+
+        XCTAssertTrue(
+            waitForAssistantBubbleContaining(
+                "Hello from stub response",
+                app: app,
+                timeout: Self.longTimeout
+            ),
+            "Expected Return to submit the composer without leaving the chat."
+        )
+        XCTAssertTrue(messageField.exists, "Expected the composer to remain available after sending.")
+    }
+
     func testLongModelLabelKeepsSendButtonHittable() throws {
         let app = launchApp(
             activeModelTag: "llama-3.2-ultra-long-model-name-for-ui-layout-verification-1234567890",

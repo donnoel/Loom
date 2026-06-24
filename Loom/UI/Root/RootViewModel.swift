@@ -10,6 +10,19 @@ final class RootViewModel {
         let actionTitle: String
     }
 
+    struct SessionCollectionGroup: Identifiable, Equatable {
+        let collectionName: String?
+        let sessions: [Session]
+
+        var id: String {
+            collectionName ?? "__loom_unfiled__"
+        }
+
+        var title: String {
+            collectionName ?? "Chats"
+        }
+    }
+
     private let store: SessionStore
     private let searchService: SessionSearchService
     private let log = Logger(subsystem: "com.loom.app", category: "RootViewModel")
@@ -33,12 +46,25 @@ final class RootViewModel {
         sessions.filter { $0.metadata.isArchived }
     }
 
+    var activeSessionGroups: [SessionCollectionGroup] {
+        collectionGroups(for: activeSessions)
+    }
+
+    var archivedSessionGroups: [SessionCollectionGroup] {
+        collectionGroups(for: archivedSessions)
+    }
+
     var filteredSessions: [Session] {
         let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return activeSessions }
 
         return activeSessions.filter { session in
             if session.metadata.title.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil {
+                return true
+            }
+
+            if let collectionName = session.metadata.collectionName,
+               collectionName.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil {
                 return true
             }
 
@@ -278,6 +304,27 @@ final class RootViewModel {
         }
     }
 
+    func updateCollection(id: Session.ID, name: String?) async {
+        guard var session = sessions.first(where: { $0.id == id }) else { return }
+        let normalizedName = name?.nonEmptyTrimmed
+        guard session.metadata.collectionName != normalizedName else { return }
+
+        session.metadata.collectionName = normalizedName
+
+        do {
+            try await store.updateMetadata(session.metadata, for: id)
+            let keepSelected = selectedSessionID
+            await load()
+            selectedSessionID = keepSelected
+        } catch {
+            log.error("Failed to update collection for session \(id.uuidString, privacy: .public): \(String(describing: error), privacy: .public)")
+            sidebarBanner = SidebarBannerState(
+                text: "Loom couldn’t update this collection. Try again.",
+                actionTitle: "Reload"
+            )
+        }
+    }
+
     private func sortSessions(_ input: [Session]) -> [Session] {
         input.sorted { lhs, rhs in
             if lhs.metadata.isArchived != rhs.metadata.isArchived {
@@ -287,6 +334,28 @@ final class RootViewModel {
                 return lhs.metadata.isPinned && !rhs.metadata.isPinned
             }
             return lhs.metadata.updatedAt > rhs.metadata.updatedAt
+        }
+    }
+
+    private func collectionGroups(for input: [Session]) -> [SessionCollectionGroup] {
+        let grouped = Dictionary(grouping: input) { session in
+            session.metadata.collectionName?.nonEmptyTrimmed
+        }
+
+        return grouped.keys.sorted { lhs, rhs in
+            switch (lhs, rhs) {
+            case (nil, nil):
+                return false
+            case (nil, _):
+                return true
+            case (_, nil):
+                return false
+            case let (left?, right?):
+                return left.localizedCaseInsensitiveCompare(right) == .orderedAscending
+            }
+        }.compactMap { key in
+            guard let sessions = grouped[key], !sessions.isEmpty else { return nil }
+            return SessionCollectionGroup(collectionName: key, sessions: sessions)
         }
     }
 

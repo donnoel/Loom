@@ -9,7 +9,6 @@ struct LoomApp: App {
     private static let uiTestResetDefaultsEnvironmentKey = "LOOM_UI_TEST_RESET_DEFAULTS"
     private static let uiTestResetStorageEnvironmentKey = "LOOM_UI_TEST_RESET_STORAGE"
     private static let uiTestActiveModelTagEnvironmentKey = "LOOM_UI_TEST_ACTIVE_MODEL_TAG"
-    private static let uiTestChatScenarioEnvironmentKey = "LOOM_UI_TEST_CHAT_STUB_SCENARIO"
     private static let uiTestChatScenarioDefaultsKey = "loom.uiTest.chatScenario"
 
     init() {
@@ -37,11 +36,7 @@ struct LoomApp: App {
             defaults.set(activeModelTag, forKey: LoomPreferenceKeys.activeModelTag)
         }
 
-        if let chatScenario = environment[Self.uiTestChatScenarioEnvironmentKey]?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-           !chatScenario.isEmpty {
-            defaults.set(chatScenario.lowercased(), forKey: Self.uiTestChatScenarioDefaultsKey)
-        }
+        // Chat stream stubs are read from launch environment only so test state cannot leak into normal app runs.
     }
 
     var body: some Scene {
@@ -62,6 +57,7 @@ struct LoomApp: App {
 extension Notification.Name {
     static let loomExportSessionRequested = Notification.Name("loom.exportSessionRequested")
     static let loomSessionsDidChange = Notification.Name("loom.sessionsDidChange")
+    static let loomChatTemplatesDidChange = Notification.Name("loom.chatTemplatesDidChange")
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
