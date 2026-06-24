@@ -363,11 +363,11 @@ final class SessionMessagesViewModel {
         }
 
         do {
-            sessionMemory = try await store.loadSessionMemory(sessionID: sessionID)
+            sessionMemory = try await store.loadGlobalMemory(fallbackSessionID: sessionID)
         } catch {
             sessionMemory = .empty
             banner = BannerState(
-                text: "Loom couldn’t load session memory. You can edit it again.",
+                text: "Loom couldn’t load global memory. You can edit it again.",
                 actionTitle: nil,
                 action: nil
             )
@@ -398,10 +398,10 @@ final class SessionMessagesViewModel {
         sessionMemory = normalized
 
         do {
-            try await store.saveSessionMemory(normalized, sessionID: sessionID)
+            try await store.saveGlobalMemory(normalized)
         } catch {
             banner = BannerState(
-                text: "Loom couldn’t save session memory.",
+                text: "Loom couldn’t save global memory.",
                 actionTitle: nil,
                 action: nil
             )

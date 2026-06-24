@@ -498,9 +498,9 @@ struct SessionDetailView: View {
                 Button {
                     isShowingSessionMemory = true
                 } label: {
-                    Label("Session Memory", systemImage: "person.text.rectangle")
+                    Label("Global Memory", systemImage: "person.text.rectangle")
                 }
-                .help("Edit session memory")
+                .help("Edit global memory")
                 .accessibilityIdentifier("session.detail.sessionMemory")
             }
 

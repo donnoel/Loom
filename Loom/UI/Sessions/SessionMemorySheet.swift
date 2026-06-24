@@ -13,16 +13,16 @@ struct SessionMemorySheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Session Memory")
+            Text("Global Memory")
                 .font(.title3.weight(.semibold))
 
-            Text("Remember a few preferences for this session only. Everything stays on this Mac and can be edited or cleared here.")
+            Text("Remember a few preferences for every chat. Everything stays on this Mac and can be edited or cleared here.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Toggle("Use memory in replies", isOn: $memory.isEnabled)
-                .accessibilityHint("Controls whether these saved preferences are included in replies for this session.")
+                .accessibilityHint("Controls whether these saved preferences are included in replies for every chat.")
 
             memoryTextField(
                 title: "Call me",
@@ -45,7 +45,7 @@ struct SessionMemorySheet: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("Short session note")
+                    Text("Short memory note")
                         .font(.callout.weight(.medium))
                     Spacer()
                     Button("Clear") {
@@ -61,7 +61,7 @@ struct SessionMemorySheet: View {
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .stroke(Color.primary.opacity(0.12), lineWidth: 1)
                     }
-                    .accessibilityLabel("Short session note")
+                    .accessibilityLabel("Short memory note")
                     .onChange(of: memory.sessionNote) { _, value in
                         memory.sessionNote = String(value.prefix(SessionMemory.sessionNoteLimit))
                     }

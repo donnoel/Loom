@@ -48,4 +48,8 @@ nonisolated enum LoomPaths {
     static func sessionMemoryURL(for id: UUID) throws -> URL {
         try sessionFolder(for: id).appendingPathComponent(memoryFileName, isDirectory: false)
     }
+
+    static func globalMemoryURL() throws -> URL {
+        try applicationSupportRoot().appendingPathComponent(memoryFileName, isDirectory: false)
+    }
 }

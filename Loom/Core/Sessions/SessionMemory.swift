@@ -6,7 +6,7 @@ nonisolated struct SessionMemory: Codable, Equatable, Sendable {
     static let assistantNameLimit = 80
     static let responseStyleLimit = 160
     static let sessionNoteLimit = 240
-    private static let contextHeader = "Session memory for this session only."
+    private static let contextHeader = "Global memory for all chats."
 
     var preferredUserName: String
     var preferredAssistantName: String
@@ -70,7 +70,7 @@ nonisolated struct SessionMemory: Codable, Equatable, Sendable {
             preferences.append("- Response style: \(value.responseStyle)")
         }
         if !value.sessionNote.isEmpty {
-            preferences.append("- Session note: \(value.sessionNote)")
+            preferences.append("- Memory note: \(value.sessionNote)")
         }
 
         guard !preferences.isEmpty else { return nil }

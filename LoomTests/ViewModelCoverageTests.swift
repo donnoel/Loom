@@ -1065,11 +1065,14 @@ struct SessionMessagesViewModelCoverageTests {
     @Test
     @MainActor
     func loadSurfacesCorruptSessionMemoryRecoveryBanner() async throws {
-        let store = SessionStore()
+        let sessionsRoot = try makeTemporarySessionsRoot()
+        defer { try? FileManager.default.removeItem(at: sessionsRoot) }
+
+        let store = SessionStore(sessionsRoot: sessionsRoot)
         let session = try await store.createSession(title: "Corrupt Memory")
         defer { cleanupSessionFolder(id: session.id) }
 
-        let memoryURL = try LoomPaths.sessionMemoryURL(for: session.id)
+        let memoryURL = sessionsRoot.appendingPathComponent(LoomPaths.memoryFileName, isDirectory: false)
         try Data("not-json".utf8).write(to: memoryURL, options: [.atomic])
 
         let vm = SessionMessagesViewModel(
@@ -1082,7 +1085,7 @@ struct SessionMessagesViewModelCoverageTests {
         await vm.load()
 
         #expect(vm.sessionMemory == .empty)
-        #expect(vm.banner?.text == "Loom couldn’t load session memory. You can edit it again.")
+        #expect(vm.banner?.text == "Loom couldn’t load global memory. You can edit it again.")
     }
 
     @Test
@@ -1158,7 +1161,10 @@ struct SessionMessagesViewModelCoverageTests {
 
         UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
 
-        let store = SessionStore()
+        let sessionsRoot = try makeTemporarySessionsRoot()
+        defer { try? FileManager.default.removeItem(at: sessionsRoot) }
+
+        let store = SessionStore(sessionsRoot: sessionsRoot)
         let session = try await store.createSession(title: "Memory Enabled")
         defer { cleanupSessionFolder(id: session.id) }
 
@@ -1185,7 +1191,7 @@ struct SessionMessagesViewModelCoverageTests {
         #expect(requests.count == 1)
         if let request = requests.first {
             #expect(request.messages.first?.role == .system)
-            #expect(request.messages.first?.content.contains("Session memory for this session only.") == true)
+            #expect(request.messages.first?.content.contains("Global memory for all chats.") == true)
             #expect(request.messages.first?.content.contains("Preferred name for the user: Don") == true)
             #expect(request.messages.first?.content.contains("Response style: Use plain language") == true)
             #expect(request.messages.last?.content == "Help me plan")
@@ -1200,7 +1206,10 @@ struct SessionMessagesViewModelCoverageTests {
 
         UserDefaults.standard.set("llama3", forKey: LoomPreferenceKeys.activeModelTag)
 
-        let store = SessionStore()
+        let sessionsRoot = try makeTemporarySessionsRoot()
+        defer { try? FileManager.default.removeItem(at: sessionsRoot) }
+
+        let store = SessionStore(sessionsRoot: sessionsRoot)
         let session = try await store.createSession(title: "Memory Disabled")
         defer { cleanupSessionFolder(id: session.id) }
 

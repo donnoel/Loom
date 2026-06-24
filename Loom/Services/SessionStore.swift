@@ -233,10 +233,37 @@ actor SessionStore {
         try data.write(to: url, options: [.atomic])
     }
 
+    func loadGlobalMemory(fallbackSessionID: UUID? = nil) throws -> SessionMemory {
+        let url = try globalMemoryURL()
+        if FileManager.default.fileExists(atPath: url.path) {
+            let data = try Data(contentsOf: url)
+            return try decoder.decode(SessionMemory.self, from: data).normalized()
+        }
+
+        guard let fallbackSessionID else { return .empty }
+
+        let legacyURL = try sessionMemoryURL(for: fallbackSessionID)
+        guard FileManager.default.fileExists(atPath: legacyURL.path) else { return .empty }
+
+        let data = try Data(contentsOf: legacyURL)
+        let migrated = try decoder.decode(SessionMemory.self, from: data).normalized()
+        try saveGlobalMemory(migrated)
+        return migrated
+    }
+
+    func saveGlobalMemory(_ memory: SessionMemory) throws {
+        let url = try globalMemoryURL()
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let data = try encoder.encode(memory.normalized())
+        try data.write(to: url, options: [.atomic])
+    }
+
     func loadSessionMemory(sessionID: UUID) throws -> SessionMemory {
         let url = try sessionMemoryURL(for: sessionID)
         guard FileManager.default.fileExists(atPath: url.path) else { return .empty }
-
         let data = try Data(contentsOf: url)
         return try decoder.decode(SessionMemory.self, from: data).normalized()
     }
@@ -389,6 +416,13 @@ actor SessionStore {
 
     private func sessionMemoryURL(for id: UUID) throws -> URL {
         try sessionFolder(for: id).appendingPathComponent(LoomPaths.memoryFileName, isDirectory: false)
+    }
+
+    private func globalMemoryURL() throws -> URL {
+        if let sessionsRootOverride {
+            return sessionsRootOverride.appendingPathComponent(LoomPaths.memoryFileName, isDirectory: false)
+        }
+        return try LoomPaths.globalMemoryURL()
     }
 
     private nonisolated static func isDefaultSessionTitle(_ title: String) -> Bool {

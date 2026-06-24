@@ -357,10 +357,13 @@ struct SessionStoreTests {
     }
 
     @Test
-    func sessionMemoryPersistsRoundTripAndIsBounded() async throws {
-        let store = SessionStore()
-        let session = try await store.createSession(title: "Remember Preferences")
-        defer { cleanupSessionFolder(id: session.id) }
+    func globalMemoryPersistsRoundTripAndIsBounded() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LoomGlobalMemoryTests", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let store = SessionStore(sessionsRoot: tempRoot)
 
         let memory = SessionMemory(
             preferredUserName: "  Don  ",
@@ -370,8 +373,8 @@ struct SessionStoreTests {
             isEnabled: true
         )
 
-        try await store.saveSessionMemory(memory, sessionID: session.id)
-        let loaded = try await store.loadSessionMemory(sessionID: session.id)
+        try await store.saveGlobalMemory(memory)
+        let loaded = try await store.loadGlobalMemory()
 
         #expect(loaded.preferredUserName == "Don")
         #expect(loaded.preferredAssistantName == "Loom")
@@ -381,8 +384,13 @@ struct SessionStoreTests {
     }
 
     @Test
-    func sessionMemoryIsIsolatedBySession() async throws {
-        let store = SessionStore()
+    func globalMemoryIsSharedAcrossSessions() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LoomGlobalMemoryTests", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let store = SessionStore(sessionsRoot: tempRoot)
         let first = try await store.createSession(title: "Memory One")
         let second = try await store.createSession(title: "Memory Two")
         defer {
@@ -390,52 +398,76 @@ struct SessionStoreTests {
             cleanupSessionFolder(id: second.id)
         }
 
-        try await store.saveSessionMemory(
-            SessionMemory(preferredUserName: "Don"),
-            sessionID: first.id
-        )
-        try await store.saveSessionMemory(
-            SessionMemory(preferredUserName: "Alex", isEnabled: false),
-            sessionID: second.id
-        )
+        try await store.saveGlobalMemory(SessionMemory(preferredUserName: "Don"))
 
-        let loadedFirst = try await store.loadSessionMemory(sessionID: first.id)
-        let loadedSecond = try await store.loadSessionMemory(sessionID: second.id)
+        let loadedFirst = try await store.loadGlobalMemory(fallbackSessionID: first.id)
+        let loadedSecond = try await store.loadGlobalMemory(fallbackSessionID: second.id)
 
         #expect(loadedFirst.preferredUserName == "Don")
         #expect(loadedFirst.isEnabled)
-        #expect(loadedSecond.preferredUserName == "Alex")
-        #expect(!loadedSecond.isEnabled)
+        #expect(loadedSecond.preferredUserName == "Don")
+        #expect(loadedSecond.isEnabled)
     }
 
     @Test
-    func loadSessionMemoryReturnsEmptyForMissingFile() async throws {
-        let store = SessionStore()
-        let session = try await store.createSession(title: "No Memory Yet")
-        defer { cleanupSessionFolder(id: session.id) }
+    func loadGlobalMemoryReturnsEmptyForMissingFile() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LoomGlobalMemoryTests", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
 
-        let loaded = try await store.loadSessionMemory(sessionID: session.id)
+        let store = SessionStore(sessionsRoot: tempRoot)
+
+        let loaded = try await store.loadGlobalMemory()
 
         #expect(loaded == .empty)
         #expect(loaded.contextMessage() == nil)
     }
 
     @Test
-    func deleteSessionRemovesStoredMemoryWithSessionFolder() async throws {
-        let store = SessionStore()
+    func globalMemorySurvivesSessionDeletion() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LoomGlobalMemoryTests", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let store = SessionStore(sessionsRoot: tempRoot)
         let session = try await store.createSession(title: "Delete Memory")
         defer { cleanupSessionFolder(id: session.id) }
 
-        try await store.saveSessionMemory(
-            SessionMemory(preferredUserName: "Don"),
-            sessionID: session.id
-        )
-        let memoryURL = try LoomPaths.sessionMemoryURL(for: session.id)
+        try await store.saveGlobalMemory(SessionMemory(preferredUserName: "Don"))
+        let memoryURL = tempRoot.appendingPathComponent(LoomPaths.memoryFileName, isDirectory: false)
         #expect(FileManager.default.fileExists(atPath: memoryURL.path))
 
         try await store.deleteSession(id: session.id)
 
-        #expect(!FileManager.default.fileExists(atPath: memoryURL.path))
+        #expect(FileManager.default.fileExists(atPath: memoryURL.path))
+        let loaded = try await store.loadGlobalMemory()
+        #expect(loaded.preferredUserName == "Don")
+    }
+
+    @Test
+    func loadGlobalMemoryMigratesLegacySessionMemoryWhenMissing() async throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("LoomGlobalMemoryTests", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let store = SessionStore(sessionsRoot: tempRoot)
+        let session = try await store.createSession(title: "Legacy Memory")
+        defer { cleanupSessionFolder(id: session.id) }
+
+        try await store.saveSessionMemory(
+            SessionMemory(preferredUserName: "Don", responseStyle: "Keep it crisp."),
+            sessionID: session.id
+        )
+
+        let loaded = try await store.loadGlobalMemory(fallbackSessionID: session.id)
+        let globalMemoryURL = tempRoot.appendingPathComponent(LoomPaths.memoryFileName, isDirectory: false)
+
+        #expect(loaded.preferredUserName == "Don")
+        #expect(loaded.responseStyle == "Keep it crisp.")
+        #expect(FileManager.default.fileExists(atPath: globalMemoryURL.path))
     }
 }
 
