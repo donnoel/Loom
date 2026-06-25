@@ -52,7 +52,7 @@ actor WorkspaceAgentRuntime {
             workingMessages.append(toolMessage)
         }
 
-        for _ in 0..<maxIterations {
+        for iteration in 0..<maxIterations {
             let index = await WorkspaceIndexer.snapshot(for: session, runner: runner)
             let response = try await provider.respond(
                 to: WorkspaceAgentRequest(
@@ -63,7 +63,22 @@ actor WorkspaceAgentRuntime {
                 )
             )
 
-            let assistantMessage = ChatMessage(role: .assistant, content: response.message.nonEmptyTrimmed ?? "I checked the LoomX project.")
+            if response.toolCalls.isEmpty,
+               shouldRequestToolFollowUp(
+                userText: trimmedText,
+                assistantMessage: response.message,
+                toolResults: allToolResults,
+                iteration: iteration
+               ) {
+                workingMessages.append(ChatMessage(role: .assistant, content: response.message))
+                workingMessages.append(ChatMessage(role: .system, content: toolFollowUpPrompt))
+                continue
+            }
+
+            let assistantMessage = ChatMessage(
+                role: .assistant,
+                content: response.message.nonEmptyTrimmed ?? "I checked the LoomX project."
+            )
             try await store.appendMessage(assistantMessage, sessionID: session.id)
             emittedMessages.append(assistantMessage)
             workingMessages.append(assistantMessage)
@@ -163,6 +178,67 @@ actor WorkspaceAgentRuntime {
             parts.append(output)
         }
         return parts.joined(separator: "\n")
+    }
+
+    private var toolFollowUpPrompt: String {
+        """
+        The user asked LoomX to inspect or change the selected workspace. Your previous reply did not include toolCalls, so no work happened.
+        Continue by returning only JSON with concrete toolCalls. Read files if you need context, use applyPatch or writeFile for edits, then build or test when useful.
+        """
+    }
+
+    private func shouldRequestToolFollowUp(
+        userText: String,
+        assistantMessage: String,
+        toolResults: [DeveloperToolResult],
+        iteration: Int
+    ) -> Bool {
+        guard iteration < maxIterations - 1,
+              userText.requestsWorkspaceAction,
+              assistantMessage.announcesWorkspaceAction else {
+            return false
+        }
+        return !toolResults.contains { result in
+            result.status == .success && (
+                result.tool.isEditingTool
+                    || result.tool == .build
+                    || result.tool == .test
+                    || result.tool == .openInXcode
+            )
+        }
+    }
+}
+
+private extension String {
+    nonisolated var requestsWorkspaceAction: Bool {
+        let normalized = lowercased()
+        return normalized.contains("implement")
+            || normalized.contains("make changes")
+            || normalized.contains("change ")
+            || normalized.contains("update ")
+            || normalized.contains("edit ")
+            || normalized.contains("fix ")
+            || normalized.contains("build out")
+            || normalized.contains("create ")
+            || normalized.contains("add ")
+            || normalized.contains("remove ")
+            || normalized.contains("directly in xcode")
+    }
+
+    nonisolated var announcesWorkspaceAction: Bool {
+        let normalized = lowercased()
+        return normalized.contains("starting implementation")
+            || normalized.contains("creating ")
+            || normalized.contains("updating ")
+            || normalized.contains("implementing ")
+            || normalized.contains("i'll start")
+            || normalized.contains("i will start")
+            || normalized.contains("let me implement")
+            || normalized.contains("i’ll implement")
+            || normalized.contains("i will implement")
+            || normalized.contains("i'll create")
+            || normalized.contains("i will create")
+            || normalized.contains("i’ll create")
     }
 }
 

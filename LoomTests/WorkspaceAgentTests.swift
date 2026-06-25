@@ -164,6 +164,59 @@ struct WorkspaceAgentTests {
     }
 
     @Test
+    func agentRuntimeRetriesImplementationMessageThatHasNoToolCalls() async throws {
+        let storeRoot = try makeTemporaryDirectory()
+        let workspaceRoot = try makeTemporaryDirectory(prefix: "loom-source-workspace")
+        try FileManager.default.createDirectory(
+            at: workspaceRoot.appendingPathComponent("LoomX", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try Data("struct ContentView {}\n".utf8).write(
+            to: workspaceRoot.appendingPathComponent("LoomX/ContentView.swift"),
+            options: [.atomic]
+        )
+        let store = WorkspaceStore(workspacesRoot: storeRoot)
+        let session = try await store.createSession(
+            displayName: "Runtime",
+            rootURL: workspaceRoot,
+            bookmarkData: nil,
+            detectedProject: nil
+        )
+        let provider = ScriptedWorkspaceProvider([
+            WorkspaceAgentProviderResponse(
+                message: "Checking current LoomX app structure before implementing MVVM gradient app",
+                toolCalls: [
+                    WorkspaceAgentToolCall(tool: .readFile, relativePath: "LoomX/ContentView.swift")
+                ]
+            ),
+            WorkspaceAgentProviderResponse(
+                message: "Creating MVVM gradient app - implementing ViewModel + updating ContentView"
+            ),
+            WorkspaceAgentProviderResponse(
+                message: "Writing the MVVM view model.",
+                toolCalls: [
+                    WorkspaceAgentToolCall(
+                        tool: .writeFile,
+                        relativePath: "LoomX/ViewModel.swift",
+                        contents: "final class ViewModel {}\n"
+                    )
+                ]
+            )
+        ])
+        let runtime = WorkspaceAgentRuntime(store: store, runner: DeveloperToolRunner(), provider: provider)
+
+        let result = try await runtime.runTurn(
+            session: session,
+            userText: "please implement the MVVM gradient app directly in Xcode",
+            existingMessages: []
+        )
+
+        #expect(result.toolResults.map(\.tool) == [.readFile, .writeFile])
+        #expect(try String(contentsOf: workspaceRoot.appendingPathComponent("LoomX/ViewModel.swift"), encoding: .utf8) == "final class ViewModel {}\n")
+        #expect((try await store.loadMessages(sessionID: session.id)).map(\.content).contains("Creating MVVM gradient app - implementing ViewModel + updating ContentView") == false)
+    }
+
+    @Test
     func agentRuntimeTurnsIncompleteWriteFileIntoToolFailure() async throws {
         let storeRoot = try makeTemporaryDirectory()
         let workspaceRoot = try makeTemporaryDirectory(prefix: "loom-source-workspace")
