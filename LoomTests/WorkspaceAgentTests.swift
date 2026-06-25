@@ -245,6 +245,63 @@ struct WorkspaceAgentTests {
     }
 
     @Test
+    func agentRuntimeKeepsGoingAfterRepeatedInvalidWriteFileCalls() async throws {
+        let storeRoot = try makeTemporaryDirectory()
+        let workspaceRoot = try makeTemporaryDirectory(prefix: "loom-source-workspace")
+        try FileManager.default.createDirectory(
+            at: workspaceRoot.appendingPathComponent("LoomX", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try Data("struct ContentView {}\n".utf8).write(
+            to: workspaceRoot.appendingPathComponent("LoomX/ContentView.swift"),
+            options: [.atomic]
+        )
+        let store = WorkspaceStore(workspacesRoot: storeRoot)
+        let session = try await store.createSession(
+            displayName: "Runtime",
+            rootURL: workspaceRoot,
+            bookmarkData: nil,
+            detectedProject: nil
+        )
+        let invalidWrite = WorkspaceToolCallParser.parse(
+            """
+            {"message":"Creating ViewModel first then ContentView update","toolCalls":[{"writeFile"},{"relativePath":"LoomX/ViewModels/CircleColorViewModel.swift"}]}
+            """
+        )
+        let provider = ScriptedWorkspaceProvider([
+            WorkspaceAgentProviderResponse(
+                message: "Reading ContentView before changing it.",
+                toolCalls: [WorkspaceAgentToolCall(tool: .readFile, relativePath: "LoomX/ContentView.swift")]
+            ),
+            invalidWrite,
+            invalidWrite,
+            WorkspaceAgentProviderResponse(
+                message: "Writing the missing file with full contents.",
+                toolCalls: [
+                    WorkspaceAgentToolCall(
+                        tool: .writeFile,
+                        relativePath: "LoomX/ViewModels/CircleColorViewModel.swift",
+                        contents: "final class CircleColorViewModel {}\n"
+                    )
+                ]
+            )
+        ])
+        let runtime = WorkspaceAgentRuntime(store: store, runner: DeveloperToolRunner(), provider: provider)
+
+        let result = try await runtime.runTurn(
+            session: session,
+            userText: "please implement the MVVM gradient app directly in Xcode",
+            existingMessages: []
+        )
+
+        #expect(result.toolResults.map(\.status) == [.success, .failure, .failure, .success])
+        #expect(try String(
+            contentsOf: workspaceRoot.appendingPathComponent("LoomX/ViewModels/CircleColorViewModel.swift"),
+            encoding: .utf8
+        ) == "final class CircleColorViewModel {}\n")
+    }
+
+    @Test
     func toolIntentDetectorParsesCommonWorkspaceCommands() {
         #expect(WorkspaceToolIntentDetector.toolCalls(for: "git status").first?.tool == .gitStatus)
         #expect(WorkspaceToolIntentDetector.toolCalls(for: "run build").first?.tool == .build)

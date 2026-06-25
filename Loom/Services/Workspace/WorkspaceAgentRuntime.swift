@@ -20,7 +20,7 @@ actor WorkspaceAgentRuntime {
         store: WorkspaceStore,
         runner: any DeveloperToolRunning,
         provider: any WorkspaceAgentProviding,
-        maxIterations: Int = 3
+        maxIterations: Int = 5
     ) {
         self.store = store
         self.runner = runner
@@ -101,6 +101,10 @@ actor WorkspaceAgentRuntime {
 
                 let toolMessage = ChatMessage(role: .tool, content: toolMessageContent(for: toolResult))
                 workingMessages.append(toolMessage)
+
+                if let repairPrompt = editRepairPrompt(for: toolResult) {
+                    workingMessages.append(ChatMessage(role: .system, content: repairPrompt))
+                }
             }
         }
 
@@ -184,6 +188,18 @@ actor WorkspaceAgentRuntime {
         """
         The user asked LoomX to inspect or change the selected workspace. Your previous reply did not include toolCalls, so no work happened.
         Continue by returning only JSON with concrete toolCalls. Read files if you need context, use applyPatch or writeFile for edits, then build or test when useful.
+        """
+    }
+
+    private func editRepairPrompt(for result: DeveloperToolResult) -> String? {
+        guard result.status == .failure, result.tool.isEditingTool else {
+            return nil
+        }
+        return """
+        The previous \(result.tool.rawValue) call failed and did not change files.
+        Do not repeat the same invalid call. Continue by returning only JSON with one valid edit:
+        {"message":"Applying the edit now.","toolCalls":[{"tool":"applyPatch","patch":"diff --git a/path b/path\\n..."}]}
+        Or use writeFile only with both "relativePath" and the complete "contents" string.
         """
     }
 
@@ -297,6 +313,7 @@ actor LocalOllamaWorkspaceAgentProvider: WorkspaceAgentProviding {
         Supported tools: readFile, search, listFiles, writeFile, applyPatch, gitDiff, gitStatus, xcodebuildList, build, test, openInXcode.
         For applyPatch, provide a unified git patch in the patch field.
         For edits, prefer applyPatch. If you use writeFile, include relativePath and the complete contents field.
+        Never send split or incomplete tool calls like [{"writeFile"},{"relativePath":"path"}]; they do not edit files.
         If no tool is needed, answer normally.
         """
     }
