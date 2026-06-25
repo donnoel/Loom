@@ -398,6 +398,7 @@ struct RootView: View {
             }
 
             Section {
+                destinationSidebarRow(.workspace)
                 destinationSidebarRow(.models)
                 destinationSidebarRow(.compare)
                 destinationSidebarRow(.info)
@@ -568,6 +569,10 @@ struct RootView: View {
     @ViewBuilder
     private var detailContent: some View {
         switch selectedSidebarSelection ?? .destination(.sessions) {
+        case .destination(.workspace):
+            WorkspaceView()
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("root.detail.workspace")
         case .destination(.models):
             ModelsView(
                 onModelSelectionChanged: {

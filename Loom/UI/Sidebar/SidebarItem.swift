@@ -2,6 +2,7 @@ import Foundation
 
 nonisolated enum SidebarItem: String, Hashable, Identifiable, Sendable {
     case sessions
+    case workspace
     case models
     case compare
     case info
@@ -14,6 +15,7 @@ nonisolated enum SidebarItem: String, Hashable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .sessions: "Sessions"
+        case .workspace: "LoomX"
         case .models: "Models"
         case .compare: "Compare"
         case .info: "Info"
@@ -26,6 +28,7 @@ nonisolated enum SidebarItem: String, Hashable, Identifiable, Sendable {
     var systemImage: String {
         switch self {
         case .sessions: "bubble.left.and.bubble.right"
+        case .workspace: "folder.badge.gearshape"
         case .models: "cube.box"
         case .compare: "square.split.2x1"
         case .info: "info.circle"

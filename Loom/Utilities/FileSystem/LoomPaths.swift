@@ -3,8 +3,11 @@ import Foundation
 nonisolated enum LoomPaths {
     static let appFolderName = "Loom"
     static let sessionsFolderName = "Sessions"
+    static let workspacesFolderName = "Workspaces"
     static let metadataFileName = "metadata.json"
     static let messagesFileName = "messages.jsonl"
+    static let toolEventsFileName = "tool-events.jsonl"
+    static let changesFolderName = "changes"
     static let scratchpadFileName = "scratchpad.txt"
     static let memoryFileName = "memory.json"
     private static let overrideRootEnvironmentKey = "LOOM_APP_SUPPORT_ROOT"
@@ -29,6 +32,10 @@ nonisolated enum LoomPaths {
         return try applicationSupportRoot().appendingPathComponent(sessionsFolderName, isDirectory: true)
     }
 
+    static func workspacesRoot() throws -> URL {
+        try applicationSupportRoot().appendingPathComponent(workspacesFolderName, isDirectory: true)
+    }
+
     static func sessionFolder(for id: UUID) throws -> URL {
         try sessionsRoot().appendingPathComponent(id.uuidString, isDirectory: true)
     }
@@ -51,5 +58,25 @@ nonisolated enum LoomPaths {
 
     static func globalMemoryURL() throws -> URL {
         try applicationSupportRoot().appendingPathComponent(memoryFileName, isDirectory: false)
+    }
+
+    static func workspaceFolder(for id: UUID) throws -> URL {
+        try workspacesRoot().appendingPathComponent(id.uuidString, isDirectory: true)
+    }
+
+    static func workspaceMetadataURL(for id: UUID) throws -> URL {
+        try workspaceFolder(for: id).appendingPathComponent(metadataFileName, isDirectory: false)
+    }
+
+    static func workspaceMessagesURL(for id: UUID) throws -> URL {
+        try workspaceFolder(for: id).appendingPathComponent(messagesFileName, isDirectory: false)
+    }
+
+    static func workspaceToolEventsURL(for id: UUID) throws -> URL {
+        try workspaceFolder(for: id).appendingPathComponent(toolEventsFileName, isDirectory: false)
+    }
+
+    static func workspaceChangesFolder(for id: UUID) throws -> URL {
+        try workspaceFolder(for: id).appendingPathComponent(changesFolderName, isDirectory: true)
     }
 }

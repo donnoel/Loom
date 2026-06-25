@@ -3,40 +3,67 @@ import SwiftUI
 
 private struct TrustCenterLocalSnapshot: Sendable, Equatable {
     let sessionsRootURL: URL?
+    let workspacesRootURL: URL?
     let sessionCount: Int
+    let workspaceCount: Int
     let totalBytes: Int64
     let metadataBytes: Int64
     let messageLogBytes: Int64
+    let workspaceBytes: Int64
+    let workspaceToolEventCount: Int
+    let cloudWorkspaceCount: Int
     let retainedAttachmentBytes: Int64
 
     static let unavailable = TrustCenterLocalSnapshot(
         sessionsRootURL: nil,
+        workspacesRootURL: nil,
         sessionCount: 0,
+        workspaceCount: 0,
         totalBytes: 0,
         metadataBytes: 0,
         messageLogBytes: 0,
+        workspaceBytes: 0,
+        workspaceToolEventCount: 0,
+        cloudWorkspaceCount: 0,
         retainedAttachmentBytes: 0
     )
 }
 
 private actor TrustCenterInspector {
+    private static let workspaceDecoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }()
+
     func loadSnapshot() -> TrustCenterLocalSnapshot {
-        guard let sessionsRoot = try? LoomPaths.sessionsRoot() else {
+        guard let appRoot = try? LoomPaths.applicationSupportRoot() else {
             return TrustCenterLocalSnapshot(
                 sessionsRootURL: nil,
+                workspacesRootURL: nil,
                 sessionCount: 0,
+                workspaceCount: 0,
                 totalBytes: 0,
                 metadataBytes: 0,
                 messageLogBytes: 0,
+                workspaceBytes: 0,
+                workspaceToolEventCount: 0,
+                cloudWorkspaceCount: 0,
                 retainedAttachmentBytes: 0
             )
         }
 
+        let sessionsRoot = appRoot.appendingPathComponent(LoomPaths.sessionsFolderName, isDirectory: true)
+        let workspacesRoot = appRoot.appendingPathComponent(LoomPaths.workspacesFolderName, isDirectory: true)
         let manager = FileManager.default
         var sessionCount = 0
+        var workspaceCount = 0
         var totalBytes: Int64 = 0
         var metadataBytes: Int64 = 0
         var messageLogBytes: Int64 = 0
+        var workspaceBytes: Int64 = 0
+        var workspaceToolEventCount = 0
+        var cloudWorkspaceCount = 0
 
         if let sessionFolders = try? manager.contentsOfDirectory(
             at: sessionsRoot,
@@ -53,8 +80,35 @@ private actor TrustCenterInspector {
             }
         }
 
+        if let workspaceFolders = try? manager.contentsOfDirectory(
+            at: workspacesRoot,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) {
+            for folder in workspaceFolders {
+                guard let values = try? folder.resourceValues(forKeys: [.isDirectoryKey]),
+                      values.isDirectory == true,
+                      UUID(uuidString: folder.lastPathComponent) != nil else {
+                    continue
+                }
+                workspaceCount += 1
+
+                let metadataURL = folder.appendingPathComponent(LoomPaths.metadataFileName, isDirectory: false)
+                if let data = try? Data(contentsOf: metadataURL),
+                   let session = try? Self.workspaceDecoder.decode(WorkspaceSession.self, from: data),
+                   session.providerMode == .cloud {
+                    cloudWorkspaceCount += 1
+                }
+
+                let toolEventsURL = folder.appendingPathComponent(LoomPaths.toolEventsFileName, isDirectory: false)
+                if let text = try? String(contentsOf: toolEventsURL, encoding: .utf8) {
+                    workspaceToolEventCount += text.split(separator: "\n").count
+                }
+            }
+        }
+
         if let enumerator = manager.enumerator(
-            at: sessionsRoot,
+            at: appRoot,
             includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
             options: [.skipsHiddenFiles]
         ) {
@@ -66,24 +120,34 @@ private actor TrustCenterInspector {
 
                 let size = Int64(values.fileSize ?? 0)
                 totalBytes += size
+                if fileURL.path.hasPrefix(workspacesRoot.path + "/") {
+                    workspaceBytes += size
+                }
 
-                switch fileURL.lastPathComponent {
-                case "metadata.json":
-                    metadataBytes += size
-                case "messages.jsonl":
-                    messageLogBytes += size
-                default:
-                    break
+                if fileURL.path.hasPrefix(sessionsRoot.path + "/") {
+                    switch fileURL.lastPathComponent {
+                    case "metadata.json":
+                        metadataBytes += size
+                    case "messages.jsonl":
+                        messageLogBytes += size
+                    default:
+                        break
+                    }
                 }
             }
         }
 
         return TrustCenterLocalSnapshot(
             sessionsRootURL: sessionsRoot,
+            workspacesRootURL: workspacesRoot,
             sessionCount: sessionCount,
+            workspaceCount: workspaceCount,
             totalBytes: totalBytes,
             metadataBytes: metadataBytes,
             messageLogBytes: messageLogBytes,
+            workspaceBytes: workspaceBytes,
+            workspaceToolEventCount: workspaceToolEventCount,
+            cloudWorkspaceCount: cloudWorkspaceCount,
             retainedAttachmentBytes: 0
         )
     }
@@ -108,6 +172,7 @@ struct TrustCenterView: View {
             VStack(alignment: .leading, spacing: 14) {
                 introCard
                 localStorageCard
+                workspaceAccessCard
                 attachmentFootprintCard
                 runtimeHealthCard
             }
@@ -155,6 +220,7 @@ struct TrustCenterView: View {
                 .font(LoomTheme.Typography.sectionTitle)
 
             valueRow("Sessions", value: "\(localSnapshot.sessionCount)")
+            valueRow("LoomX projects", value: "\(localSnapshot.workspaceCount)")
             valueRow("Total local storage", value: formattedBytes(localSnapshot.totalBytes))
             valueRow("Message logs", value: formattedBytes(localSnapshot.messageLogBytes))
             valueRow("Session metadata", value: formattedBytes(localSnapshot.metadataBytes))
@@ -182,6 +248,32 @@ struct TrustCenterView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(statusViewModel.isRefreshing)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .loomCard(cornerRadius: 12)
+    }
+
+    private var workspaceAccessCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("LoomX")
+                .font(LoomTheme.Typography.sectionTitle)
+
+            valueRow("Local helper", value: "Available")
+            valueRow("Saved LoomX projects", value: "\(localSnapshot.workspaceCount)")
+            valueRow("LoomX storage", value: formattedBytes(localSnapshot.workspaceBytes))
+            valueRow("Recent tool logs", value: "\(localSnapshot.workspaceToolEventCount)")
+            valueRow("Cloud-enabled LoomX projects", value: "\(localSnapshot.cloudWorkspaceCount)")
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("LoomX folder")
+                    .font(LoomTheme.Typography.caption)
+                    .foregroundStyle(.secondary)
+                Text(localSnapshot.workspacesRootURL?.path ?? "Unavailable")
+                    .font(LoomTheme.Typography.monospacedFootnote)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
             }
         }
         .padding(16)

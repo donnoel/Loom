@@ -28,6 +28,10 @@ struct LoomApp: App {
                FileManager.default.fileExists(atPath: sessionsRoot.path) {
                 try? FileManager.default.removeItem(at: sessionsRoot)
             }
+            if let workspacesRoot = try? LoomPaths.workspacesRoot(),
+               FileManager.default.fileExists(atPath: workspacesRoot.path) {
+                try? FileManager.default.removeItem(at: workspacesRoot)
+            }
         }
 
         if let activeModelTag = environment[Self.uiTestActiveModelTagEnvironmentKey]?
