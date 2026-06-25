@@ -392,8 +392,9 @@ actor DeveloperToolRunner: DeveloperToolRunning {
         return String(path.dropFirst(rootPath.count + 1))
     }
 
-    private static func parseSchemes(from output: String) -> [String] {
-        guard let data = output.data(using: .utf8),
+    static func parseSchemes(from output: String) -> [String] {
+        guard let jsonText = firstJSONObject(in: output),
+              let data = jsonText.data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return []
         }
@@ -404,5 +405,38 @@ actor DeveloperToolRunner: DeveloperToolRunning {
             }
         }
         return []
+    }
+
+    private static func firstJSONObject(in output: String) -> String? {
+        guard let startIndex = output.firstIndex(of: "{") else { return nil }
+
+        var depth = 0
+        var isInsideString = false
+        var isEscaped = false
+
+        var index = startIndex
+        while index < output.endIndex {
+            let character = output[index]
+
+            if isEscaped {
+                isEscaped = false
+            } else if character == "\\" {
+                isEscaped = true
+            } else if character == "\"" {
+                isInsideString.toggle()
+            } else if !isInsideString {
+                if character == "{" {
+                    depth += 1
+                } else if character == "}" {
+                    depth -= 1
+                    if depth == 0 {
+                        return String(output[startIndex...index])
+                    }
+                }
+            }
+
+            index = output.index(after: index)
+        }
+        return nil
     }
 }

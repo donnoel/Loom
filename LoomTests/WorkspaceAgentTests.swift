@@ -136,7 +136,76 @@ struct WorkspaceAgentTests {
         #expect(result.toolResults.map(\.tool) == [.writeFile])
         #expect(try String(contentsOf: workspaceRoot.appendingPathComponent("notes.txt"), encoding: .utf8) == "workspace agent note")
         #expect((try await store.loadToolEvents(sessionID: session.id)).count == 1)
-        #expect((try await store.loadMessages(sessionID: session.id)).contains { $0.role == .tool })
+        #expect(!(try await store.loadMessages(sessionID: session.id)).contains { $0.role == .tool })
+    }
+
+    @Test
+    func agentRuntimeRunsDirectToolIntentBeforeProviderResponse() async throws {
+        let storeRoot = try makeTemporaryDirectory()
+        let workspaceRoot = try makeTemporaryDirectory(prefix: "loom-source-workspace")
+        try Data("struct RootView {}".utf8).write(to: workspaceRoot.appendingPathComponent("RootView.swift"), options: [.atomic])
+        let store = WorkspaceStore(workspacesRoot: storeRoot)
+        let session = try await store.createSession(
+            displayName: "Runtime",
+            rootURL: workspaceRoot,
+            bookmarkData: nil,
+            detectedProject: nil
+        )
+        let provider = ScriptedWorkspaceProvider([
+            WorkspaceAgentProviderResponse(message: "I found the matching file.")
+        ])
+        let runtime = WorkspaceAgentRuntime(store: store, runner: DeveloperToolRunner(), provider: provider)
+
+        let result = try await runtime.runTurn(session: session, userText: "search for RootView", existingMessages: [])
+
+        #expect(result.toolResults.map(\.tool) == [.search])
+        #expect(result.toolResults.first?.output.contains("RootView.swift:1") == true)
+        #expect(!(try await store.loadMessages(sessionID: session.id)).contains { $0.role == .tool })
+    }
+
+    @Test
+    func agentRuntimeTurnsIncompleteWriteFileIntoToolFailure() async throws {
+        let storeRoot = try makeTemporaryDirectory()
+        let workspaceRoot = try makeTemporaryDirectory(prefix: "loom-source-workspace")
+        let store = WorkspaceStore(workspacesRoot: storeRoot)
+        let session = try await store.createSession(
+            displayName: "Runtime",
+            rootURL: workspaceRoot,
+            bookmarkData: nil,
+            detectedProject: nil
+        )
+        let provider = ScriptedWorkspaceProvider([
+            WorkspaceToolCallParser.parse(
+                """
+                {"message":"Creating MVVM gradient app.","toolCalls":[{"writeFile"},{"relativePath":"LoomX/ViewModels/CircleButtonColorViewModel.swift"}]}
+                """
+            )
+        ])
+        let runtime = WorkspaceAgentRuntime(store: store, runner: DeveloperToolRunner(), provider: provider)
+
+        let result = try await runtime.runTurn(session: session, userText: "please implement the plan", existingMessages: [])
+
+        #expect(result.toolResults.map(\.tool) == [.writeFile])
+        #expect(result.toolResults.first?.status == .failure)
+        #expect(result.toolResults.first?.summary.contains("without file contents") == true)
+        #expect(!FileManager.default.fileExists(atPath: workspaceRoot.appendingPathComponent("LoomX/ViewModels/CircleButtonColorViewModel.swift").path))
+    }
+
+    @Test
+    func toolIntentDetectorParsesCommonWorkspaceCommands() {
+        #expect(WorkspaceToolIntentDetector.toolCalls(for: "git status").first?.tool == .gitStatus)
+        #expect(WorkspaceToolIntentDetector.toolCalls(for: "run build").first?.tool == .build)
+        #expect(WorkspaceToolIntentDetector.toolCalls(for: "read Loom/App.swift").first?.relativePath == "Loom/App.swift")
+        #expect(WorkspaceToolIntentDetector.toolCalls(for: "find WorkspaceView").first?.pattern == "WorkspaceView")
+    }
+
+    @Test
+    func toolIntentDetectorDoesNotTreatAppCreationPromptAsBuildCommand() {
+        let prompt = """
+        I want to build an iOS app that when launched simply opens and shows a nice gradient background. Please build out the whole app.
+        """
+
+        #expect(WorkspaceToolIntentDetector.toolCalls(for: prompt).isEmpty)
     }
 
     @Test
@@ -153,5 +222,45 @@ struct WorkspaceAgentTests {
         #expect(response.toolCalls.count == 1)
         #expect(response.toolCalls.first?.tool == .search)
         #expect(response.toolCalls.first?.pattern == "RootView")
+    }
+
+    @Test
+    func toolCallParserRecoversMalformedLocalToolShape() {
+        let response = WorkspaceToolCallParser.parse(
+            """
+            I’ll help inspect this first.
+            {"message":"Reading current project structure...","toolCalls":[{"readFile","relativePath":"LoomX/LoomXApp.swift"},{"readFile","relativePath":"LoomX/ContentView.swift"}]}
+            """
+        )
+
+        #expect(response.message == "I’ll help inspect this first.")
+        #expect(response.toolCalls.map(\.tool) == [.readFile, .readFile])
+        #expect(response.toolCalls.map(\.relativePath) == ["LoomX/LoomXApp.swift", "LoomX/ContentView.swift"])
+    }
+
+    @Test
+    func toolCallParserRecoversSplitMalformedWriteFileShape() {
+        let response = WorkspaceToolCallParser.parse(
+            """
+            {"message":"Creating MVVM gradient app.","toolCalls":[{"writeFile"},{"relativePath":"LoomX/ViewModels/CircleButtonColorViewModel.swift"}]}
+            """
+        )
+
+        #expect(response.message == "Creating MVVM gradient app.")
+        #expect(response.toolCalls.count == 1)
+        #expect(response.toolCalls.first?.tool == .writeFile)
+        #expect(response.toolCalls.first?.relativePath == "LoomX/ViewModels/CircleButtonColorViewModel.swift")
+        #expect(response.toolCalls.first?.contents == nil)
+    }
+
+    @Test
+    func xcodebuildSchemeParserToleratesLogLinesAroundJSON() {
+        let output = """
+        2026-06-25 12:00:00.000 xcodebuild[123:456] DVT warning before JSON
+        {"project":{"name":"Demo","schemes":["DemoTests","Demo"]}}
+        trailing note
+        """
+
+        #expect(DeveloperToolRunner.parseSchemes(from: output) == ["Demo", "DemoTests"])
     }
 }

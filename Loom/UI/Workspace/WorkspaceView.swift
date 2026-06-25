@@ -6,22 +6,28 @@ struct WorkspaceView: View {
     @State private var vm = WorkspaceViewModel()
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                headerCard
-                if vm.sessions.isEmpty {
-                    emptyWorkspaceCard
-                } else {
-                    workspaceSelectionRow
-                    workspaceControls
+        VStack(alignment: .leading, spacing: 12) {
+            headerCard
+            if vm.sessions.isEmpty {
+                emptyWorkspaceCard
+            } else {
+                workspaceSelectionRow
+                workspaceControls
+
+                HStack(alignment: .top, spacing: 14) {
                     transcriptCard
-                    toolActivityCard
-                    changesCard
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        toolActivityCard
+                        changesCard
+                    }
+                    .frame(minWidth: 340, idealWidth: 360, maxWidth: 380, maxHeight: .infinity, alignment: .topLeading)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .accessibilityIdentifier("screen.workspace")
         .navigationTitle("LoomX")
         .task {
@@ -80,7 +86,7 @@ struct WorkspaceView: View {
             .accessibilityIdentifier("workspace.choose")
         }
         .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .loomCard(cornerRadius: 12)
     }
 
@@ -244,32 +250,72 @@ struct WorkspaceView: View {
     }
 
     private var transcriptCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Chat")
-                .font(LoomTheme.Typography.sectionTitle)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Chat")
+                    .font(LoomTheme.Typography.sectionTitle)
+                Spacer()
+                if vm.isSending {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, 8)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    if vm.messages.isEmpty {
-                    Text("No LoomX messages yet")
-                            .font(LoomTheme.Typography.body)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
-                    } else {
-                        ForEach(vm.messages) { message in
-                            messageRow(message)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        if vm.messages.isEmpty {
+                            Text("No LoomX messages yet")
+                                .font(LoomTheme.Typography.body)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, minHeight: 180, alignment: .center)
+                        } else {
+                            ForEach(vm.messages) { message in
+                                messageRow(message)
+                                    .id(message.id)
+                            }
                         }
+
+                        Color.clear
+                            .frame(height: 1)
+                            .id("workspace.chat.bottom")
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .onChange(of: vm.messages.map(\.id)) {
+                    scrollWorkspaceChatToBottom(proxy)
+                }
+                .task {
+                    scrollWorkspaceChatToBottom(proxy)
+                }
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 10) {
+                ZStack(alignment: .topLeading) {
+                    TextEditor(text: $vm.draft)
+                        .font(LoomTheme.Typography.body)
+                        .frame(minHeight: 76, maxHeight: 112)
+                        .scrollContentBackground(.hidden)
+                        .padding(8)
+                        .disabled(vm.isSending)
+                        .accessibilityIdentifier("workspace.prompt")
+
+                    if vm.draft.isEmpty {
+                        Text("Ask LoomX to inspect, edit, build, or test this project")
+                            .font(LoomTheme.Typography.body)
+                            .foregroundStyle(LoomTheme.inputPlaceholder(colorScheme))
+                            .padding(.horizontal, 13)
+                            .padding(.vertical, 14)
+                            .allowsHitTesting(false)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-            }
-            .frame(maxWidth: .infinity, minHeight: 120, maxHeight: 360, alignment: .topLeading)
-
-            TextEditor(text: $vm.draft)
-                .font(LoomTheme.Typography.body)
-                .frame(minHeight: 92, maxHeight: 130)
-                .scrollContentBackground(.hidden)
-                .padding(8)
                 .background(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(colorScheme == .dark ? Color.white.opacity(0.04) : Color.black.opacity(0.03))
@@ -278,36 +324,32 @@ struct WorkspaceView: View {
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .stroke(Color.primary.opacity(0.10), lineWidth: 1)
                 )
-                .disabled(vm.isSending)
-                .accessibilityIdentifier("workspace.prompt")
 
-            HStack(spacing: 10) {
-                Button {
-                    vm.sendDraft()
-                } label: {
-                    Label("Send", systemImage: "paperplane.fill")
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(vm.isSending || vm.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .accessibilityIdentifier("workspace.send")
-
-                if vm.isSending {
+                HStack(spacing: 10) {
                     Button {
-                        vm.cancelSend()
+                        vm.sendDraft()
                     } label: {
-                        Label("Stop", systemImage: "stop.fill")
+                        Label("Send", systemImage: "paperplane.fill")
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(vm.isSending || vm.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityIdentifier("workspace.send")
 
-                    ProgressView()
-                        .controlSize(.small)
+                    if vm.isSending {
+                        Button {
+                            vm.cancelSend()
+                        } label: {
+                            Label("Stop", systemImage: "stop.fill")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
+                    Spacer(minLength: 0)
                 }
-
-                Spacer(minLength: 0)
             }
+            .padding(14)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .loomCard(cornerRadius: 12)
     }
 
@@ -321,9 +363,15 @@ struct WorkspaceView: View {
                     .font(LoomTheme.Typography.body)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(vm.toolEvents.prefix(8)) { event in
-                    toolEventRow(event)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 10) {
+                        ForEach(vm.toolEvents.prefix(24)) { event in
+                            toolEventRow(event)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .frame(minHeight: 160, maxHeight: 280)
             }
         }
         .padding(16)
@@ -373,20 +421,16 @@ struct WorkspaceView: View {
 
     private func messageRow(_ message: ChatMessage) -> some View {
         let isUser = message.role == .user
-        return VStack(alignment: .leading, spacing: 5) {
-            Text(message.role.rawValue.capitalized)
-                .font(LoomTheme.Typography.captionStrong)
-                .foregroundStyle(.secondary)
+        return VStack(alignment: isUser ? .trailing : .leading, spacing: 6) {
             Text(message.content)
-                .font(LoomTheme.Typography.body)
                 .textSelection(.enabled)
+                .loomBubble(role: message.role)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(isUser ? "You" : "LoomX"): \(message.content)")
+                .accessibilityIdentifier(isUser ? "workspace.message.user.bubble" : "workspace.message.assistant.bubble")
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(isUser ? Color.accentColor.opacity(0.14) : Color.primary.opacity(0.05))
-        )
+        .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
+        .padding(.vertical, 3)
     }
 
     private func toolEventRow(_ event: DeveloperToolResult) -> some View {
@@ -455,6 +499,14 @@ struct WorkspaceView: View {
                 Task { await vm.selectScheme(scheme) }
             }
         )
+    }
+
+    private func scrollWorkspaceChatToBottom(_ proxy: ScrollViewProxy) {
+        DispatchQueue.main.async {
+            withAnimation(.easeOut(duration: 0.18)) {
+                proxy.scrollTo("workspace.chat.bottom", anchor: .bottom)
+            }
+        }
     }
 
     private func chooseWorkspace() {

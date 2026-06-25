@@ -214,14 +214,14 @@ final class WorkspaceViewModel {
     }
 
     func buildSelectedWorkspace() async {
-        guard let session = selectedSession else { return }
+        guard let session = await selectedSessionReadyForXcodeAction() else { return }
         await beginSecurityScope(for: session)
         let result = await runner.build(session: session)
         await persistToolEvent(result, sessionID: session.id)
     }
 
     func testSelectedWorkspace() async {
-        guard let session = selectedSession else { return }
+        guard let session = await selectedSessionReadyForXcodeAction() else { return }
         await beginSecurityScope(for: session)
         let result = await runner.test(session: session)
         await persistToolEvent(result, sessionID: session.id)
@@ -250,7 +250,7 @@ final class WorkspaceViewModel {
         availableProjects = WorkspaceProjectDetector.detectProjects(in: session.rootURL)
         availableSchemes = session.selectedProject?.schemes ?? []
         destinationDraft = session.selectedDestination ?? ""
-        messages = (try? await store.loadMessages(sessionID: session.id)) ?? []
+        messages = Self.visibleChatMessages(from: (try? await store.loadMessages(sessionID: session.id)) ?? [])
         toolEvents = ((try? await store.loadToolEvents(sessionID: session.id)) ?? []).sorted { $0.finishedAt > $1.finishedAt }
         changeRecords = (try? await store.loadChangeRecords(sessionID: session.id)) ?? []
         await refreshGitDiff()
@@ -275,6 +275,13 @@ final class WorkspaceViewModel {
         } catch {
             bannerText = "Loom couldn’t save a tool result."
         }
+    }
+
+    private func selectedSessionReadyForXcodeAction() async -> WorkspaceSession? {
+        guard let session = selectedSession else { return nil }
+        guard session.selectedScheme == nil else { return session }
+        await runReadinessCheck()
+        return selectedSession
     }
 
     private func provider(for session: WorkspaceSession) -> any WorkspaceAgentProviding {
@@ -314,5 +321,16 @@ final class WorkspaceViewModel {
         }
         let branch = firstLine.dropFirst(3).split(separator: ".").first.map(String.init)
         return branch?.nonEmptyTrimmed
+    }
+
+    private static func visibleChatMessages(from messages: [ChatMessage]) -> [ChatMessage] {
+        messages.filter { message in
+            switch message.role {
+            case .assistant, .user:
+                return true
+            case .system, .tool:
+                return false
+            }
+        }
     }
 }

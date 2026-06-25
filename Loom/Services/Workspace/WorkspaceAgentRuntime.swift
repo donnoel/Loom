@@ -42,6 +42,16 @@ actor WorkspaceAgentRuntime {
         var allToolResults: [DeveloperToolResult] = []
         var changeRecords: [WorkspaceChangeRecord] = []
 
+        let directToolCalls = WorkspaceToolIntentDetector.toolCalls(for: trimmedText)
+        for toolCall in directToolCalls {
+            let toolResult = await execute(toolCall, session: session)
+            try await store.appendToolEvent(toolResult, sessionID: session.id)
+            allToolResults.append(toolResult)
+
+            let toolMessage = ChatMessage(role: .tool, content: toolMessageContent(for: toolResult))
+            workingMessages.append(toolMessage)
+        }
+
         for _ in 0..<maxIterations {
             let index = await WorkspaceIndexer.snapshot(for: session, runner: runner)
             let response = try await provider.respond(
@@ -75,8 +85,6 @@ actor WorkspaceAgentRuntime {
                 }
 
                 let toolMessage = ChatMessage(role: .tool, content: toolMessageContent(for: toolResult))
-                try await store.appendMessage(toolMessage, sessionID: session.id)
-                emittedMessages.append(toolMessage)
                 workingMessages.append(toolMessage)
             }
         }
@@ -107,10 +115,26 @@ actor WorkspaceAgentRuntime {
             let (result, _) = await runner.listFiles(session: session)
             return result
         case .writeFile:
+            guard let relativePath = toolCall.relativePath?.nonEmptyTrimmed else {
+                return DeveloperToolResult(
+                    tool: .writeFile,
+                    status: .failure,
+                    summary: "The model tried to write a file without a path.",
+                    output: "Retry with a writeFile tool call that includes relativePath and contents."
+                )
+            }
+            guard let contents = toolCall.contents else {
+                return DeveloperToolResult(
+                    tool: .writeFile,
+                    status: .failure,
+                    summary: "The model tried to write \(relativePath) without file contents.",
+                    output: "Retry with an applyPatch tool call, or provide writeFile with both relativePath and full contents."
+                )
+            }
             return await runner.writeFile(
                 session: session,
-                relativePath: toolCall.relativePath ?? "",
-                contents: toolCall.contents ?? ""
+                relativePath: relativePath,
+                contents: contents
             )
         case .applyPatch:
             return await runner.applyPatch(session: session, patch: toolCall.patch ?? "")
@@ -153,6 +177,9 @@ actor LocalOllamaWorkspaceAgentProvider: WorkspaceAgentProviding {
 
     func respond(to request: WorkspaceAgentRequest) async throws -> WorkspaceAgentProviderResponse {
         guard let modelTag else {
+            if !request.toolResults.isEmpty {
+                return WorkspaceAgentProviderResponse(message: "I ran that LoomX tool. Review the activity output above.")
+            }
             return WorkspaceAgentProviderResponse(message: "Choose a local model before using LoomX.")
         }
 
@@ -190,8 +217,10 @@ actor LocalOllamaWorkspaceAgentProvider: WorkspaceAgentProviding {
 
         To call tools, reply with JSON in this shape:
         {"message":"short user-facing update","toolCalls":[{"tool":"readFile","relativePath":"path"}]}
+        The JSON must be the entire reply when calling tools. Every tool call object must include the "tool" key.
         Supported tools: readFile, search, listFiles, writeFile, applyPatch, gitDiff, gitStatus, xcodebuildList, build, test, openInXcode.
         For applyPatch, provide a unified git patch in the patch field.
+        For edits, prefer applyPatch. If you use writeFile, include relativePath and the complete contents field.
         If no tool is needed, answer normally.
         """
     }
@@ -202,6 +231,91 @@ actor CloudWorkspaceAgentProvider: WorkspaceAgentProviding {
         WorkspaceAgentProviderResponse(
             message: "Cloud LoomX coding is enabled for this session, but no cloud provider is configured yet. Switch to Local to continue."
         )
+    }
+}
+
+nonisolated enum WorkspaceToolIntentDetector {
+    static func toolCalls(for text: String) -> [WorkspaceAgentToolCall] {
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowercase = normalized.lowercased()
+
+        if containsAny(lowercase, ["git status", "status"]) {
+            return [WorkspaceAgentToolCall(tool: .gitStatus)]
+        }
+        if containsAny(lowercase, ["git diff", "show diff", "current diff", "what changed"]) {
+            return [WorkspaceAgentToolCall(tool: .gitDiff)]
+        }
+        if containsAny(lowercase, ["xcode metadata", "list schemes", "schemes"]) {
+            return [WorkspaceAgentToolCall(tool: .xcodebuildList)]
+        }
+        if containsBuildIntent(lowercase) {
+            return [WorkspaceAgentToolCall(tool: .build)]
+        }
+        if containsTestIntent(lowercase) {
+            return [WorkspaceAgentToolCall(tool: .test)]
+        }
+        if containsAny(lowercase, ["open in xcode", "open xcode"]) {
+            return [WorkspaceAgentToolCall(tool: .openInXcode)]
+        }
+        if containsAny(lowercase, ["list files", "show files", "file list"]) {
+            return [WorkspaceAgentToolCall(tool: .listFiles)]
+        }
+        if let pattern = searchPattern(in: normalized) {
+            return [WorkspaceAgentToolCall(tool: .search, pattern: pattern)]
+        }
+        if let relativePath = readPath(in: normalized) {
+            return [WorkspaceAgentToolCall(tool: .readFile, relativePath: relativePath)]
+        }
+        return []
+    }
+
+    private static func containsAny(_ text: String, _ needles: [String]) -> Bool {
+        needles.contains { text.contains($0) }
+    }
+
+    private static func containsBuildIntent(_ text: String) -> Bool {
+        text == "build"
+            || text == "run build"
+            || text.hasPrefix("run build ")
+            || text == "build project"
+            || text == "build the project"
+            || text == "build workspace"
+            || text == "build the workspace"
+    }
+
+    private static func containsTestIntent(_ text: String) -> Bool {
+        text == "test"
+            || text == "run tests"
+            || text == "run test"
+            || text.hasPrefix("run tests ")
+            || text.hasPrefix("run test ")
+            || text == "test project"
+            || text == "test the project"
+            || text == "test workspace"
+            || text == "test the workspace"
+    }
+
+    private static func searchPattern(in text: String) -> String? {
+        let prefixes = ["search for ", "search ", "find "]
+        for prefix in prefixes {
+            guard let range = text.range(of: prefix, options: [.caseInsensitive]) else { continue }
+            let pattern = text[range.upperBound...]
+                .trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+            return pattern.nonEmptyTrimmed
+        }
+        return nil
+    }
+
+    private static func readPath(in text: String) -> String? {
+        let prefixes = ["read file ", "read ", "open file ", "show file "]
+        for prefix in prefixes {
+            guard let range = text.range(of: prefix, options: [.caseInsensitive]) else { continue }
+            let path = text[range.upperBound...]
+                .trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+            guard path.contains("/") || path.contains(".") else { continue }
+            return path.nonEmptyTrimmed
+        }
+        return nil
     }
 }
 
@@ -221,6 +335,15 @@ nonisolated enum WorkspaceToolCallParser {
             return WorkspaceAgentProviderResponse(
                 message: envelope.message?.nonEmptyTrimmed ?? text,
                 toolCalls: envelope.toolCalls ?? []
+            )
+        }
+        let fallbackToolCalls = looseToolCalls(in: text)
+        if !fallbackToolCalls.isEmpty {
+            return WorkspaceAgentProviderResponse(
+                message: displayMessageBeforeJSON(in: text)
+                    ?? quotedValue(for: "message", in: text)
+                    ?? "I’ll inspect that with LoomX tools.",
+                toolCalls: fallbackToolCalls
             )
         }
         return WorkspaceAgentProviderResponse(message: text)
@@ -250,6 +373,81 @@ nonisolated enum WorkspaceToolCallParser {
         }
         guard let closeRange = afterFence[contentStart...].range(of: "```") else { return nil }
         return String(afterFence[contentStart..<closeRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func displayMessageBeforeJSON(in text: String) -> String? {
+        guard let jsonStart = text.firstIndex(of: "{") else {
+            return text.nonEmptyTrimmed
+        }
+        return String(text[..<jsonStart]).nonEmptyTrimmed
+    }
+
+    private static func looseToolCalls(in text: String) -> [WorkspaceAgentToolCall] {
+        guard text.contains("toolCalls") else { return [] }
+
+        var calls: [WorkspaceAgentToolCall] = []
+        for tool in DeveloperToolName.allCases {
+            var searchRange = text.startIndex..<text.endIndex
+            let token = "\"\(tool.rawValue)\""
+
+            while let range = text.range(of: token, options: [], range: searchRange) {
+                if let call = looseToolCall(tool: tool, text: text, startingAt: range.lowerBound) {
+                    calls.append(call)
+                }
+                searchRange = range.upperBound..<text.endIndex
+            }
+        }
+        return calls
+    }
+
+    private static func looseToolCall(tool: DeveloperToolName, text: String, startingAt start: String.Index) -> WorkspaceAgentToolCall? {
+        let end = text.index(start, offsetBy: min(600, text.distance(from: start, to: text.endIndex)))
+        let objectText = String(text[start..<end])
+
+        switch tool {
+        case .readFile:
+            guard let relativePath = quotedValue(for: "relativePath", in: objectText) else { return nil }
+            return WorkspaceAgentToolCall(tool: .readFile, relativePath: relativePath)
+        case .search:
+            guard let pattern = quotedValue(for: "pattern", in: objectText) else { return nil }
+            return WorkspaceAgentToolCall(tool: .search, pattern: pattern)
+        case .writeFile:
+            let relativePath = quotedValue(for: "relativePath", in: objectText)
+            let contents = quotedValue(for: "contents", in: objectText)
+            return WorkspaceAgentToolCall(tool: .writeFile, relativePath: relativePath, contents: contents)
+        case .applyPatch:
+            guard let patch = quotedValue(for: "patch", in: objectText) else { return nil }
+            return WorkspaceAgentToolCall(tool: .applyPatch, patch: patch)
+        case .listFiles, .gitDiff, .gitStatus, .xcodebuildList, .build, .test, .openInXcode:
+            return WorkspaceAgentToolCall(tool: tool)
+        }
+    }
+
+    private static func quotedValue(for key: String, in text: String) -> String? {
+        guard let keyRange = text.range(of: "\"\(key)\""),
+              let colonRange = text[keyRange.upperBound...].range(of: ":"),
+              let openingQuote = text[colonRange.upperBound...].firstIndex(of: "\"") else {
+            return nil
+        }
+
+        var value = ""
+        var isEscaped = false
+        var index = text.index(after: openingQuote)
+        while index < text.endIndex {
+            let character = text[index]
+            if isEscaped {
+                value.append(character)
+                isEscaped = false
+            } else if character == "\\" {
+                isEscaped = true
+            } else if character == "\"" {
+                return value.nonEmptyTrimmed
+            } else {
+                value.append(character)
+            }
+            index = text.index(after: index)
+        }
+        return nil
     }
 }
 
