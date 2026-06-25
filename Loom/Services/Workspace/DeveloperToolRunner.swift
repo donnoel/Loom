@@ -23,6 +23,14 @@ actor DeveloperToolRunner: DeveloperToolRunning {
     private let maxReadBytes = 1_000_000
     private let maxSearchFileBytes = 300_000
     private let maxOutputCharacters = 24_000
+    private let gitExecutablePath = DeveloperToolRunner.executablePath(
+        preferred: "/Applications/Xcode.app/Contents/Developer/usr/bin/git",
+        fallback: "/usr/bin/git"
+    )
+    private let xcodebuildExecutablePath = DeveloperToolRunner.executablePath(
+        preferred: "/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild",
+        fallback: "/usr/bin/xcodebuild"
+    )
 
     func readFile(session: WorkspaceSession, relativePath: String) async -> DeveloperToolResult {
         let startedAt = Date()
@@ -121,7 +129,7 @@ actor DeveloperToolRunner: DeveloperToolRunning {
 
         do {
             let check = try await runProcess(
-                executablePath: "/usr/bin/git",
+                executablePath: gitExecutablePath,
                 arguments: ["apply", "--check", "--whitespace=nowarn", "-"],
                 currentDirectory: session.rootURL,
                 input: patch
@@ -131,7 +139,7 @@ actor DeveloperToolRunner: DeveloperToolRunning {
             }
 
             let apply = try await runProcess(
-                executablePath: "/usr/bin/git",
+                executablePath: gitExecutablePath,
                 arguments: ["apply", "--whitespace=nowarn", "-"],
                 currentDirectory: session.rootURL,
                 input: patch
@@ -159,7 +167,7 @@ actor DeveloperToolRunner: DeveloperToolRunning {
             var arguments = try xcodeProjectArguments(for: session)
             arguments.append(contentsOf: ["-list", "-json"])
             let command = try await runProcess(
-                executablePath: "/usr/bin/xcodebuild",
+                executablePath: xcodebuildExecutablePath,
                 arguments: arguments,
                 currentDirectory: session.rootURL
             )
@@ -210,7 +218,7 @@ actor DeveloperToolRunner: DeveloperToolRunning {
         let startedAt = Date()
         do {
             let command = try await runProcess(
-                executablePath: "/usr/bin/git",
+                executablePath: gitExecutablePath,
                 arguments: arguments,
                 currentDirectory: session.rootURL
             )
@@ -235,7 +243,7 @@ actor DeveloperToolRunner: DeveloperToolRunning {
             }
             arguments.append(action)
             let command = try await runProcess(
-                executablePath: "/usr/bin/xcodebuild",
+                executablePath: xcodebuildExecutablePath,
                 arguments: arguments,
                 currentDirectory: session.rootURL
             )
@@ -261,7 +269,7 @@ actor DeveloperToolRunner: DeveloperToolRunning {
 
     private func gitTrackedFiles(in session: WorkspaceSession) async throws -> [String] {
         let command = try await runProcess(
-            executablePath: "/usr/bin/git",
+            executablePath: gitExecutablePath,
             arguments: ["ls-files"],
             currentDirectory: session.rootURL
         )
@@ -390,6 +398,10 @@ actor DeveloperToolRunner: DeveloperToolRunning {
         let path = url.standardizedFileURL.path
         guard path.hasPrefix(rootPath + "/") else { return url.lastPathComponent }
         return String(path.dropFirst(rootPath.count + 1))
+    }
+
+    private static func executablePath(preferred: String, fallback: String) -> String {
+        FileManager.default.isExecutableFile(atPath: preferred) ? preferred : fallback
     }
 
     static func parseSchemes(from output: String) -> [String] {
