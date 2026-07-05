@@ -329,6 +329,68 @@ struct WorkspaceAgentTests {
     }
 
     @Test
+    func agentRuntimeRejectsProseReplyWhenUserAskedForXcodeEdits() async throws {
+        let storeRoot = try makeTemporaryDirectory()
+        let workspaceRoot = try makeTemporaryDirectory(prefix: "loom-source-workspace")
+        try FileManager.default.createDirectory(
+            at: workspaceRoot.appendingPathComponent("LoomX", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try Data("struct ContentView {}\n".utf8).write(
+            to: workspaceRoot.appendingPathComponent("LoomX/ContentView.swift"),
+            options: [.atomic]
+        )
+        let store = WorkspaceStore(workspacesRoot: storeRoot)
+        let session = try await store.createSession(
+            displayName: "Runtime",
+            rootURL: workspaceRoot,
+            bookmarkData: nil,
+            detectedProject: nil
+        )
+        let previousRequest = ChatMessage(
+            role: .user,
+            content: "I want a blue screen with a button that changes the color using MVVM."
+        )
+        let provider = ScriptedWorkspaceProvider([
+            WorkspaceAgentProviderResponse(
+                message: "Would you like me to explain any specific part in more detail?"
+            ),
+            WorkspaceAgentProviderResponse(
+                message: "Reading the current view before editing.",
+                toolCalls: [WorkspaceAgentToolCall(tool: .readFile, relativePath: "LoomX/ContentView.swift")]
+            ),
+            WorkspaceAgentProviderResponse(
+                message: "Applying the requested MVVM edit.",
+                toolCalls: [
+                    WorkspaceAgentToolCall(
+                        tool: .writeFile,
+                        relativePath: "LoomX/ViewModel.swift",
+                        contents: "final class ViewModel {}\n"
+                    )
+                ]
+            )
+        ])
+        let runtime = WorkspaceAgentRuntime(store: store, runner: DeveloperToolRunner(), provider: provider)
+
+        let result = try await runtime.runTurn(
+            session: session,
+            userText: "I would like you to make the edits directly in Xcode.",
+            existingMessages: [previousRequest]
+        )
+
+        #expect(result.toolResults.map(\.tool) == [.readFile, .writeFile])
+        #expect(try String(
+            contentsOf: workspaceRoot.appendingPathComponent("LoomX/ViewModel.swift"),
+            encoding: .utf8
+        ) == "final class ViewModel {}\n")
+        #expect(
+            (try await store.loadMessages(sessionID: session.id))
+                .map(\.content)
+                .contains("Would you like me to explain any specific part in more detail?") == false
+        )
+    }
+
+    @Test
     func agentRuntimeTurnsIncompleteWriteFileIntoToolFailure() async throws {
         let storeRoot = try makeTemporaryDirectory()
         let workspaceRoot = try makeTemporaryDirectory(prefix: "loom-source-workspace")

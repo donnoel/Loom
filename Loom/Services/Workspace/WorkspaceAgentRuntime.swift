@@ -186,8 +186,9 @@ actor WorkspaceAgentRuntime {
 
     private var toolFollowUpPrompt: String {
         """
-        The user asked LoomX to inspect or change the selected workspace. Your previous reply did not include toolCalls, so no work happened.
+        The user asked LoomX to inspect or change the selected workspace, but your previous reply did not include toolCalls, so no work happened.
         Continue by returning only JSON with concrete toolCalls. Read files if you need context, use applyPatch or writeFile for edits, then build or test when useful.
+        Do not ask whether to proceed when the user has already asked for the workspace change.
         """
     }
 
@@ -210,8 +211,7 @@ actor WorkspaceAgentRuntime {
         iteration: Int
     ) -> Bool {
         guard iteration < maxIterations - 1,
-              userText.requestsWorkspaceAction,
-              assistantMessage.announcesWorkspaceAction else {
+              userText.requestsWorkspaceAction else {
             return false
         }
         return !toolResults.contains { result in
@@ -230,6 +230,8 @@ private extension String {
         let normalized = lowercased()
         return normalized.contains("implement")
             || normalized.contains("make changes")
+            || normalized.contains("make the edits")
+            || normalized.contains("make edits")
             || normalized.contains("change ")
             || normalized.contains("update ")
             || normalized.contains("edit ")
@@ -239,22 +241,6 @@ private extension String {
             || normalized.contains("add ")
             || normalized.contains("remove ")
             || normalized.contains("directly in xcode")
-    }
-
-    nonisolated var announcesWorkspaceAction: Bool {
-        let normalized = lowercased()
-        return normalized.contains("starting implementation")
-            || normalized.contains("creating ")
-            || normalized.contains("updating ")
-            || normalized.contains("implementing ")
-            || normalized.contains("i'll start")
-            || normalized.contains("i will start")
-            || normalized.contains("let me implement")
-            || normalized.contains("i’ll implement")
-            || normalized.contains("i will implement")
-            || normalized.contains("i'll create")
-            || normalized.contains("i will create")
-            || normalized.contains("i’ll create")
     }
 }
 
@@ -299,6 +285,8 @@ actor LocalOllamaWorkspaceAgentProvider: WorkspaceAgentProviding {
         You are LoomX, Loom's coding agent. Work only inside the selected LoomX project.
         Use typed tools when you need code context or need to edit. Never ask for raw shell access.
         Prefer small diffs, preserve behavior, and run build or test tools after code changes when useful.
+        When the user asks you to inspect, implement, create, update, fix, build, test, or make edits,
+        return JSON toolCalls instead of ordinary prose. Do not merely describe a plan or ask whether to proceed.
 
         LoomX project: \(request.session.displayName)
         Xcode project: \(project)
