@@ -10,6 +10,7 @@ final class WorkspaceViewModel {
     private let defaults: UserDefaults
     private var activeSecurityScopedRoots: [UUID: URL] = [:]
     private var sendTask: Task<Void, Never>?
+    private var activeSendingStatusMessageID: UUID?
 
     var sessions: [WorkspaceSession] = []
     var selectedSessionID: WorkspaceSession.ID?
@@ -21,6 +22,7 @@ final class WorkspaceViewModel {
     var gitDiffText: String = ""
     var draft: String = ""
     var destinationDraft: String = ""
+    var activeModelTag: String?
     var bannerText: String?
     var isLoading: Bool = false
     var isSending: Bool = false
@@ -34,6 +36,7 @@ final class WorkspaceViewModel {
         self.store = store
         self.runner = runner
         self.defaults = defaults
+        self.activeModelTag = Self.storedActiveModelTag(defaults: defaults)
     }
 
     var selectedSession: WorkspaceSession? {
@@ -179,12 +182,27 @@ final class WorkspaceViewModel {
         guard !isSending, let session = selectedSession else { return }
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        synchronizeActiveModelSelectionFromPreferences()
+        if session.providerMode == .localOllama, activeModelTag == nil {
+            bannerText = "Choose a local model before using LoomX."
+            return
+        }
 
+        let optimisticUserMessage = ChatMessage(role: .user, content: text)
+        let workingMessage = ChatMessage(role: .assistant, content: "Working on that in LoomX.")
+        let priorMessages = messages
+        messages.append(optimisticUserMessage)
+        messages.append(workingMessage)
+        activeSendingStatusMessageID = workingMessage.id
         draft = ""
         isSending = true
         bannerText = nil
         sendTask = Task { [weak self] in
             guard let self else { return }
+            defer {
+                self.isSending = false
+                self.sendTask = nil
+            }
             await self.beginSecurityScope(for: session)
             let provider = self.provider(for: session)
             let runtime = WorkspaceAgentRuntime(store: self.store, runner: self.runner, provider: provider)
@@ -192,24 +210,31 @@ final class WorkspaceViewModel {
                 let result = try await runtime.runTurn(
                     session: session,
                     userText: text,
-                    existingMessages: self.messages
+                    existingMessages: priorMessages
                 )
-                self.messages.append(contentsOf: result.messages)
+                self.messages.removeAll { $0.id == workingMessage.id }
+                self.activeSendingStatusMessageID = nil
+                self.messages.append(contentsOf: result.messages.filter { $0.role != .user })
                 self.toolEvents.append(contentsOf: result.toolResults)
                 self.toolEvents.sort { $0.finishedAt > $1.finishedAt }
                 self.changeRecords.insert(contentsOf: result.changeRecords, at: 0)
                 await self.refreshGitDiff()
             } catch {
                 self.bannerText = "LoomX couldn’t finish that request."
+                self.messages.removeAll { $0.id == workingMessage.id }
+                self.activeSendingStatusMessageID = nil
                 self.draft = text
             }
-            self.isSending = false
         }
     }
 
     func cancelSend() {
         sendTask?.cancel()
         sendTask = nil
+        if let activeSendingStatusMessageID {
+            messages.removeAll { $0.id == activeSendingStatusMessageID }
+            self.activeSendingStatusMessageID = nil
+        }
         isSending = false
     }
 
@@ -292,7 +317,7 @@ final class WorkspaceViewModel {
         switch session.providerMode {
         case .localOllama:
             return LocalOllamaWorkspaceAgentProvider(
-                modelTag: defaults.string(forKey: LoomPreferenceKeys.activeModelTag),
+                modelTag: activeModelTag,
                 chatClient: OllamaChatClient()
             )
         case .cloud:
@@ -336,5 +361,13 @@ final class WorkspaceViewModel {
                 return false
             }
         }
+    }
+
+    private static func storedActiveModelTag(defaults: UserDefaults) -> String? {
+        defaults.string(forKey: LoomPreferenceKeys.activeModelTag)?.nonEmptyTrimmed
+    }
+
+    private func synchronizeActiveModelSelectionFromPreferences() {
+        activeModelTag = Self.storedActiveModelTag(defaults: defaults)
     }
 }

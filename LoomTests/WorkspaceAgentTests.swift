@@ -111,6 +111,35 @@ struct WorkspaceAgentTests {
     }
 
     @Test
+    @MainActor
+    func workspaceViewModelDoesNotSpinWithoutLocalModel() async throws {
+        let storeRoot = try makeTemporaryDirectory()
+        let workspaceRoot = try makeTemporaryDirectory(prefix: "loom-source-workspace")
+        let store = WorkspaceStore(workspacesRoot: storeRoot)
+        _ = try await store.createSession(
+            displayName: "Loom",
+            rootURL: workspaceRoot,
+            bookmarkData: nil,
+            detectedProject: WorkspaceSession.ProjectSelection(kind: .xcodeProject, relativePath: "Loom.xcodeproj")
+        )
+        let defaults = UserDefaults(suiteName: "workspace-no-model-\(UUID().uuidString)") ?? .standard
+        defaults.removeObject(forKey: LoomPreferenceKeys.activeModelTag)
+        let viewModel = WorkspaceViewModel(
+            store: store,
+            runner: ScriptedDeveloperToolRunner(),
+            defaults: defaults
+        )
+
+        await viewModel.load()
+        viewModel.draft = "Build an app"
+        viewModel.sendDraft()
+
+        #expect(viewModel.isSending == false)
+        #expect(viewModel.draft == "Build an app")
+        #expect(viewModel.bannerText == "Choose a local model before using LoomX.")
+    }
+
+    @Test
     func workspaceStorePersistsMetadataMessagesToolsAndChanges() async throws {
         let storeRoot = try makeTemporaryDirectory()
         let workspaceRoot = try makeTemporaryDirectory(prefix: "loom-source-workspace")
