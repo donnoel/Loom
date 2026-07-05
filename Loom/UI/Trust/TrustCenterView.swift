@@ -260,7 +260,7 @@ struct TrustCenterView: View {
             Text("LoomX")
                 .font(LoomTheme.Typography.sectionTitle)
 
-            valueRow("Local helper", value: "External process required")
+            valueRow("Developer tools", value: "Enabled for this build")
             valueRow("Saved LoomX projects", value: "\(localSnapshot.workspaceCount)")
             valueRow("LoomX storage", value: formattedBytes(localSnapshot.workspaceBytes))
             valueRow("Recent tool logs", value: "\(localSnapshot.workspaceToolEventCount)")

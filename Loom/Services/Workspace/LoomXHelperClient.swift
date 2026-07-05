@@ -36,43 +36,52 @@ actor HelperBackedDeveloperToolRunner: DeveloperToolRunning {
     }
 
     func applyPatch(session: WorkspaceSession, patch: String) async -> DeveloperToolResult {
-        await helperClient.run(.applyPatch, session: session, patch: patch)?.result ?? helperUnavailableResult(.applyPatch)
+        if let response = await helperClient.run(.applyPatch, session: session, patch: patch) {
+            return response.result
+        }
+        return await localRunner.applyPatch(session: session, patch: patch)
     }
 
     func gitDiff(session: WorkspaceSession) async -> DeveloperToolResult {
-        await helperClient.run(.gitDiff, session: session)?.result ?? helperUnavailableResult(.gitDiff)
+        if let response = await helperClient.run(.gitDiff, session: session) {
+            return response.result
+        }
+        return await localRunner.gitDiff(session: session)
     }
 
     func gitStatus(session: WorkspaceSession) async -> DeveloperToolResult {
-        await helperClient.run(.gitStatus, session: session)?.result ?? helperUnavailableResult(.gitStatus)
+        if let response = await helperClient.run(.gitStatus, session: session) {
+            return response.result
+        }
+        return await localRunner.gitStatus(session: session)
     }
 
     func xcodebuildList(session: WorkspaceSession) async -> (DeveloperToolResult, [String]) {
-        guard let response = await helperClient.run(.xcodebuildList, session: session) else {
-            return (helperUnavailableResult(.xcodebuildList), [])
+        if let response = await helperClient.run(.xcodebuildList, session: session) {
+            return (response.result, response.schemes)
         }
-        return (response.result, response.schemes)
+        return await localRunner.xcodebuildList(session: session)
     }
 
     func build(session: WorkspaceSession) async -> DeveloperToolResult {
-        await helperClient.run(.build, session: session)?.result ?? helperUnavailableResult(.build)
+        if let response = await helperClient.run(.build, session: session) {
+            return response.result
+        }
+        return await localRunner.build(session: session)
     }
 
     func test(session: WorkspaceSession) async -> DeveloperToolResult {
-        await helperClient.run(.test, session: session)?.result ?? helperUnavailableResult(.test)
+        if let response = await helperClient.run(.test, session: session) {
+            return response.result
+        }
+        return await localRunner.test(session: session)
     }
 
     func openInXcode(session: WorkspaceSession) async -> DeveloperToolResult {
-        await helperClient.run(.openInXcode, session: session)?.result ?? helperUnavailableResult(.openInXcode)
-    }
-
-    private func helperUnavailableResult(_ tool: DeveloperToolName) -> DeveloperToolResult {
-        DeveloperToolResult(
-            tool: tool,
-            status: .failure,
-            summary: "Start LoomX Helper to use git and Xcode tools.",
-            output: LoomXHelperClient.startInstructions
-        )
+        if let response = await helperClient.run(.openInXcode, session: session) {
+            return response.result
+        }
+        return await localRunner.openInXcode(session: session)
     }
 }
 
@@ -108,11 +117,6 @@ actor LoomXHelperClient {
     }
 
     static let port = 7347
-    static let startInstructions = """
-    In Terminal, run:
-    cd /Users/donnoel/Development/Loom/LoomXHelper
-    swift run LoomXHelper
-    """
 
     private let endpoint = URL(string: "http://127.0.0.1:\(LoomXHelperClient.port)/tool")!
     private let session: URLSession
