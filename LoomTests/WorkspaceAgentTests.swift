@@ -4,16 +4,22 @@ import Testing
 
 private actor ScriptedWorkspaceProvider: WorkspaceAgentProviding {
     private var responses: [WorkspaceAgentProviderResponse]
+    private var requestCount = 0
 
     init(_ responses: [WorkspaceAgentProviderResponse]) {
         self.responses = responses
     }
 
     func respond(to request: WorkspaceAgentRequest) async throws -> WorkspaceAgentProviderResponse {
+        requestCount += 1
         guard !responses.isEmpty else {
             return WorkspaceAgentProviderResponse(message: "Done.")
         }
         return responses.removeFirst()
+    }
+
+    func responseRequestCount() -> Int {
+        requestCount
     }
 }
 
@@ -388,6 +394,37 @@ struct WorkspaceAgentTests {
                 .map(\.content)
                 .contains("Would you like me to explain any specific part in more detail?") == false
         )
+    }
+
+    @Test
+    func agentRuntimeStopsAfterOneNoToolRetryForWorkspaceAction() async throws {
+        let storeRoot = try makeTemporaryDirectory()
+        let workspaceRoot = try makeTemporaryDirectory(prefix: "loom-source-workspace")
+        let store = WorkspaceStore(workspacesRoot: storeRoot)
+        let session = try await store.createSession(
+            displayName: "Runtime",
+            rootURL: workspaceRoot,
+            bookmarkData: nil,
+            detectedProject: nil
+        )
+        let provider = ScriptedWorkspaceProvider([
+            WorkspaceAgentProviderResponse(message: "Would you like me to explain this first?"),
+            WorkspaceAgentProviderResponse(message: "I can help with that.")
+        ])
+        let runtime = WorkspaceAgentRuntime(store: store, runner: DeveloperToolRunner(), provider: provider)
+
+        let result = try await runtime.runTurn(
+            session: session,
+            userText: "I would like you to make the edits directly in Xcode.",
+            existingMessages: []
+        )
+        let persistedMessages = try await store.loadMessages(sessionID: session.id)
+        let requestCount = await provider.responseRequestCount()
+
+        #expect(requestCount == 2)
+        #expect(result.toolResults.isEmpty)
+        #expect(result.messages.last?.content.contains("stopped instead of continuing to run the model") == true)
+        #expect(persistedMessages.last?.content.contains("stopped instead of continuing to run the model") == true)
     }
 
     @Test

@@ -15,17 +15,20 @@ actor WorkspaceAgentRuntime {
     private let runner: any DeveloperToolRunning
     private let provider: any WorkspaceAgentProviding
     private let maxIterations: Int
+    private let maxNoToolFollowUps: Int
 
     init(
         store: WorkspaceStore,
         runner: any DeveloperToolRunning,
         provider: any WorkspaceAgentProviding,
-        maxIterations: Int = 5
+        maxIterations: Int = 5,
+        maxNoToolFollowUps: Int = 1
     ) {
         self.store = store
         self.runner = runner
         self.provider = provider
         self.maxIterations = maxIterations
+        self.maxNoToolFollowUps = maxNoToolFollowUps
     }
 
     func runTurn(session: WorkspaceSession, userText: String, existingMessages: [ChatMessage]) async throws -> WorkspaceAgentTurnResult {
@@ -41,9 +44,11 @@ actor WorkspaceAgentRuntime {
         var workingMessages = existingMessages + [userMessage]
         var allToolResults: [DeveloperToolResult] = []
         var changeRecords: [WorkspaceChangeRecord] = []
+        var noToolFollowUpCount = 0
 
         let directToolCalls = WorkspaceToolIntentDetector.toolCalls(for: trimmedText)
         for toolCall in directToolCalls {
+            try Task.checkCancellation()
             let toolResult = await execute(toolCall, session: session)
             try await store.appendToolEvent(toolResult, sessionID: session.id)
             allToolResults.append(toolResult)
@@ -52,7 +57,8 @@ actor WorkspaceAgentRuntime {
             workingMessages.append(toolMessage)
         }
 
-        for iteration in 0..<maxIterations {
+        for _ in 0..<maxIterations {
+            try Task.checkCancellation()
             let index = await WorkspaceIndexer.snapshot(for: session, runner: runner)
             let response = try await provider.respond(
                 to: WorkspaceAgentRequest(
@@ -66,18 +72,23 @@ actor WorkspaceAgentRuntime {
             if response.toolCalls.isEmpty,
                shouldRequestToolFollowUp(
                 userText: trimmedText,
-                assistantMessage: response.message,
                 toolResults: allToolResults,
-                iteration: iteration
+                noToolFollowUpCount: noToolFollowUpCount
                ) {
                 workingMessages.append(ChatMessage(role: .assistant, content: response.message))
                 workingMessages.append(ChatMessage(role: .system, content: toolFollowUpPrompt))
+                noToolFollowUpCount += 1
                 continue
             }
 
+            let assistantContent = assistantMessageContent(
+                for: response,
+                userText: trimmedText,
+                noToolFollowUpCount: noToolFollowUpCount
+            )
             let assistantMessage = ChatMessage(
                 role: .assistant,
-                content: response.message.nonEmptyTrimmed ?? "I checked the LoomX project."
+                content: assistantContent
             )
             try await store.appendMessage(assistantMessage, sessionID: session.id)
             emittedMessages.append(assistantMessage)
@@ -88,6 +99,7 @@ actor WorkspaceAgentRuntime {
             }
 
             for toolCall in response.toolCalls {
+                try Task.checkCancellation()
                 let toolResult = await execute(toolCall, session: session)
                 try await store.appendToolEvent(toolResult, sessionID: session.id)
                 allToolResults.append(toolResult)
@@ -184,6 +196,23 @@ actor WorkspaceAgentRuntime {
         return parts.joined(separator: "\n")
     }
 
+    private func assistantMessageContent(
+        for response: WorkspaceAgentProviderResponse,
+        userText: String,
+        noToolFollowUpCount: Int
+    ) -> String {
+        guard response.toolCalls.isEmpty,
+              userText.requestsWorkspaceAction,
+              noToolFollowUpCount >= maxNoToolFollowUps else {
+            return response.message.nonEmptyTrimmed ?? "I checked the LoomX project."
+        }
+
+        return """
+        LoomX could not get this local model to return a valid workspace tool call, so I stopped instead of continuing to run the model.
+        Try the request again with a specific file or change, or choose a stronger coding model.
+        """
+    }
+
     private var toolFollowUpPrompt: String {
         """
         The user asked LoomX to inspect or change the selected workspace, but your previous reply did not include toolCalls, so no work happened.
@@ -206,11 +235,10 @@ actor WorkspaceAgentRuntime {
 
     private func shouldRequestToolFollowUp(
         userText: String,
-        assistantMessage: String,
         toolResults: [DeveloperToolResult],
-        iteration: Int
+        noToolFollowUpCount: Int
     ) -> Bool {
-        guard iteration < maxIterations - 1,
+        guard noToolFollowUpCount < maxNoToolFollowUps,
               userText.requestsWorkspaceAction else {
             return false
         }
