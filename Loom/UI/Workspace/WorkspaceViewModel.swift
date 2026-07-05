@@ -28,7 +28,7 @@ final class WorkspaceViewModel {
 
     init(
         store: WorkspaceStore = WorkspaceStore(),
-        runner: any DeveloperToolRunning = DeveloperToolRunner(),
+        runner: any DeveloperToolRunning = HelperBackedDeveloperToolRunner(),
         defaults: UserDefaults = .standard
     ) {
         self.store = store
