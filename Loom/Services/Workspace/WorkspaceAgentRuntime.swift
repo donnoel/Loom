@@ -60,14 +60,13 @@ actor WorkspaceAgentRuntime {
         for _ in 0..<maxIterations {
             try Task.checkCancellation()
             let index = await WorkspaceIndexer.snapshot(for: session, runner: runner)
-            let response = try await provider.respond(
-                to: WorkspaceAgentRequest(
-                    session: session,
-                    messages: workingMessages,
-                    indexSnapshot: index,
-                    toolResults: allToolResults
-                )
+            let request = WorkspaceAgentRequest(
+                session: session,
+                messages: workingMessages,
+                indexSnapshot: index,
+                toolResults: allToolResults
             )
+            let response = try await provider.respond(to: request)
 
             if response.toolCalls.isEmpty,
                shouldRequestToolFollowUp(
@@ -290,13 +289,25 @@ actor LocalOllamaWorkspaceAgentProvider: WorkspaceAgentProviding {
         }
 
         let accumulator = WorkspaceResponseAccumulator()
-        try await chatClient.streamChat(
-            model: modelTag,
-            messages: promptMessages(for: request),
-            onDelta: { delta in
-                await accumulator.append(delta)
-            }
-        )
+        let messages = promptMessages(for: request)
+        if let structuredClient = chatClient as? any OllamaStructuredChatStreaming {
+            try await structuredClient.streamChat(
+                model: modelTag,
+                messages: messages,
+                responseFormat: .json,
+                onDelta: { delta in
+                    await accumulator.append(delta)
+                }
+            )
+        } else {
+            try await chatClient.streamChat(
+                model: modelTag,
+                messages: messages,
+                onDelta: { delta in
+                    await accumulator.append(delta)
+                }
+            )
+        }
         let responseText = await accumulator.value()
         return WorkspaceToolCallParser.parse(responseText)
     }
@@ -323,14 +334,14 @@ actor LocalOllamaWorkspaceAgentProvider: WorkspaceAgentProviding {
         Indexed files:
         \(files)
 
-        To call tools, reply with JSON in this shape:
+        Always reply with exactly one JSON object in this shape:
         {"message":"short user-facing update","toolCalls":[{"tool":"readFile","relativePath":"path"}]}
-        The JSON must be the entire reply when calling tools. Every tool call object must include the "tool" key.
+        The JSON must be the entire reply. Every tool call object must include the "tool" key.
         Supported tools: readFile, search, listFiles, writeFile, applyPatch, gitDiff, gitStatus, xcodebuildList, build, test, openInXcode.
         For applyPatch, provide a unified git patch in the patch field.
         For edits, prefer applyPatch. If you use writeFile, include relativePath and the complete contents field.
         Never send split or incomplete tool calls like [{"writeFile"},{"relativePath":"path"}]; they do not edit files.
-        If no tool is needed, answer normally.
+        If no tool is needed, return {"message":"...","toolCalls":[]}.
         """
     }
 }

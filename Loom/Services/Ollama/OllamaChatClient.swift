@@ -14,6 +14,19 @@ protocol OllamaChatStreaming: Actor {
     ) async throws
 }
 
+nonisolated enum OllamaChatResponseFormat: String, Sendable {
+    case json
+}
+
+protocol OllamaStructuredChatStreaming: OllamaChatStreaming {
+    func streamChat(
+        model: String,
+        messages: [ChatMessage],
+        responseFormat: OllamaChatResponseFormat,
+        onDelta: @Sendable (String) async -> Void
+    ) async throws
+}
+
 actor OllamaChatClient: OllamaChatStreaming {
     enum StreamError: LocalizedError, Sendable {
         case ollamaUnavailable
@@ -62,6 +75,26 @@ actor OllamaChatClient: OllamaChatStreaming {
         messages: [ChatMessage],
         onDelta: @Sendable (String) async -> Void
     ) async throws {
+        try await streamChat(model: model, messages: messages, responseFormat: nil, onDelta: onDelta)
+    }
+}
+
+extension OllamaChatClient: OllamaStructuredChatStreaming {
+    func streamChat(
+        model: String,
+        messages: [ChatMessage],
+        responseFormat: OllamaChatResponseFormat,
+        onDelta: @Sendable (String) async -> Void
+    ) async throws {
+        try await streamChat(model: model, messages: messages, responseFormat: Optional(responseFormat), onDelta: onDelta)
+    }
+
+    private func streamChat(
+        model: String,
+        messages: [ChatMessage],
+        responseFormat: OllamaChatResponseFormat?,
+        onDelta: @Sendable (String) async -> Void
+    ) async throws {
         guard let selectedModel = model.nonEmptyTrimmed else {
             throw StreamError.invalidRequest
         }
@@ -74,7 +107,8 @@ actor OllamaChatClient: OllamaChatStreaming {
         let payload = ChatRequest(
             model: selectedModel,
             messages: messages.map { ChatRequest.Message(role: $0.role.rawValue, content: $0.content) },
-            stream: true
+            stream: true,
+            format: responseFormat?.rawValue
         )
 
         var request = URLRequest(url: baseURL.appendingPathComponent("api/chat"))
@@ -174,6 +208,7 @@ nonisolated private struct ChatRequest: Encodable {
     let model: String
     let messages: [Message]
     let stream: Bool
+    let format: String?
 }
 
 nonisolated private struct ChatStreamChunk: Decodable {

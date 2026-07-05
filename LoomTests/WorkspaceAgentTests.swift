@@ -78,6 +78,32 @@ private actor ScriptedDeveloperToolRunner: DeveloperToolRunning {
     }
 }
 
+private actor RecordingStructuredChatClient: OllamaStructuredChatStreaming {
+    private(set) var requestedFormat: OllamaChatResponseFormat?
+
+    func streamChat(
+        model: String,
+        messages: [ChatMessage],
+        onDelta: @Sendable (String) async -> Void
+    ) async throws {
+        try await streamChat(model: model, messages: messages, responseFormat: .json, onDelta: onDelta)
+    }
+
+    func streamChat(
+        model: String,
+        messages: [ChatMessage],
+        responseFormat: OllamaChatResponseFormat,
+        onDelta: @Sendable (String) async -> Void
+    ) async throws {
+        requestedFormat = responseFormat
+        await onDelta(
+            """
+            {"message":"Reading the current view.","toolCalls":[{"tool":"readFile","relativePath":"LoomX/ContentView.swift"}]}
+            """
+        )
+    }
+}
+
 private func makeTemporaryDirectory(prefix: String = "loom-workspace-tests") throws -> URL {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent(prefix, isDirectory: true)
@@ -88,6 +114,28 @@ private func makeTemporaryDirectory(prefix: String = "loom-workspace-tests") thr
 
 @Suite("Workspace Agent")
 struct WorkspaceAgentTests {
+    @Test
+    func localWorkspaceProviderRequestsStructuredJSONToolCalls() async throws {
+        let chatClient = RecordingStructuredChatClient()
+        let provider = LocalOllamaWorkspaceAgentProvider(modelTag: "llama3", chatClient: chatClient)
+        let session = WorkspaceSession(displayName: "LoomX", rootPath: "/tmp/LoomX")
+
+        let response = try await provider.respond(
+            to: WorkspaceAgentRequest(
+                session: session,
+                messages: [ChatMessage(role: .user, content: "Make the edits directly in Xcode.")],
+                indexSnapshot: WorkspaceIndexSnapshot(files: ["LoomX/ContentView.swift"], source: .fileSystem),
+                toolResults: []
+            )
+        )
+        let requestedFormat = await chatClient.requestedFormat
+
+        #expect(requestedFormat == .json)
+        #expect(response.message == "Reading the current view.")
+        #expect(response.toolCalls.map(\.tool) == [.readFile])
+        #expect(response.toolCalls.first?.relativePath == "LoomX/ContentView.swift")
+    }
+
     @Test
     @MainActor
     func workspaceViewModelRefreshesMissingSchemeOnLoad() async throws {

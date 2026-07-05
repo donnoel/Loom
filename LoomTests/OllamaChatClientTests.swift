@@ -279,6 +279,40 @@ struct OllamaChatClientTransportTests {
     }
 
     @Test
+    func structuredStreamChatRequestsJSONFormat() async throws {
+        let (_, chatClient, _) = await makeClients { request in
+            switch request.url?.path {
+            case "/api/version":
+                return jsonResponse(statusCode: 200, body: #"{"version":"0.7.0"}"#)
+            case "/api/chat":
+                let body = request.httpBody.flatMap {
+                    try? JSONSerialization.jsonObject(with: $0) as? [String: Any]
+                }
+                #expect(body?["format"] as? String == "json")
+                let streamBody = """
+                {"message":{"content":"{\\"message\\":\\"Reading files\\",\\"toolCalls\\":[]}"},"done":false}
+                {"done":true}
+                """
+                return jsonResponse(statusCode: 200, body: streamBody)
+            default:
+                return textResponse(statusCode: 404, body: "not found")
+            }
+        }
+
+        let collector = DeltaCollector()
+        try await chatClient.streamChat(
+            model: "llama3",
+            messages: [],
+            responseFormat: .json,
+            onDelta: { delta in
+                await collector.append(delta)
+            }
+        )
+
+        #expect(await collector.snapshot() == [#"{"message":"Reading files","toolCalls":[]}"#])
+    }
+
+    @Test
     func streamChatThrowsOllamaUnavailableWhenNoReachableBaseURL() async {
         let (_, chatClient, _) = await makeClients(installed: true) { request in
             if request.url?.path == "/api/version" {
