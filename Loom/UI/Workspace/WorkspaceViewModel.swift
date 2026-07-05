@@ -253,7 +253,11 @@ final class WorkspaceViewModel {
         messages = Self.visibleChatMessages(from: (try? await store.loadMessages(sessionID: session.id)) ?? [])
         toolEvents = ((try? await store.loadToolEvents(sessionID: session.id)) ?? []).sorted { $0.finishedAt > $1.finishedAt }
         changeRecords = (try? await store.loadChangeRecords(sessionID: session.id)) ?? []
-        await refreshGitDiff()
+        if session.selectedProject != nil, session.selectedScheme == nil {
+            await runReadinessCheck()
+        } else {
+            await refreshGitDiff()
+        }
     }
 
     private func saveAndReplace(_ session: WorkspaceSession) async {

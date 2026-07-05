@@ -17,6 +17,61 @@ private actor ScriptedWorkspaceProvider: WorkspaceAgentProviding {
     }
 }
 
+private actor ScriptedDeveloperToolRunner: DeveloperToolRunning {
+    var xcodebuildListCalls = 0
+
+    func readFile(session: WorkspaceSession, relativePath: String) async -> DeveloperToolResult {
+        DeveloperToolResult(tool: .readFile, status: .success, summary: "Read file", output: "")
+    }
+
+    func search(session: WorkspaceSession, pattern: String) async -> DeveloperToolResult {
+        DeveloperToolResult(tool: .search, status: .success, summary: "Searched", output: "")
+    }
+
+    func listFiles(session: WorkspaceSession) async -> (DeveloperToolResult, WorkspaceFileList) {
+        (
+            DeveloperToolResult(tool: .listFiles, status: .success, summary: "Listed files", output: ""),
+            WorkspaceFileList(files: [], source: .fileSystem)
+        )
+    }
+
+    func writeFile(session: WorkspaceSession, relativePath: String, contents: String) async -> DeveloperToolResult {
+        DeveloperToolResult(tool: .writeFile, status: .success, summary: "Wrote file", output: "")
+    }
+
+    func applyPatch(session: WorkspaceSession, patch: String) async -> DeveloperToolResult {
+        DeveloperToolResult(tool: .applyPatch, status: .success, summary: "Applied patch", output: "")
+    }
+
+    func gitDiff(session: WorkspaceSession) async -> DeveloperToolResult {
+        DeveloperToolResult(tool: .gitDiff, status: .success, summary: "Loaded diff", output: "")
+    }
+
+    func gitStatus(session: WorkspaceSession) async -> DeveloperToolResult {
+        DeveloperToolResult(tool: .gitStatus, status: .success, summary: "Loaded git status", output: "## main")
+    }
+
+    func xcodebuildList(session: WorkspaceSession) async -> (DeveloperToolResult, [String]) {
+        xcodebuildListCalls += 1
+        return (
+            DeveloperToolResult(tool: .xcodebuildList, status: .success, summary: "Loaded Xcode project metadata.", output: ""),
+            ["Loom"]
+        )
+    }
+
+    func build(session: WorkspaceSession) async -> DeveloperToolResult {
+        DeveloperToolResult(tool: .build, status: .success, summary: "Built", output: "")
+    }
+
+    func test(session: WorkspaceSession) async -> DeveloperToolResult {
+        DeveloperToolResult(tool: .test, status: .success, summary: "Tested", output: "")
+    }
+
+    func openInXcode(session: WorkspaceSession) async -> DeveloperToolResult {
+        DeveloperToolResult(tool: .openInXcode, status: .success, summary: "Opened", output: "")
+    }
+}
+
 private func makeTemporaryDirectory(prefix: String = "loom-workspace-tests") throws -> URL {
     let url = FileManager.default.temporaryDirectory
         .appendingPathComponent(prefix, isDirectory: true)
@@ -27,6 +82,34 @@ private func makeTemporaryDirectory(prefix: String = "loom-workspace-tests") thr
 
 @Suite("Workspace Agent")
 struct WorkspaceAgentTests {
+    @Test
+    @MainActor
+    func workspaceViewModelRefreshesMissingSchemeOnLoad() async throws {
+        let storeRoot = try makeTemporaryDirectory()
+        let workspaceRoot = try makeTemporaryDirectory(prefix: "loom-source-workspace")
+        let store = WorkspaceStore(workspacesRoot: storeRoot)
+        let session = try await store.createSession(
+            displayName: "Loom",
+            rootURL: workspaceRoot,
+            bookmarkData: nil,
+            detectedProject: WorkspaceSession.ProjectSelection(kind: .xcodeProject, relativePath: "Loom.xcodeproj")
+        )
+        let runner = ScriptedDeveloperToolRunner()
+        let viewModel = WorkspaceViewModel(
+            store: store,
+            runner: runner,
+            defaults: UserDefaults(suiteName: "workspace-view-model-\(UUID().uuidString)") ?? .standard
+        )
+
+        await viewModel.load()
+
+        let xcodebuildListCalls = await runner.xcodebuildListCalls
+        #expect(viewModel.selectedSessionID == session.id)
+        #expect(viewModel.availableSchemes == ["Loom"])
+        #expect(viewModel.selectedSession?.selectedScheme == "Loom")
+        #expect(xcodebuildListCalls == 1)
+    }
+
     @Test
     func workspaceStorePersistsMetadataMessagesToolsAndChanges() async throws {
         let storeRoot = try makeTemporaryDirectory()
@@ -372,5 +455,15 @@ struct WorkspaceAgentTests {
         """
 
         #expect(DeveloperToolRunner.parseSchemes(from: output) == ["Demo", "DemoTests"])
+    }
+
+    @Test
+    func xcodebuildLicenseFailureGetsSpecificSummary() {
+        let output = """
+        You have not agreed to the Xcode license agreements.
+        Please run 'sudo xcodebuild -license' from within a Terminal window.
+        """
+
+        #expect(DeveloperToolRunner.xcodeMetadataFailureSummary(for: output) == "Accept the Xcode license to load project schemes.")
     }
 }

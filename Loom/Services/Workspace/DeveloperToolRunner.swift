@@ -173,7 +173,7 @@ actor DeveloperToolRunner: DeveloperToolRunning {
             )
             let schemes = Self.parseSchemes(from: command.output)
             let status: DeveloperToolStatus = command.exitCode == 0 ? .success : .failure
-            let summary = command.exitCode == 0 ? "Loaded Xcode project metadata." : "Xcode project metadata failed."
+            let summary = command.exitCode == 0 ? "Loaded Xcode project metadata." : Self.xcodeMetadataFailureSummary(for: command.output)
             return (result(.xcodebuildList, status, summary, command.output, startedAt), schemes)
         } catch {
             return (result(.xcodebuildList, .failure, "Choose an Xcode project or workspace first.", error.localizedDescription, startedAt), [])
@@ -417,6 +417,14 @@ actor DeveloperToolRunner: DeveloperToolRunning {
             }
         }
         return []
+    }
+
+    static func xcodeMetadataFailureSummary(for output: String) -> String {
+        let normalized = output.lowercased()
+        if normalized.contains("license") && normalized.contains("xcode") {
+            return "Accept the Xcode license to load project schemes."
+        }
+        return "Xcode project metadata failed."
     }
 
     private static func firstJSONObject(in output: String) -> String? {
