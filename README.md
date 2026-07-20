@@ -274,7 +274,7 @@ Also included:
 
 ## ❤️ Credits
 
-Built with care by **Don Noel** and AI collaboration.
+Built with care by Don Noel and Codex collaboration.
 
 ---
 
