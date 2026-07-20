@@ -272,7 +272,7 @@ Also included:
 
 ---
 
-## ❤️ Credits
+## Credits
 
 Built with care by **Don Noel** and Codex collaboration.
 
