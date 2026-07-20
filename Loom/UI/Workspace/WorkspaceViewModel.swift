@@ -219,6 +219,11 @@ final class WorkspaceViewModel {
                 self.toolEvents.sort { $0.finishedAt > $1.finishedAt }
                 self.changeRecords.insert(contentsOf: result.changeRecords, at: 0)
                 await self.refreshGitDiff()
+            } catch WorkspaceAgentRuntimeError.providerTimedOut {
+                self.bannerText = "LoomX waited too long for the local model."
+                self.messages.removeAll { $0.id == workingMessage.id }
+                self.activeSendingStatusMessageID = nil
+                self.draft = text
             } catch {
                 self.bannerText = "LoomX couldn’t finish that request."
                 self.messages.removeAll { $0.id == workingMessage.id }

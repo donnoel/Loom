@@ -10,12 +10,17 @@ nonisolated struct WorkspaceAgentTurnResult: Sendable {
     let changeRecords: [WorkspaceChangeRecord]
 }
 
+nonisolated enum WorkspaceAgentRuntimeError: Error, Equatable, Sendable {
+    case providerTimedOut
+}
+
 actor WorkspaceAgentRuntime {
     private let store: WorkspaceStore
     private let runner: any DeveloperToolRunning
     private let provider: any WorkspaceAgentProviding
     private let maxIterations: Int
     private let maxNoToolFollowUps: Int
+    private let providerResponseTimeoutNanoseconds: UInt64
 
     init(
         store: WorkspaceStore,
@@ -24,11 +29,30 @@ actor WorkspaceAgentRuntime {
         maxIterations: Int = 5,
         maxNoToolFollowUps: Int = 1
     ) {
+        self.init(
+            store: store,
+            runner: runner,
+            provider: provider,
+            maxIterations: maxIterations,
+            maxNoToolFollowUps: maxNoToolFollowUps,
+            providerResponseTimeoutNanoseconds: 45_000_000_000
+        )
+    }
+
+    init(
+        store: WorkspaceStore,
+        runner: any DeveloperToolRunning,
+        provider: any WorkspaceAgentProviding,
+        maxIterations: Int,
+        maxNoToolFollowUps: Int,
+        providerResponseTimeoutNanoseconds: UInt64
+    ) {
         self.store = store
         self.runner = runner
         self.provider = provider
         self.maxIterations = maxIterations
         self.maxNoToolFollowUps = maxNoToolFollowUps
+        self.providerResponseTimeoutNanoseconds = providerResponseTimeoutNanoseconds
     }
 
     func runTurn(session: WorkspaceSession, userText: String, existingMessages: [ChatMessage]) async throws -> WorkspaceAgentTurnResult {
@@ -66,7 +90,7 @@ actor WorkspaceAgentRuntime {
                 indexSnapshot: index,
                 toolResults: allToolResults
             )
-            let response = try await provider.respond(to: request)
+            let response = try await providerResponse(for: request)
 
             if response.toolCalls.isEmpty,
                shouldRequestToolFollowUp(
@@ -97,11 +121,15 @@ actor WorkspaceAgentRuntime {
                 break
             }
 
+            var didSuccessfullyEdit = false
+            var didRunBuild = false
             for toolCall in response.toolCalls {
                 try Task.checkCancellation()
                 let toolResult = await execute(toolCall, session: session)
                 try await store.appendToolEvent(toolResult, sessionID: session.id)
                 allToolResults.append(toolResult)
+                didRunBuild = didRunBuild || toolCall.tool == .build
+                didSuccessfullyEdit = didSuccessfullyEdit || (toolCall.tool.isEditingTool && toolResult.status == .success)
 
                 if toolCall.tool == .applyPatch,
                    toolResult.status == .success,
@@ -117,6 +145,16 @@ actor WorkspaceAgentRuntime {
                     workingMessages.append(ChatMessage(role: .system, content: repairPrompt))
                 }
             }
+
+            if shouldBuildAfterSuccessfulEdit(didSuccessfullyEdit: didSuccessfullyEdit, didRunBuild: didRunBuild, session: session) {
+                try Task.checkCancellation()
+                let buildResult = await execute(WorkspaceAgentToolCall(tool: .build), session: session)
+                try await store.appendToolEvent(buildResult, sessionID: session.id)
+                allToolResults.append(buildResult)
+
+                let toolMessage = ChatMessage(role: .tool, content: toolMessageContent(for: buildResult))
+                workingMessages.append(toolMessage)
+            }
         }
 
         return WorkspaceAgentTurnResult(
@@ -124,6 +162,26 @@ actor WorkspaceAgentRuntime {
             toolResults: allToolResults,
             changeRecords: changeRecords
         )
+    }
+
+    private func providerResponse(for request: WorkspaceAgentRequest) async throws -> WorkspaceAgentProviderResponse {
+        let provider = self.provider
+        let timeout = providerResponseTimeoutNanoseconds
+        return try await withThrowingTaskGroup(of: WorkspaceAgentProviderResponse.self) { group in
+            group.addTask {
+                try await provider.respond(to: request)
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: timeout)
+                throw WorkspaceAgentRuntimeError.providerTimedOut
+            }
+
+            guard let response = try await group.next() else {
+                throw WorkspaceAgentRuntimeError.providerTimedOut
+            }
+            group.cancelAll()
+            return response
+        }
     }
 
     private func execute(_ toolCall: WorkspaceAgentToolCall, session: WorkspaceSession) async -> DeveloperToolResult {
@@ -182,6 +240,13 @@ actor WorkspaceAgentRuntime {
         case .openInXcode:
             return await runner.openInXcode(session: session)
         }
+    }
+
+    private func shouldBuildAfterSuccessfulEdit(didSuccessfullyEdit: Bool, didRunBuild: Bool, session: WorkspaceSession) -> Bool {
+        didSuccessfullyEdit
+            && !didRunBuild
+            && session.selectedProject != nil
+            && session.selectedScheme?.nonEmptyTrimmed != nil
     }
 
     private func toolMessageContent(for result: DeveloperToolResult) -> String {

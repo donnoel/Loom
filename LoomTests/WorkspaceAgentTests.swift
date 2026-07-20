@@ -23,8 +23,16 @@ private actor ScriptedWorkspaceProvider: WorkspaceAgentProviding {
     }
 }
 
+private actor SlowWorkspaceProvider: WorkspaceAgentProviding {
+    func respond(to request: WorkspaceAgentRequest) async throws -> WorkspaceAgentProviderResponse {
+        try await Task.sleep(nanoseconds: 1_000_000_000)
+        return WorkspaceAgentProviderResponse(message: "Too late.")
+    }
+}
+
 private actor ScriptedDeveloperToolRunner: DeveloperToolRunning {
     var xcodebuildListCalls = 0
+    var buildCalls = 0
 
     func readFile(session: WorkspaceSession, relativePath: String) async -> DeveloperToolResult {
         DeveloperToolResult(tool: .readFile, status: .success, summary: "Read file", output: "")
@@ -66,7 +74,8 @@ private actor ScriptedDeveloperToolRunner: DeveloperToolRunning {
     }
 
     func build(session: WorkspaceSession) async -> DeveloperToolResult {
-        DeveloperToolResult(tool: .build, status: .success, summary: "Built", output: "")
+        buildCalls += 1
+        return DeveloperToolResult(tool: .build, status: .success, summary: "Built", output: "")
     }
 
     func test(session: WorkspaceSession) async -> DeveloperToolResult {
@@ -303,6 +312,121 @@ struct WorkspaceAgentTests {
         #expect(try String(contentsOf: workspaceRoot.appendingPathComponent("notes.txt"), encoding: .utf8) == "workspace agent note")
         #expect((try await store.loadToolEvents(sessionID: session.id)).count == 1)
         #expect(!(try await store.loadMessages(sessionID: session.id)).contains { $0.role == .tool })
+    }
+
+    @Test
+    func agentRuntimeBuildsConfiguredXcodeProjectAfterSuccessfulEdit() async throws {
+        let storeRoot = try makeTemporaryDirectory()
+        let workspaceRoot = try makeTemporaryDirectory(prefix: "loom-source-workspace")
+        let store = WorkspaceStore(workspacesRoot: storeRoot)
+        var session = try await store.createSession(
+            displayName: "Runtime",
+            rootURL: workspaceRoot,
+            bookmarkData: nil,
+            detectedProject: WorkspaceSession.ProjectSelection(kind: .xcodeProject, relativePath: "Runtime.xcodeproj")
+        )
+        session.selectedScheme = "Runtime"
+        let provider = ScriptedWorkspaceProvider([
+            WorkspaceAgentProviderResponse(
+                message: "Applying the requested app edit.",
+                toolCalls: [
+                    WorkspaceAgentToolCall(
+                        tool: .writeFile,
+                        relativePath: "Runtime/ContentView.swift",
+                        contents: "struct ContentView {}\n"
+                    )
+                ]
+            ),
+            WorkspaceAgentProviderResponse(message: "Done.")
+        ])
+        let runner = ScriptedDeveloperToolRunner()
+        let runtime = WorkspaceAgentRuntime(store: store, runner: runner, provider: provider)
+
+        let result = try await runtime.runTurn(
+            session: session,
+            userText: "Make the edit directly in Xcode.",
+            existingMessages: []
+        )
+
+        #expect(result.toolResults.map(\.tool) == [.writeFile, .build])
+        #expect(await runner.buildCalls == 1)
+        #expect((try await store.loadToolEvents(sessionID: session.id)).map(\.tool) == [.writeFile, .build])
+    }
+
+    @Test
+    func agentRuntimeDoesNotDuplicateModelRequestedBuildAfterEdit() async throws {
+        let storeRoot = try makeTemporaryDirectory()
+        let workspaceRoot = try makeTemporaryDirectory(prefix: "loom-source-workspace")
+        let store = WorkspaceStore(workspacesRoot: storeRoot)
+        var session = try await store.createSession(
+            displayName: "Runtime",
+            rootURL: workspaceRoot,
+            bookmarkData: nil,
+            detectedProject: WorkspaceSession.ProjectSelection(kind: .xcodeProject, relativePath: "Runtime.xcodeproj")
+        )
+        session.selectedScheme = "Runtime"
+        let provider = ScriptedWorkspaceProvider([
+            WorkspaceAgentProviderResponse(
+                message: "Applying the requested app edit and building it.",
+                toolCalls: [
+                    WorkspaceAgentToolCall(
+                        tool: .writeFile,
+                        relativePath: "Runtime/ContentView.swift",
+                        contents: "struct ContentView {}\n"
+                    ),
+                    WorkspaceAgentToolCall(tool: .build)
+                ]
+            ),
+            WorkspaceAgentProviderResponse(message: "Done.")
+        ])
+        let runner = ScriptedDeveloperToolRunner()
+        let runtime = WorkspaceAgentRuntime(store: store, runner: runner, provider: provider)
+
+        let result = try await runtime.runTurn(
+            session: session,
+            userText: "Make the edit directly in Xcode.",
+            existingMessages: []
+        )
+
+        #expect(result.toolResults.map(\.tool) == [.writeFile, .build])
+        #expect(await runner.buildCalls == 1)
+    }
+
+    @Test
+    func agentRuntimeTimesOutSlowProviderBeforeSpinnerCanHangForever() async throws {
+        let storeRoot = try makeTemporaryDirectory()
+        let workspaceRoot = try makeTemporaryDirectory(prefix: "loom-source-workspace")
+        let store = WorkspaceStore(workspacesRoot: storeRoot)
+        let session = try await store.createSession(
+            displayName: "Runtime",
+            rootURL: workspaceRoot,
+            bookmarkData: nil,
+            detectedProject: WorkspaceSession.ProjectSelection(kind: .xcodeProject, relativePath: "Runtime.xcodeproj")
+        )
+        let runtime = WorkspaceAgentRuntime(
+            store: store,
+            runner: ScriptedDeveloperToolRunner(),
+            provider: SlowWorkspaceProvider(),
+            maxIterations: 5,
+            maxNoToolFollowUps: 1,
+            providerResponseTimeoutNanoseconds: 1_000_000
+        )
+
+        do {
+            _ = try await runtime.runTurn(
+                session: session,
+                userText: "Make this edit directly in Xcode.",
+                existingMessages: []
+            )
+            Issue.record("Expected the slow provider to time out.")
+        } catch let error as WorkspaceAgentRuntimeError {
+            #expect(error == .providerTimedOut)
+        } catch {
+            Issue.record("Unexpected error: \(String(describing: error))")
+        }
+
+        #expect((try await store.loadMessages(sessionID: session.id)).map(\.role) == [.user])
+        #expect((try await store.loadToolEvents(sessionID: session.id)).isEmpty)
     }
 
     @Test
