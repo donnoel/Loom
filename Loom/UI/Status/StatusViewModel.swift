@@ -11,6 +11,11 @@ final class StatusViewModel {
     private var refreshTask: Task<Void, Never>?
     private var activationObserver: NSObjectProtocol?
     private nonisolated static let localRuntimeAutoRefreshInterval: Duration = .seconds(60)
+    private nonisolated static let uiTestResetDefaultsEnvironmentKey = "LOOM_UI_TEST_RESET_DEFAULTS"
+
+    private nonisolated static var isRunningUITests: Bool {
+        ProcessInfo.processInfo.environment[uiTestResetDefaultsEnvironmentKey] == "1"
+    }
 
     private nonisolated static func isAutoRefreshEnabled() -> Bool {
         if let stored = UserDefaults.standard.object(forKey: LoomPreferenceKeys.statusAutoRefreshEnabled) as? Bool {
@@ -33,6 +38,11 @@ final class StatusViewModel {
     }
 
     func startMonitoring() {
+        if Self.isRunningUITests {
+            Task { await refresh() }
+            return
+        }
+
         if activationObserver == nil {
             activationObserver = NotificationCenter.default.addObserver(
                 forName: NSApplication.didBecomeActiveNotification,
