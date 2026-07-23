@@ -39,7 +39,7 @@ final class StatusViewModel {
 
     func startMonitoring() {
         if Self.isRunningUITests {
-            Task { await refresh() }
+            hasCompletedInitialRefresh = true
             return
         }
 
