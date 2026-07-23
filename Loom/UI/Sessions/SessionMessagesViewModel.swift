@@ -388,6 +388,7 @@ final class SessionMessagesViewModel {
     }
 
     func flushScratchpad() async {
+        guard scratchpadSaveTask != nil else { return }
         scratchpadSaveTask?.cancel()
         scratchpadSaveTask = nil
         await persistScratchpad(scratchpadText)
@@ -623,19 +624,21 @@ final class SessionMessagesViewModel {
         return true
     }
 
-    func stopGenerating() {
+    func stopGenerating() async {
         let placeholderID = generatingMessageID
-        generationTask?.cancel()
-        generationTask = nil
+        let task = generationTask
+        task?.cancel()
         generatingMessageID = nil
         generatingMessageIndex = nil
         isGenerating = false
 
-        if let placeholderID {
-            Task { [weak self] in
-                await self?.persistAssistantMessage(id: placeholderID, forcePersist: false)
-            }
+        if let task {
+            await task.value
+        } else if let placeholderID {
+            await persistAssistantMessage(id: placeholderID, forcePersist: false)
         }
+
+        generationTask = nil
     }
 
     func retryLastReply() async {

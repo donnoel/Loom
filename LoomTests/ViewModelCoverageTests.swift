@@ -1222,7 +1222,7 @@ struct SessionMessagesViewModelCoverageTests {
 
         await sendDraftWithModelRetry(vm, draft: "Hello")
         await waitUntil { vm.messages.count == 2 && vm.messages[1].content == "Partial" }
-        vm.stopGenerating()
+        await vm.stopGenerating()
         await waitUntil { !vm.isGenerating }
 
         let clock = ContinuousClock()

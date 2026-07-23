@@ -81,6 +81,11 @@ final class StatusViewModel {
     }
 
     func refresh() async {
+        if Self.isRunningUITests {
+            hasCompletedInitialRefresh = true
+            return
+        }
+
         guard !isRefreshing else { return }
 
         isRefreshing = true

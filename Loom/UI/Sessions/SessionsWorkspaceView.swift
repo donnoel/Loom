@@ -377,8 +377,8 @@ struct SessionDetailView: View {
 
                         if vm.isGenerating {
                             Button(role: .destructive) {
-                                vm.stopGenerating()
                                 stopDictationIfNeeded()
+                                Task { await vm.stopGenerating() }
                             } label: {
                                 Image(systemName: "stop.fill")
                                     .font(.system(size: 11, weight: .bold))
@@ -492,9 +492,11 @@ struct SessionDetailView: View {
         }
         .onDisappear {
             stopDictationIfNeeded()
-            speechSynthesizer.stopSpeaking(at: .immediate)
-            vm.stopGenerating()
+            if speechSynthesizer.isSpeaking {
+                speechSynthesizer.stopSpeaking(at: .immediate)
+            }
             Task {
+                await vm.stopGenerating()
                 await vm.flushScratchpad()
             }
         }
@@ -808,6 +810,7 @@ struct SessionDetailView: View {
     }
 
     private func stopDictationIfNeeded() {
+        guard isDictating else { return }
         speechInputController.stop()
         isDictating = false
     }

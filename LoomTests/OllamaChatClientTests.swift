@@ -144,6 +144,30 @@ private func textResponse(statusCode: Int, body: String) -> MockHTTPResponse {
     )
 }
 
+private func requestBodyData(_ request: URLRequest) -> Data? {
+    if let body = request.httpBody {
+        return body
+    }
+
+    guard let stream = request.httpBodyStream else { return nil }
+    stream.open()
+    defer { stream.close() }
+
+    var body = Data()
+    let bufferSize = 4_096
+    let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+    defer { buffer.deallocate() }
+
+    while true {
+        let count = stream.read(buffer, maxLength: bufferSize)
+        guard count >= 0 else { return nil }
+        if count == 0 { break }
+        body.append(buffer, count: count)
+    }
+
+    return body
+}
+
 private func makeClients(
     installed: Bool = true,
     handler: @escaping MockHTTPHandler
@@ -285,7 +309,7 @@ struct OllamaChatClientTransportTests {
             case "/api/version":
                 return jsonResponse(statusCode: 200, body: #"{"version":"0.7.0"}"#)
             case "/api/chat":
-                let body = request.httpBody.flatMap {
+                let body = requestBodyData(request).flatMap {
                     try? JSONSerialization.jsonObject(with: $0) as? [String: Any]
                 }
                 #expect(body?["format"] as? String == "json")
