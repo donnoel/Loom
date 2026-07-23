@@ -28,20 +28,21 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 |--------|-------------|
 | 🗂️ **Session Workspace** | Create, rename, delete, search, pin, archive, and sort sessions by recent activity. |
 | 🏷️ **Auto Session Titles** | New sessions are renamed from your first prompt so conversations are easier to scan later. |
-| 💾 **Disk-Backed Persistence** | Each session stores `metadata.json`, append-only `messages.jsonl`, optional `scratchpad.txt`, and optional `memory.json`. |
+| 💾 **Disk-Backed Persistence** | Each chat stores `metadata.json`, append-only `messages.jsonl`, and an optional `scratchpad.txt`; shared preferences live in a global `memory.json`. |
 | ⚡ **Streaming Assistant Replies** | Assistant responses stream live into the UI as tokens arrive. |
 | 🎙️ **Speech Input (Push-to-Talk)** | Use the mic button to dictate directly into the draft field with on-device speech recognition. |
 | 🔊 **Optional Voice Replies** | Toggle read-aloud mode so new assistant replies are spoken after generation completes, using your chosen voice from Settings. |
-| 📎 **File Upload Grounding** | Attach local text/PDF files and Loom injects extracted excerpts as context for the next turn, with size/count guardrails and automatic context-budget trimming. |
+| 📎 **File Upload Grounding** | Attach local text/PDF files and Loom injects extracted excerpts as context for the next turn, with size/count guardrails and automatic context-budget trimming. Files are not copied into chat storage. |
 | 🎚️ **Composer Context Controls** | Choose concise/balanced/extended history and off/compact/full file context from the composer, with quieter UI defaults. |
 | 🧭 **Capability-Aware Guidance** | Model cards and chat composer clearly show which models support speech input/output and file uploads. |
 | 💬 **Animated Typing Pulse** | While Loom is generating, assistant placeholders show a pulsing typing indicator. |
 | ✍️ **Readable Chat Formatting** | Assistant text is normalized for paragraph/list readability when raw output arrives as a dense block, while keeping stable whitespace-preserving rendering during streaming to avoid visual "snap back." |
 | 🎨 **Chat-First Workspace Styling** | The app uses a cleaner dark workspace with flatter surfaces, calmer sidebar emphasis, and a simplified composer to keep focus on conversation content. |
 | 💡 **Starter Prompt Chips** | New sessions include one-tap prompt suggestions that prefill the composer to help non-technical users get started quickly. |
+| 🧰 **Chat Templates** | Use four customizable prompt templates from the composer and edit or reset them in Settings. |
 | 📌 **Session Organization** | Pin important chats, archive old ones without deleting them, and use sidebar search across chat titles and messages. |
 | 📝 **Per-Session Scratchpad** | Keep lightweight notes beside a chat without adding them to the transcript. |
-| 🧾 **Session Memory** | Save a few user-edited reply preferences for a session and optionally include them in future turns. |
+| 🧾 **Global Memory** | Save a few user-edited reply preferences and optionally include them in future turns across every chat. |
 | 🔀 **Model Compare Mode** | Run one prompt against two installed local models side by side without changing the active chat. |
 | 🪄 **Assistant Quick Actions** | Copy replies as plain text/Markdown or create follow-up turns that summarize, simplify, professionalize, or checklist a response. |
 | ⏹️ **Stop Generation** | Cancel generation any time and keep the partial assistant response. |
@@ -61,7 +62,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 
 ## 🎛 Controls
 
-- **Create Session** with the `+` toolbar button
+- **Create a New Chat** with the square-and-pencil toolbar button or the always-visible sidebar entry
 - **Auto-Name New Sessions** by sending your first message (title is derived from the opening request)
 - **Browse Chats** directly in the sidebar
 - **Search Chats** from the sidebar to find matching chat titles or message snippets
@@ -70,12 +71,14 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Tap Starter Prompts** in a new session to prefill a question instantly
 - **Attach Files** with the paperclip button to add local text/PDF context
   Limits: up to 8 files, max ~2 MB per text file, max ~5 MB per PDF, and excerpt trimming when total attachment context is too large.
+  Extracted context is used for that turn and is not saved as a persistent chat attachment.
 - **Dictate Message** with the mic button (when supported by the active model)
 - **Read Replies Aloud** with the speaker toggle (when supported by the active model)
 - **Switch Models In Session** from the combined model/tools menu above the composer
 - **Tune Context Before Send** from the same `Tools` menu (history + file inclusion)
 - **Compare Models** from the sidebar to send one prompt to two installed models side by side
-- **Use Session Memory** from the session toolbar to edit local reply preferences for that chat
+- **Use Global Memory** from the chat toolbar to edit local reply preferences shared across chats
+- **Use Chat Templates** from the composer menu; edit or reset the four templates in Settings
 - **Open Scratchpad** from the session toolbar to keep notes beside the transcript
 - **Use Assistant Quick Actions** from an assistant message context menu to copy or transform a reply
 - **Tune Voice Quality** in Settings with a voice picker and preview button
@@ -97,7 +100,7 @@ Persistence owner for sessions and messages:
 - Bootstraps app storage folders
 - CRUD for session metadata
 - Append-only JSONL writes for chat messages
-- Atomic scratchpad and session memory writes
+- Atomic scratchpad and global memory writes, including migration from legacy per-session memory
 - Deterministic session sorting via `updatedAt`
 
 ### **SessionSearchService (actor)**
@@ -131,7 +134,7 @@ Chat interaction coordinator:
 - Adds local attachment excerpts into request context for file-aware turns
 - Enforces attachment guardrails (file count, file size, and total context budget) with plain-language skip guidance
 - Loads and saves per-session scratchpad notes
-- Applies optional per-session memory preferences to request context
+- Applies optional global memory preferences to request context
 - Loads installed-model choices for in-session switching and keeps active-model preference in sync
 - Exposes model capability gating for speech/file tools and inline guidance
 - Exposes inline banner state for guidance
@@ -155,18 +158,20 @@ Loom stores data in Application Support:
 
 ```text
 ~/Library/Application Support/Loom/
+├── memory.json
 └── Sessions/
     └── <UUID>/
         ├── metadata.json
         ├── messages.jsonl
-        ├── scratchpad.txt
-        └── memory.json
+        └── scratchpad.txt
 ```
 
 Notes:
 - `metadata.json` writes are atomic
 - `messages.jsonl` is append-only (one JSON message per line)
-- `scratchpad.txt` and `memory.json` are per-session local files and write atomically when saved
+- `scratchpad.txt` is local to one chat and writes atomically when saved
+- The root `memory.json` stores optional global reply preferences and writes atomically
+- If global memory is missing, Loom can migrate a legacy per-session `memory.json` when that chat is opened
 
 ---
 
@@ -177,11 +182,14 @@ Loom/
 ├── App/
 │   └── LoomApp.swift
 ├── Core/
-│   └── Sessions/
-│       ├── Session.swift
-│       ├── ChatMessage.swift
-│       ├── SessionMemory.swift
-│       └── SessionSearchResult.swift
+│   ├── Sessions/
+│   │   ├── Session.swift
+│   │   ├── ChatMessage.swift
+│   │   ├── SessionMemory.swift
+│   │   └── SessionSearchResult.swift
+│   ├── Templates/
+│   │   └── ChatTemplateLibrary.swift
+│   └── VoiceReplyVoiceCatalog.swift
 ├── Services/
 │   ├── SessionStore.swift
 │   ├── SessionSearchService.swift
@@ -218,7 +226,8 @@ Also included:
 
 `LoomTests` includes focused coverage across persistence, formatting, services, and view models:
 - `SessionStore` create/update/delete + append/load JSONL behavior
-- `SessionStore` scratchpad and session memory persistence
+- `SessionStore` scratchpad persistence plus global memory sharing and legacy migration
+- `ChatTemplateLibrary` template persistence and reset behavior
 - `SessionSearchService` title and message search
 - `ChatDisplayFormatter` dense-text paragraph/list normalization behavior
 - `ModelCatalog` loading and curated model lookups
@@ -233,10 +242,11 @@ Also included:
 - `OllamaClient` diagnosis/list/delete/pull network-path behavior via mocked transport
 
 `LoomUITests` covers key end-to-end desktop flows:
-- Sidebar navigation
+- Models recovery navigation from setup guidance
 - Session create/delete
 - Setup guidance when no model is active
 - Streaming reply path
+- Return-key sending and compact composer layout
 - Long model-label layout safety for composer send-button hittability
 - Stop generation with relaunch verification
 
@@ -250,7 +260,23 @@ Also included:
 4. Open `Loom.xcodeproj` in a current Xcode with the macOS 26.2 SDK available
 5. Build and run the **Loom** scheme  
 6. In Loom, open **Models** and select an active model  
-7. Open/create a session and start chatting
+7. Open or create a chat and start chatting
+
+To reproduce the warning-clean CI build and test locally:
+
+```sh
+xcodebuild \
+  -project Loom.xcodeproj \
+  -scheme Loom \
+  -configuration Debug \
+  -destination "platform=macOS,arch=arm64" \
+  -parallel-testing-enabled NO \
+  CODE_SIGN_IDENTITY="-" \
+  DEVELOPMENT_TEAM="" \
+  GCC_TREAT_WARNINGS_AS_ERRORS=YES \
+  SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+  clean test
+```
 
 ---
 

@@ -49,7 +49,7 @@ title: Loom
     <article class="principle-card">
       <span class="card-number" aria-hidden="true">01</span>
       <h3>Local by default</h3>
-      <p>Ollama runs the model on your Mac, while chat history, notes, attachments, and preferences remain in local app storage.</p>
+      <p>Ollama runs the model on your Mac, while chat history, notes, and preferences remain in local app storage. Attached files stay at their original location and are read locally for the selected turn.</p>
     </article>
     <article class="principle-card">
       <span class="card-number" aria-hidden="true">02</span>
@@ -75,10 +75,10 @@ title: Loom
         <h2 id="session-title">A conversation with a workspace around it</h2>
       </div>
     </div>
-    <p class="resident-card__summary">Each session keeps its transcript, model context, optional files, scratchpad, and reply preferences together—ready when you return.</p>
+    <p class="resident-card__summary">Each chat keeps its transcript and scratchpad ready when you return. Global reply preferences can apply across chats, while attached file excerpts are turn-scoped.</p>
     <div class="boundary-note">
       <strong>Files you can understand</strong>
-      <span>Metadata · Append-only messages · Notes · Memory</span>
+      <span>Metadata · Append-only messages · Scratchpad · Global memory</span>
     </div>
     <ul class="capability-list">
       <li><span aria-hidden="true">✓</span> Search, pin, archive, rename, and export</li>
@@ -93,7 +93,7 @@ title: Loom
     <h2 id="flow-title">Start simply. Keep everything useful.</h2>
     <ol>
       <li><span>01</span><div><strong>Choose a model</strong><p>Use one already installed through Ollama.</p></div></li>
-      <li><span>02</span><div><strong>Create a session</strong><p>Begin with a durable local workspace.</p></div></li>
+      <li><span>02</span><div><strong>Create a chat</strong><p>Begin with a durable local workspace.</p></div></li>
       <li><span>03</span><div><strong>Add context</strong><p>Attach files or tune conversation history.</p></div></li>
       <li><span>04</span><div><strong>Send a request</strong><p>Watch the local reply stream as it arrives.</p></div></li>
       <li><span>05</span><div><strong>Stop when needed</strong><p>Keep the partial answer instead of losing it.</p></div></li>

@@ -15,7 +15,7 @@ We have the V1 local chat spine in place:
 5) **Stop/cancel generation** keeps partial output and persists it
 6) **Multimodal chat controls** now include optional speech input/output and uploaded file context for supported models, with guardrails on attachment size/count/context budget and user-configurable voice picker/preview controls
 7) **Model Library UX** now supports drag-and-drop reordering of installed models with persisted order across refresh/relaunch
-8) **Session UX polish** now includes a cleaner chat-first dark visual treatment with calmer selected-session emphasis (bold + color cue), clearer chat bubble readability, a simplified composer panel (including preserved macOS autocorrect behavior while typing), friendly empty-state onboarding, starter prompt chips for non-technical users, and an always-visible `New Session` entry at the top of the Chats sidebar
+8) **Session UX polish** now includes a cleaner chat-first dark visual treatment with calmer selected-session emphasis (bold + color cue), clearer chat bubble readability, a simplified composer panel (including preserved macOS autocorrect behavior while typing), friendly empty-state onboarding, starter prompt chips for non-technical users, and an always-visible `New Chat` entry at the top of the Chats sidebar
 9) **In-session model switching** is available from the chat composer so users can change models without leaving their active session
 10) **Automatic session naming** now derives a concise topic-style title from the first user request when the title is still the default
 11) **Composer context controls** now let users choose concise/balanced/extended history and off/compact/full file context from a compact Tools menu
@@ -24,14 +24,15 @@ We have the V1 local chat spine in place:
 14) **Assistant reply quick actions** now provide context-menu actions for copy-as-plain-text, copy-as-markdown, and model-backed transforms (summarize, simplify, professional rewrite, checklist) that create derived follow-up turns
 15) **Per-session scratchpad** now provides a lightweight local notes area tied to each session for takeaways and working notes outside the main transcript
 16) **Model compare mode** now provides a focused side-by-side tool to run one prompt against two installed local models and compare outputs without altering normal chat flow
-17) **Session memory** now stores a few user-edited, per-session reply preferences locally and optionally inserts them into requests for that session only
+17) **Global memory** now stores a few user-edited reply preferences locally and optionally inserts them into requests across every chat
+18) **Chat templates** provide four customizable prompts in the composer, with edit and reset controls in Settings and persistence through `UserDefaults`
 
 Current focus should be reliability, polish, and guardrails (not sweeping architecture rewrites).
 
 ## Architecture snapshot (current)
 - **SwiftUI** with `NavigationSplitView` for macOS layout.
 - **MVVM**: view models on the MainActor; services/IO actors off-main.
-- **SessionStore** (`actor`) owns persistence and session recency updates.
+- **SessionStore** (`actor`) owns chat persistence, global memory, legacy memory migration, and session recency updates.
 - **OllamaClient** (`actor`) handles diagnosis, reachability, and model listing via local HTTP.
 - **OllamaChatClient** (`actor`) streams chat via `POST /api/chat` and parses line-delimited JSON chunks.
 - **SessionMessagesViewModel** orchestrates send flow, in-memory streaming updates, banners, cancellation, and persistence.
@@ -40,10 +41,12 @@ Current focus should be reliability, polish, and guardrails (not sweeping archit
 - `~/Library/Application Support/Loom/Sessions/<UUID>/metadata.json`
 - `~/Library/Application Support/Loom/Sessions/<UUID>/messages.jsonl` (append-only)
 - `~/Library/Application Support/Loom/Sessions/<UUID>/scratchpad.txt`
-- `~/Library/Application Support/Loom/Sessions/<UUID>/memory.json`
+- `~/Library/Application Support/Loom/memory.json` (global reply preferences)
+
+Legacy per-session `memory.json` files may still exist. When global memory is missing, Loom can migrate the legacy memory for the opened chat into the global file.
 
 ## Concurrency rules (important)
-We are using Swift 6 concurrency checks. Do NOT silence them by adding broad `@MainActor`.
+We are using the Swift 6 compiler's concurrency checks while the project currently remains in Swift 5 language mode. Do NOT silence warnings by adding broad `@MainActor`.
 - `Session`, `Session.Metadata`, `ChatMessage`, and filesystem helpers (e.g. `LoomPaths`) must remain **nonisolated** (no `@MainActor`).
 - UI state and SwiftUI view models can be `@MainActor`.
 - Persistence/network actor methods may be `async` and called from MainActor view models.
