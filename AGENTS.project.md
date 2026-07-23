@@ -18,15 +18,13 @@ We have the V1 local chat spine in place:
 8) **Session UX polish** now includes a cleaner chat-first dark visual treatment with calmer selected-session emphasis (bold + color cue), clearer chat bubble readability, a simplified composer panel (including preserved macOS autocorrect behavior while typing), friendly empty-state onboarding, starter prompt chips for non-technical users, and an always-visible `New Session` entry at the top of the Chats sidebar
 9) **In-session model switching** is available from the chat composer so users can change models without leaving their active session
 10) **Automatic session naming** now derives a concise topic-style title from the first user request when the title is still the default
-11) **AI service monitoring** now includes an App-level status screen (including Grok) that checks public chatbot status feeds, surfaces known incidents, and supports drag-and-drop card reordering with persisted order
-12) **Composer context controls** now let users choose concise/balanced/extended history and off/compact/full file context from a compact Tools menu
-13) **Trust Center** now provides a local-only panel for sessions-data location, local storage footprint, attachment retention footprint, and recent local runtime health history
-14) **Curated model catalog refresh** now focuses on four models only: Qwen 3.5 9B, DeepSeek R1 8B, Gemma 3 4B, and Gemma 4 E4B
-15) **Session organization controls** now support pinned sessions and archived sessions with local persistence, keeping archived chats out of the default active list without deleting them
-16) **Assistant reply quick actions** now provide context-menu actions for copy-as-plain-text, copy-as-markdown, and model-backed transforms (summarize, simplify, professional rewrite, checklist) that create derived follow-up turns
-17) **Per-session scratchpad** now provides a lightweight local notes area tied to each session for takeaways and working notes outside the main transcript
-18) **Model compare mode** now provides a focused side-by-side tool to run one prompt against two installed local models and compare outputs without altering normal chat flow
-19) **Session memory** now stores a few user-edited, per-session reply preferences locally and optionally inserts them into requests for that session only
+11) **Composer context controls** now let users choose concise/balanced/extended history and off/compact/full file context from a compact Tools menu
+12) **Curated model catalog refresh** now focuses on four models only: Qwen 3.5 9B, DeepSeek R1 8B, Gemma 3 4B, and Gemma 4 E4B
+13) **Session organization controls** now support pinned sessions and archived sessions with local persistence, keeping archived chats out of the default active list without deleting them
+14) **Assistant reply quick actions** now provide context-menu actions for copy-as-plain-text, copy-as-markdown, and model-backed transforms (summarize, simplify, professional rewrite, checklist) that create derived follow-up turns
+15) **Per-session scratchpad** now provides a lightweight local notes area tied to each session for takeaways and working notes outside the main transcript
+16) **Model compare mode** now provides a focused side-by-side tool to run one prompt against two installed local models and compare outputs without altering normal chat flow
+17) **Session memory** now stores a few user-edited, per-session reply preferences locally and optionally inserts them into requests for that session only
 
 Current focus should be reliability, polish, and guardrails (not sweeping architecture rewrites).
 
@@ -104,7 +102,7 @@ Use plain language and actionable buttons.
 - Harden multimodal paths (speech permissions, file parsing edge cases, capability messaging).
 - Improve message rendering polish (rich text/markdown-safe display).
 - Harden retry/recovery UX for transient local runtime failures.
-- Continue model management and trust-center roadmap items without compromising local-first behavior.
+- Continue model management without compromising local-first behavior.
 
 ## Output expectations per patch
 Provide:

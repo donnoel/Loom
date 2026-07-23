@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct ModelsView: View {
     let onModelSelectionChanged: () async -> Void
 
+    @Environment(\.colorScheme) private var colorScheme
     @State private var viewModel: ModelsViewModel
     @State private var isShowingServeHelp: Bool = false
     @State private var isShowingAddModelSheet: Bool = false
@@ -144,7 +145,7 @@ struct ModelsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .loomCard(cornerRadius: 12)
+        .loomFeatureCard(.tide, cornerRadius: 16)
     }
 
     private var statusDetailsCard: some View {
@@ -280,22 +281,22 @@ struct ModelsView: View {
 
                 Text(viewModel.installedModelCompanyCountryText(for: model))
                     .font(LoomTheme.Typography.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LoomTheme.textSecondary(colorScheme))
                     .lineLimit(2)
 
                 Text(viewModel.installedModelBestForText(for: model))
                     .font(LoomTheme.Typography.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LoomTheme.textSecondary(colorScheme))
                     .lineLimit(2)
 
                 Text(viewModel.installedModelCapabilitiesText(for: model))
                     .font(LoomTheme.Typography.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LoomTheme.textSecondary(colorScheme))
                     .lineLimit(2)
 
                 Text(viewModel.installedModelLastTrainedText(for: model))
                     .font(LoomTheme.Typography.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LoomTheme.textSecondary(colorScheme))
                     .lineLimit(1)
 
                 HStack(spacing: 10) {
@@ -308,12 +309,12 @@ struct ModelsView: View {
                     }
                 }
                 .font(LoomTheme.Typography.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(LoomTheme.textSecondary(colorScheme))
 
                 if let modifiedAt = model.modifiedAt {
                     Text("Updated \(modifiedAt.formatted(date: .abbreviated, time: .omitted))")
                         .font(LoomTheme.Typography.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(LoomTheme.textSecondary(colorScheme))
                 }
             }
 

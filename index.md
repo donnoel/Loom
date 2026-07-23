@@ -107,5 +107,5 @@ title: Loom
     <p class="eyebrow">Built for trust</p>
     <h2 id="foundation-title">The local foundation stays visible.</h2>
   </div>
-  <p>Loom stores sessions in Application Support with atomic metadata writes and append-only message history. The Trust Center shows where that data lives, how much space it uses, and recent local runtime health—without turning privacy into a vague promise.</p>
+  <p>Loom stores sessions in Application Support with atomic metadata writes and append-only message history, while the toolbar keeps local runtime readiness visible at a glance.</p>
 </section>

@@ -34,7 +34,6 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 🔊 **Optional Voice Replies** | Toggle read-aloud mode so new assistant replies are spoken after generation completes, using your chosen voice from Settings. |
 | 📎 **File Upload Grounding** | Attach local text/PDF files and Loom injects extracted excerpts as context for the next turn, with size/count guardrails and automatic context-budget trimming. |
 | 🎚️ **Composer Context Controls** | Choose concise/balanced/extended history and off/compact/full file context from the composer, with quieter UI defaults. |
-| 🛡️ **Trust Center** | Dedicated local-only panel showing where data lives, local storage footprint, attachment retention footprint, and recent local runtime health checks. |
 | 🧭 **Capability-Aware Guidance** | Model cards and chat composer clearly show which models support speech input/output and file uploads. |
 | 💬 **Animated Typing Pulse** | While Loom is generating, assistant placeholders show a pulsing typing indicator. |
 | ✍️ **Readable Chat Formatting** | Assistant text is normalized for paragraph/list readability when raw output arrives as a dense block, while keeping stable whitespace-preserving rendering during streaming to avoid visual "snap back." |
@@ -47,13 +46,10 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 🪄 **Assistant Quick Actions** | Copy replies as plain text/Markdown or create follow-up turns that summarize, simplify, professionalize, or checklist a response. |
 | ⏹️ **Stop Generation** | Cancel generation any time and keep the partial assistant response. |
 | 🧠 **Helpful Setup Gating** | Clear in-context guidance if no active model is selected or Ollama is unavailable. |
-| 🌐 **AI Service Monitor** | App → AI Status checks public status feeds for major chatbots (including Grok) and shows uptime + known issues in one place. |
-| ↕️ **Drag-Reorder AI Status** | Reorder AI Status cards with drag-and-drop, and Loom remembers your preferred order across refresh/relaunch. |
 | 🔁 **Model-Aware Context Switching** | If the active model changes for a session, the next turn uses user-only context to avoid old-model anchoring. |
 | 🔀 **In-Session Model Switcher** | Change the active model directly from the chat composer without leaving the current session. |
 | 🧩 **Model Picker** | View installed Ollama models with plain-language "good for" guidance plus maker/country and last-trained details, use streamlined actions (Set Active / Update / Delete), and keep model selection across launches until you change it. |
 | ↕️ **Drag-Reorder Models** | Reorder installed models in Model Library with drag-and-drop, and Loom remembers your order across refresh/relaunch. |
-| ℹ️ **System Info Sheet** | Open **App → Info** in the sidebar to see a plain-language walkthrough of how Loom, Ollama, and local models work together, with official source links per company. |
 | 📥 **In-App Model Install** | Use **Add Model…** to browse a focused curated catalog (Qwen 3.5 9B, DeepSeek R1 8B, Gemma 3 4B, Gemma 4 E4B), review friendly summaries, and install with live progress + cancel support. |
 | 🧹 **Model Cleanup** | Delete installed models directly from Loom (with confirmation and active-model safety checks). |
 | 💽 **Disk Awareness** | Model Library shows local free-space info and warns when free space is below 10%. |
@@ -82,13 +78,10 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Use Session Memory** from the session toolbar to edit local reply preferences for that chat
 - **Open Scratchpad** from the session toolbar to keep notes beside the transcript
 - **Use Assistant Quick Actions** from an assistant message context menu to copy or transform a reply
-- **Open Trust Center** from **App → Trust Center** for local data location, footprint, and runtime health visibility
 - **Tune Voice Quality** in Settings with a voice picker and preview button
 - **Auto-Correct + Spell Check** in the message field (uses your macOS Keyboard settings)
 - **Stop** to cancel streaming while keeping partial text
 - **Jump to Bottom** with the floating down-arrow when you scroll up in long chats
-- **Check AI Service Health** from **App → AI Status** for quick uptime and incident visibility
-- **Reorder AI Status Cards** by dragging service cards in **App → AI Status**
 - **Export Session** from toolbar or `⌘⇧E`
 - **Models** from sidebar for setup, diagnostics, and update checks in one place
 - **Reorder Installed Models** by dragging model cards in Model Library
@@ -150,7 +143,7 @@ Side-by-side local model comparison coordinator:
 - Keeps compare output separate from normal chat transcripts
 
 ### **Root UI (SwiftUI + NavigationSplitView)**
-- Sidebar areas: Sessions, Models, Compare, Info, AI Status, Trust Center, Settings
+- Sidebar areas: Sessions, Models, Compare, Settings
 - Status pill in toolbar with quick readiness visibility (shows `Checking…` until initial local status refresh completes)
 - Session detail optimized for steady, low-jank streaming updates
 
@@ -203,7 +196,6 @@ Loom/
 │   ├── Sessions/
 │   ├── Models/
 │   ├── Status/
-│   ├── Trust/
 │   ├── Settings/
 │   ├── Sidebar/
 │   └── Theme/
@@ -235,7 +227,7 @@ Also included:
 - `SessionMessagesViewModel` context controls (history/file modes), context budgeting, and attachment-context toggles
 - `ModelsViewModel` refresh/install/update/delete and safety rails
 - `RootViewModel` load/rename/pin/archive/tags/delete flows
-- `StatusViewModel` local runtime-health history snapshots for Trust Center
+- `StatusViewModel` local Ollama/model readiness behavior
 - `CompareModeViewModel` two-model compare behavior and validation
 - `OllamaChatClient` stream-line parsing and transport-level stream error mapping
 - `OllamaClient` diagnosis/list/delete/pull network-path behavior via mocked transport
@@ -267,7 +259,7 @@ Also included:
 - [ ] Refine session search/filtering polish
 - [ ] Improve message rendering polish (bubbles + richer markdown)
 - [ ] Add chat export enhancements
-- [ ] Deepen trust center + model update workflows
+- [ ] Deepen model update workflows
 - [ ] Continue hardening local engine resiliency and diagnostics
 
 ---

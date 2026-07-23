@@ -362,10 +362,10 @@ struct SessionDetailView: View {
                             .frame(minHeight: 30)
                             .background(
                                 Capsule(style: .continuous)
-                                    .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.05))
+                                    .fill(LoomTheme.controlFill(colorScheme))
                                     .overlay(
                                         Capsule(style: .continuous)
-                                            .stroke(LoomTheme.surfaceBorder(colorScheme).opacity(0.55), lineWidth: 0.75)
+                                            .stroke(LoomTheme.chromaticBorder(colorScheme), lineWidth: 0.75)
                                     )
                             )
                         }
@@ -442,12 +442,17 @@ struct SessionDetailView: View {
                 .background {
                     let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
                     shape
-                        .fill(colorScheme == .dark ? Color(red: 0.13, green: 0.13, blue: 0.14) : Color.white.opacity(0.98))
+                        .fill(LoomTheme.composerFill(colorScheme))
                         .overlay {
-                            shape.strokeBorder(LoomTheme.surfaceBorder(colorScheme).opacity(0.52), lineWidth: 1)
+                            shape.strokeBorder(LoomTheme.chromaticBorder(colorScheme), lineWidth: 1)
                         }
                 }
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.09 : 0.04), radius: 2, x: 0, y: 1)
+                .shadow(
+                    color: LoomTheme.ultraviolet.opacity(colorScheme == .dark ? 0.18 : 0.09),
+                    radius: 10,
+                    x: 0,
+                    y: 4
+                )
                 .padding(.top, 10)
 
                 Spacer(minLength: 0)
@@ -872,7 +877,7 @@ struct SessionDetailView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .loomCard(cornerRadius: 12)
+        .loomFeatureCard(.sunset, cornerRadius: 16)
         .padding(.vertical, 6)
     }
 
@@ -1226,6 +1231,8 @@ private struct MessageRowView: View, Equatable {
 }
 
 private struct StarterPromptChip: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     let prompt: String
     let onTap: () -> Void
     @State private var isHovered: Bool = false
@@ -1240,10 +1247,13 @@ private struct StarterPromptChip: View {
                 .padding(.vertical, 8)
                 .background(
                     Capsule(style: .continuous)
-                        .fill(Color.accentColor.opacity(isHovered ? 0.16 : 0.10))
+                        .fill(LoomTheme.controlFill(colorScheme))
                         .overlay(
                             Capsule(style: .continuous)
-                                .stroke(Color.primary.opacity(isHovered ? 0.18 : 0.10), lineWidth: 1)
+                                .stroke(
+                                    LoomTheme.chromaticBorder(colorScheme),
+                                    lineWidth: isHovered ? 1.25 : 0.75
+                                )
                         )
                 )
         }
@@ -1299,11 +1309,13 @@ private struct ComposerUtilityIconChrome: View {
             .frame(width: 28, height: 28)
             .background(
                 Circle()
-                    .fill(
-                        isActive
-                            ? (colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.10))
-                            : (colorScheme == .dark ? Color.white.opacity(0.03) : Color.black.opacity(0.04))
-                    )
+                    .fill(isActive ? LoomTheme.controlFill(colorScheme) : LoomTheme.cardWash(colorScheme))
+                    .overlay {
+                        if isActive {
+                            Circle()
+                                .strokeBorder(LoomTheme.chromaticBorder(colorScheme), lineWidth: 0.75)
+                        }
+                    }
             )
     }
 }

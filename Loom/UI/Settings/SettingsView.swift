@@ -69,14 +69,7 @@ struct SettingsView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(LoomTheme.accentGradient(for: colorScheme).opacity(colorScheme == .dark ? 0.28 : 0.16))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.primary.opacity(0.10), lineWidth: 1)
-        )
+        .loomFeatureCard(.sunset, cornerRadius: 16)
     }
 
     private var automationCard: some View {
@@ -84,10 +77,10 @@ struct SettingsView: View {
             Text("Automation")
                 .font(LoomTheme.Typography.sectionTitle)
 
-            Toggle("Refresh status automatically", isOn: $statusAutoRefreshEnabled)
+            Toggle("Refresh local readiness automatically", isOn: $statusAutoRefreshEnabled)
             Toggle("Check model availability automatically", isOn: $modelsAutoCheckEnabled)
 
-            Text("Turn these off if you prefer manual refresh while troubleshooting.")
+            Text("Turn these off if you prefer manual checks while troubleshooting.")
                 .font(LoomTheme.Typography.caption)
                 .foregroundStyle(.secondary)
         }
