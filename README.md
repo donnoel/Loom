@@ -1,16 +1,20 @@
-# 🧵 **Loom**
+# **Loom**
+
 ### *An offline-first local LLM workspace for macOS.*
 
 <p align="center">
-  <img src="https://img.shields.io/badge/SwiftUI-MVVM-orange?logo=swift">
-  <img src="https://img.shields.io/badge/Platform-macOS-blue">
-  <img src="https://img.shields.io/badge/Runtime-Ollama_(local)-green">
-  <img src="https://img.shields.io/badge/Storage-JSONL-purple">
+  <img src="https://img.shields.io/badge/SwiftUI-MVVM-orange?logo=swift" alt="SwiftUI: MVVM">
+  <img src="https://img.shields.io/badge/Platform-macOS-blue" alt="Platform: macOS">
+  <img src="https://img.shields.io/badge/Runtime-Ollama_(local)-green" alt="Runtime: Ollama (local)">
+  <img src="https://img.shields.io/badge/Storage-JSONL-purple" alt="Storage: JSONL">
 </p>
 
 ---
 
-## ✨ What is Loom?
+## ✨ Overview
+
+<a id="-what-is-loom"></a>
+<a id="what-is-loom"></a>
 
 **Loom** is a macOS-first workspace for local AI chats.
 
@@ -20,9 +24,20 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - Local model inference through **Ollama**
 - Helpful setup guidance when anything is missing
 
----
-
 ## 💎 Core Features
+
+| Feature | What it does |
+| --- | --- |
+| **Local chats** | Organize local AI conversations in a macOS workspace. |
+| **Search and organization** | Find and manage chats through the documented sidebar tools. |
+| **Comparison** | Review model responses through the Compare workflow. |
+| **Local records** | Keep chats, scratchpads, and memory in the documented on-disk layout. |
+
+<details>
+<summary>Feature details and controls</summary>
+
+<a id="-core-features"></a>
+<a id="core-features"></a>
 
 | Feature | Description |
 |--------|-------------|
@@ -58,9 +73,10 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 📤 **Markdown Export** | Export any session to Markdown (`⌘⇧E` command + toolbar action). |
 | 🔒 **Privacy-First by Default** | Chats and model usage stay local to your Mac. |
 
----
+<a id="-controls"></a>
+<a id="controls"></a>
 
-## 🎛 Controls
+### Controls
 
 - **Create a New Chat** with the square-and-pencil toolbar button or the always-visible sidebar entry
 - **Auto-Name New Sessions** by sending your first message (title is derived from the opening request)
@@ -91,11 +107,85 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Add Model…** from Model Library to install curated models without leaving Loom
 - **Automation toggles** in Settings let you disable background status/model checks and use manual Refresh instead
 
+</details>
+
 ---
 
-## 🧠 Architecture Overview
+## 🚀 Getting Started
 
-### **SessionStore (actor)**
+<a id="-tests"></a>
+<a id="tests"></a>
+
+### Tests
+
+`LoomTests` includes focused coverage across persistence, formatting, services, and view models:
+- `SessionStore` create/update/delete + append/load JSONL behavior
+- `SessionStore` scratchpad persistence plus global memory sharing and legacy migration
+- `ChatTemplateLibrary` template persistence and reset behavior
+- `SessionSearchService` title and message search
+- `ChatDisplayFormatter` dense-text paragraph/list normalization behavior
+- `ModelCatalog` loading and curated model lookups
+- `DiskSpaceSnapshot` probe-path ordering/deduplication rules
+- `SessionMessagesViewModel` send/stream/cancel/retry/failure/model-switch context flows
+- `SessionMessagesViewModel` context controls (history/file modes), context budgeting, and attachment-context toggles
+- `ModelsViewModel` refresh/install/update/delete and safety rails
+- `RootViewModel` load/rename/pin/archive/tags/delete flows
+- `StatusViewModel` local Ollama/model readiness behavior
+- `CompareModeViewModel` two-model compare behavior and validation
+- `OllamaChatClient` stream-line parsing and transport-level stream error mapping
+- `OllamaClient` diagnosis/list/delete/pull network-path behavior via mocked transport
+
+`LoomUITests` covers key end-to-end desktop flows:
+- Models recovery navigation from setup guidance
+- Session create/delete
+- Setup guidance when no model is active
+- Streaming reply path
+- Return-key sending and compact composer layout
+- Long model-label layout safety for composer send-button hittability
+- Stop generation with relaunch verification
+
+<a id="-getting-started"></a>
+<a id="getting-started"></a>
+
+1. Install **Ollama** on your Mac (`https://ollama.com/download`)
+2. Start Ollama (app launch or `ollama serve`)
+3. Pull at least one model from Loom's current catalog (example: `ollama pull qwen3.5:9b`)
+4. Open `Loom.xcodeproj` in a current Xcode with the macOS 26.2 SDK available
+5. Build and run the **Loom** scheme
+6. In Loom, open **Models** and select an active model
+7. Open or create a chat and start chatting
+
+To reproduce the warning-clean CI build and test locally:
+
+```sh
+xcodebuild \
+  -project Loom.xcodeproj \
+  -scheme Loom \
+  -configuration Debug \
+  -destination "platform=macOS,arch=arm64" \
+  -parallel-testing-enabled NO \
+  CODE_SIGN_IDENTITY="-" \
+  DEVELOPMENT_TEAM="" \
+  GCC_TREAT_WARNINGS_AS_ERRORS=YES \
+  SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+  clean test
+```
+
+### Isolated UI tests
+
+UI tests use a temporary `LOOM_APP_SUPPORT_ROOT`, explicit `LOOM_UI_TEST_RESET_DEFAULTS` / `LOOM_UI_TEST_RESET_STORAGE`, and deterministic `LOOM_UI_TEST_ACTIVE_MODEL_TAG` / `LOOM_UI_TEST_CHAT_STUB_SCENARIO` values. Preserve these controls so tests do not read the normal Application Support store or require live Ollama responses.
+
+## 🧠 How It Works
+
+<details>
+<summary>Architecture and component reference</summary>
+
+<a id="-architecture-overview"></a>
+<a id="architecture-overview"></a>
+
+### Architecture Overview
+
+#### **SessionStore (actor)**
 Persistence owner for sessions and messages:
 - Bootstraps app storage folders
 - CRUD for session metadata
@@ -103,13 +193,13 @@ Persistence owner for sessions and messages:
 - Atomic scratchpad and global memory writes, including migration from legacy per-session memory
 - Deterministic session sorting via `updatedAt`
 
-### **SessionSearchService (actor)**
+#### **SessionSearchService (actor)**
 Search coordinator for saved sessions:
 - Searches session titles and message contents
 - Returns snippets that can jump back into the matching chat
 - Keeps per-session read failures isolated so one bad transcript does not break search
 
-### **OllamaClient (actor)**
+#### **OllamaClient (actor)**
 Connectivity + model discovery:
 - Probes resilient local endpoints (`localhost`, `127.0.0.1`, `[::1]`)
 - Caches the last reachable base URL
@@ -117,14 +207,14 @@ Connectivity + model discovery:
 - Lists installed models from Ollama API
 - Pulls and deletes models via Ollama HTTP endpoints with install-progress streaming
 
-### **OllamaChatClient (actor)**
+#### **OllamaChatClient (actor)**
 Streaming chat transport:
 - Uses `POST /api/chat` with streaming enabled
 - Parses line-delimited JSON stream chunks
 - Emits incremental assistant deltas
 - Surfaces user-friendly error states
 
-### **SessionMessagesViewModel (@MainActor)**
+#### **SessionMessagesViewModel (@MainActor)**
 Chat interaction coordinator:
 - Loads/persists messages per session
 - Applies model + reachability gating before send
@@ -139,20 +229,21 @@ Chat interaction coordinator:
 - Exposes model capability gating for speech/file tools and inline guidance
 - Exposes inline banner state for guidance
 
-### **CompareModeViewModel (@MainActor)**
+#### **CompareModeViewModel (@MainActor)**
 Side-by-side local model comparison coordinator:
 - Loads installed Ollama models for left/right selection
 - Runs the same prompt against two different models
 - Keeps compare output separate from normal chat transcripts
 
-### **Root UI (SwiftUI + NavigationSplitView)**
+#### **Root UI (SwiftUI + NavigationSplitView)**
 - Sidebar areas: Sessions, Models, Compare, Settings
 - Status pill in toolbar with quick readiness visibility (shows `Checking…` until initial local status refresh completes)
 - Session detail optimized for steady, low-jank streaming updates
 
----
+<a id="-data-layout"></a>
+<a id="data-layout"></a>
 
-## 🗄️ Data Layout
+### Data Layout
 
 Loom stores data in Application Support:
 
@@ -173,9 +264,10 @@ Notes:
 - The root `memory.json` stores optional global reply preferences and writes atomically
 - If global memory is missing, Loom can migrate a legacy per-session `memory.json` when that chat is opened
 
----
+<a id="-project-structure"></a>
+<a id="project-structure"></a>
 
-## 📁 Project Structure
+### Project Structure
 
 ```text
 Loom/
@@ -220,67 +312,27 @@ Also included:
 - `LoomTests/`
 - `LoomUITests/`
 
----
+### Chat collections
 
-## 🧪 Tests
+Chat metadata stores `collectionName`; the sidebar groups chats by collection, and **Set Collection…** changes that organization without moving the chat's stored files.
 
-`LoomTests` includes focused coverage across persistence, formatting, services, and view models:
-- `SessionStore` create/update/delete + append/load JSONL behavior
-- `SessionStore` scratchpad persistence plus global memory sharing and legacy migration
-- `ChatTemplateLibrary` template persistence and reset behavior
-- `SessionSearchService` title and message search
-- `ChatDisplayFormatter` dense-text paragraph/list normalization behavior
-- `ModelCatalog` loading and curated model lookups
-- `DiskSpaceSnapshot` probe-path ordering/deduplication rules
-- `SessionMessagesViewModel` send/stream/cancel/retry/failure/model-switch context flows
-- `SessionMessagesViewModel` context controls (history/file modes), context budgeting, and attachment-context toggles
-- `ModelsViewModel` refresh/install/update/delete and safety rails
-- `RootViewModel` load/rename/pin/archive/tags/delete flows
-- `StatusViewModel` local Ollama/model readiness behavior
-- `CompareModeViewModel` two-model compare behavior and validation
-- `OllamaChatClient` stream-line parsing and transport-level stream error mapping
-- `OllamaClient` diagnosis/list/delete/pull network-path behavior via mocked transport
+</details>
 
-`LoomUITests` covers key end-to-end desktop flows:
-- Models recovery navigation from setup guidance
-- Session create/delete
-- Setup guidance when no model is active
-- Streaming reply path
-- Return-key sending and compact composer layout
-- Long model-label layout safety for composer send-button hittability
-- Stop generation with relaunch verification
+## 🔒 Data and Privacy
 
----
+Chats, scratchpads, and memory are stored in the documented local data layout.
+Model responses use the configured local Ollama runtime. UI-test fixtures use an
+explicit temporary store and deterministic response stubs.
 
-## 🚀 Getting Started
+## 📚 Documentation
 
-1. Install **Ollama** on your Mac (`https://ollama.com/download`)  
-2. Start Ollama (app launch or `ollama serve`)  
-3. Pull at least one model from Loom's current catalog (example: `ollama pull qwen3.5:9b`)
-4. Open `Loom.xcodeproj` in a current Xcode with the macOS 26.2 SDK available
-5. Build and run the **Loom** scheme  
-6. In Loom, open **Models** and select an active model  
-7. Open or create a chat and start chatting
-
-To reproduce the warning-clean CI build and test locally:
-
-```sh
-xcodebuild \
-  -project Loom.xcodeproj \
-  -scheme Loom \
-  -configuration Debug \
-  -destination "platform=macOS,arch=arm64" \
-  -parallel-testing-enabled NO \
-  CODE_SIGN_IDENTITY="-" \
-  DEVELOPMENT_TEAM="" \
-  GCC_TREAT_WARNINGS_AS_ERRORS=YES \
-  SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
-  clean test
-```
-
----
+- [Repository guidance](AGENTS.md)
+- [Project guide](AGENTS.project.md)
 
 ## 🗺️ Roadmap
+
+<a id="-roadmap"></a>
+<a id="roadmap"></a>
 
 - [ ] Refine session search/filtering polish
 - [ ] Improve message rendering polish (bubbles + richer markdown)
@@ -290,10 +342,10 @@ xcodebuild \
 
 ---
 
-## Credits
+## 🤝 Credits
+
+<a id="credits"></a>
 
 Built with care by **Don Noel** and Codex collaboration.
-
----
 
 > *Loom is designed to make local AI feel calm, capable, and private by default.*
