@@ -100,12 +100,9 @@ Use plain language and actionable buttons.
 - App Intents metadata generation is disabled in build settings to keep builds warning-clean for this target set.
 - If you introduce new files, ensure they are included in the correct target.
 
-## Near-term priorities
-- Strengthen automated tests for send/stream/cancel/failure persistence paths.
-- Harden multimodal paths (speech permissions, file parsing edge cases, capability messaging).
-- Improve message rendering polish (rich text/markdown-safe display).
-- Harden retry/recovery UX for transient local runtime failures.
-- Continue model management without compromising local-first behavior.
+## Work tracking
+
+[GitHub Issues](https://github.com/donnoel/Loom/issues) owns open work, priority, and assignment. [Issue #9](https://github.com/donnoel/Loom/issues/9) preserves the former roadmap and near-term improvement themes for deferred review against current capabilities. These are not confirmed missing features or test gaps; do not revive completed issues without new evidence. Keep this guide focused on constraints and reference rather than a competing task list.
 
 ## Output expectations per patch
 Provide:
