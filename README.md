@@ -324,6 +324,10 @@ Chats, scratchpads, and memory are stored in the documented local data layout.
 Model responses use the configured local Ollama runtime. UI-test fixtures use an
 explicit temporary store and deterministic response stubs.
 
+## Work tracking
+
+[GitHub Issues](https://github.com/donnoel/Loom/issues) is the authoritative place for open work, priorities, and ownership. Documentation describes the product and preserves reference/history; it is not a separate backlog. Check existing and closed issues before adding follow-ups. Optional ideas are not implementation commitments.
+
 ## 📚 Documentation
 
 - [Repository guidance](AGENTS.md)
@@ -334,11 +338,7 @@ explicit temporary store and deterministic response stubs.
 <a id="-roadmap"></a>
 <a id="roadmap"></a>
 
-- [ ] Refine session search/filtering polish
-- [ ] Improve message rendering polish (bubbles + richer markdown)
-- [ ] Add chat export enhancements
-- [ ] Deepen model update workflows
-- [ ] Continue hardening local engine resiliency and diagnostics
+Optional roadmap ideas and their reconciliation with delivered capabilities are tracked in [issue #9](https://github.com/donnoel/Loom/issues/9). They remain deferred discovery, not confirmed defects or an active release commitment.
 
 ---
 
