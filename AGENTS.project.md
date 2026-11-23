@@ -6,8 +6,8 @@
 **Loom** is a macOS-first, offline-first local LLM workspace designed for non-technical users.
 Core values: **privacy, resilience, calm UX, Apple-native polish**.
 
-## Current product phase (updated)
-We have the V1 local chat spine in place:
+## Current capabilities
+
 1) **Sessions** are disk-backed (list/create/delete/rename/export)
 2) **messages.jsonl** is append-only per session
 3) **Local Ollama model selection + status** are integrated
@@ -15,7 +15,7 @@ We have the V1 local chat spine in place:
 5) **Stop/cancel generation** keeps partial output and persists it
 6) **Multimodal chat controls** now include optional speech input/output and uploaded file context for supported models, with guardrails on attachment size/count/context budget and user-configurable voice picker/preview controls
 7) **Model Library UX** now supports drag-and-drop reordering of installed models with persisted order across refresh/relaunch
-8) **Session UX polish** now includes a cleaner chat-first dark visual treatment with calmer selected-session emphasis (bold + color cue), clearer chat bubble readability, a simplified composer panel (including preserved macOS autocorrect behavior while typing), friendly empty-state onboarding, starter prompt chips for non-technical users, and an always-visible `New Chat` entry at the top of the Chats sidebar
+8) **Chat workspace** supports light and dark appearances, clear session selection, a composer with macOS autocorrect, starter prompts, and an always-visible `New Chat` entry in the Chats sidebar
 9) **In-session model switching** is available from the chat composer so users can change models without leaving their active session
 10) **Automatic session naming** now derives a concise topic-style title from the first user request when the title is still the default
 11) **Composer context controls** now let users choose concise/balanced/extended history and off/compact/full file context from a compact Tools menu
@@ -26,8 +26,6 @@ We have the V1 local chat spine in place:
 16) **Model compare mode** now provides a focused side-by-side tool to run one prompt against two installed local models and compare outputs without altering normal chat flow
 17) **Global memory** now stores a few user-edited reply preferences locally and optionally inserts them into requests across every chat
 18) **Chat templates** provide four customizable prompts in the composer, with edit and reset controls in Settings and persistence through `UserDefaults`
-
-Current focus should be reliability, polish, and guardrails (not sweeping architecture rewrites).
 
 ## Architecture snapshot (current)
 - **SwiftUI** with `NavigationSplitView` for macOS layout.
@@ -63,7 +61,7 @@ When user sends a message:
 
 Additional expectations:
 - Keep the user draft intact if send fails.
-- Throttle/coalesce streaming UI updates (currently ~50ms).
+- Coalesce streaming UI updates using the interval in `SessionMessagesViewModel`.
 - Keep context bounded by the selected composer policy (history/file context levels + internal budget guardrails).
 - If active model changes for a session (including after leaving and returning), use user-only context for the next turn to avoid old-model anchoring.
 - Avoid full message-list reload per token.
@@ -79,7 +77,7 @@ Use plain language and actionable buttons.
 ## User experience goals
 - Calm, simple, “Finder-like” interactions.
 - Sessions feel like documents/projects.
-- Rename should feel native (context menu rename; inline edit; Return commits; Escape cancels).
+- Rename opens a sheet from the toolbar or context menu. Return submits and Cancel dismisses the sheet.
 - Chat should feel immediate: quick placeholder + live stream + stable scrolling.
 
 ## Coding conventions
@@ -102,7 +100,7 @@ Use plain language and actionable buttons.
 
 ## Work tracking
 
-[GitHub Issues](https://github.com/donnoel/Loom/issues) owns open work, priority, and assignment. [Issue #9](https://github.com/donnoel/Loom/issues/9) preserves the former roadmap and near-term improvement themes for deferred review against current capabilities. These are not confirmed missing features or test gaps; do not revive completed issues without new evidence. Keep this guide focused on constraints and reference rather than a competing task list.
+[GitHub Issues](https://github.com/donnoel/Loom/issues) owns open work, priority, and assignment. [Issue #9](https://github.com/donnoel/Loom/issues/9) records the review of earlier roadmap ideas against current capabilities. Check existing issues and current behavior before filing a concrete follow-up.
 
 ## Output expectations per patch
 Provide:
@@ -114,7 +112,7 @@ Provide:
 ## CI reliability and local validation
 
 - For ordinary changes, start with the narrowest relevant build, unit test or UI check. Expand for shared behavior, persistence, startup or release risk. Documentation and local tool-selection helper changes need scoped structural/contract checks; they do not require an application rebuild solely to repeat CI.
-- Use `bash scripts/local-check.sh <command> [args...]` for local checks. It selects the fixed local Xcode 27.0 (27A266a), rejects conflicting compiler selections, and never installs or switches global tools. Use the shared Apple target helper for concrete destinations. Hosted CI baselines remain separate.
+- Use `bash scripts/local-check.sh <command> [args...]` for local checks. It selects the fixed local Xcode 27.0 (27A266a) and rejects conflicting compiler selections. For native Mac builds and tests, use `python3 /Users/donnoel/Development/DevSystem/scripts/apple-local.py run mac -- xcodebuild` with Loom's project, scheme, and focused action arguments. The shared helper supplies the destination and serial test settings.
 - GitHub keeps Xcode 26.6 on macOS arm64. Its strict `ci.sh` may reject the local Xcode 27 compiler; this is a documented baseline difference. Do not switch local compilers or create a fresh simulator automatically. Historical matched-CI reproduction must be explicitly requested and scoped separately; keep existing hosted checks intact.
 - Run the complete affected suites when changing build/test workflow behavior, test harnesses or shared fixtures, or when reproducing a hosted failure. Full local CI is not a blanket prerequisite for every edit. Keep GitHub CI enabled and all existing suites/assertions; a focused pass is not a full-suite pass.
 - Check installed tools and equivalent capabilities before proposing a download. Do not install or switch global tools merely to obtain exact CI parity for an unrelated change. Report local compiler/runtime/browser/OS differences and checks not run; only observed GitHub results establish hosted CI success.

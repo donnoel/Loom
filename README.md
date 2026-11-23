@@ -45,14 +45,14 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 🏷️ **Auto Session Titles** | New sessions are renamed from your first prompt so conversations are easier to scan later. |
 | 💾 **Disk-Backed Persistence** | Each chat stores `metadata.json`, append-only `messages.jsonl`, and an optional `scratchpad.txt`; shared preferences live in a global `memory.json`. |
 | ⚡ **Streaming Assistant Replies** | Assistant responses stream live into the UI as tokens arrive. |
-| 🎙️ **Speech Input (Push-to-Talk)** | Use the mic button to dictate directly into the draft field with on-device speech recognition. |
+| 🎙️ **Speech Input** | Toggle the mic button to start or stop dictation into the draft field using Apple Speech Recognition. |
 | 🔊 **Optional Voice Replies** | Toggle read-aloud mode so new assistant replies are spoken after generation completes, using your chosen voice from Settings. |
 | 📎 **File Upload Grounding** | Attach local text/PDF files and Loom injects extracted excerpts as context for the next turn, with size/count guardrails and automatic context-budget trimming. Files are not copied into chat storage. |
 | 🎚️ **Composer Context Controls** | Choose concise/balanced/extended history and off/compact/full file context from the composer, with quieter UI defaults. |
 | 🧭 **Capability-Aware Guidance** | Model cards and chat composer clearly show which models support speech input/output and file uploads. |
 | 💬 **Animated Typing Pulse** | While Loom is generating, assistant placeholders show a pulsing typing indicator. |
-| ✍️ **Readable Chat Formatting** | Assistant text is normalized for paragraph/list readability when raw output arrives as a dense block, while keeping stable whitespace-preserving rendering during streaming to avoid visual "snap back." |
-| 🎨 **Chat-First Workspace Styling** | The app uses a cleaner dark workspace with flatter surfaces, calmer sidebar emphasis, and a simplified composer to keep focus on conversation content. |
+| ✍️ **Readable Chat Formatting** | Replies stream as plain text with whitespace preserved. Completed replies render Markdown, including fenced code blocks and tables, and normalize dense text for readability. |
+| 🎨 **Chat-First Workspace Styling** | Light and dark appearances keep the focus on the transcript with a simplified composer and clear sidebar selection. |
 | 💡 **Starter Prompt Chips** | New sessions include one-tap prompt suggestions that prefill the composer to help non-technical users get started quickly. |
 | 🧰 **Chat Templates** | Use four customizable prompt templates from the composer and edit or reset them in Settings. |
 | 📌 **Session Organization** | Pin important chats, archive old ones without deleting them, and use sidebar search across chat titles and messages. |
@@ -71,7 +71,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 | 💽 **Disk Awareness** | Model Library shows local free-space info and warns when free space is below 10%. |
 | 🩺 **Readiness Status** | Model Library + toolbar pill show ready/setup/not-ready state in plain language. |
 | 📤 **Markdown Export** | Export any session to Markdown (`⌘⇧E` command + toolbar action). |
-| 🔒 **Privacy-First by Default** | Chats and model usage stay local to your Mac. |
+| 🔒 **Privacy-First by Default** | Chat history stays on your Mac, and the curated models run locally. |
 
 <a id="-controls"></a>
 <a id="controls"></a>
@@ -102,10 +102,10 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - **Stop** to cancel streaming while keeping partial text
 - **Jump to Bottom** with the floating down-arrow when you scroll up in long chats
 - **Export Session** from toolbar or `⌘⇧E`
-- **Models** from sidebar for setup, diagnostics, and update checks in one place
+- **Models** from the sidebar for setup and diagnostics. **Check for Updates** asks Ollama to pull the latest version of each installed model.
 - **Reorder Installed Models** by dragging model cards in Model Library
 - **Add Model…** from Model Library to install curated models without leaving Loom
-- **Automation toggles** in Settings let you disable background status/model checks and use manual Refresh instead
+- **Automation toggles** in Settings let you disable automatic readiness and model availability checks and use **Refresh** instead
 
 </details>
 
@@ -124,6 +124,7 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 - `ChatTemplateLibrary` template persistence and reset behavior
 - `SessionSearchService` title and message search
 - `ChatDisplayFormatter` dense-text paragraph/list normalization behavior
+- `ChatMarkdownBlockParser` fenced code blocks and Markdown tables
 - `ModelCatalog` loading and curated model lookups
 - `DiskSpaceSnapshot` probe-path ordering/deduplication rules
 - `SessionMessagesViewModel` send/stream/cancel/retry/failure/model-switch context flows
@@ -147,29 +148,17 @@ It is built for people who want a clean, Finder-like experience with **local-fir
 <a id="-getting-started"></a>
 <a id="getting-started"></a>
 
-1. Install **Ollama** on your Mac (`https://ollama.com/download`)
-2. Start Ollama (app launch or `ollama serve`)
-3. Pull at least one model from Loom's current catalog (example: `ollama pull qwen3.5:9b`)
-4. Open `Loom.xcodeproj` in a current Xcode with the macOS 26.2 SDK available
-5. Build and run the **Loom** scheme
-6. In Loom, open **Models** and select an active model
-7. Open or create a chat and start chatting
+Loom requires macOS 26.2 or later.
 
-To reproduce the warning-clean CI build and test locally:
+1. Install [Ollama](https://ollama.com/download) and start the app or run `ollama serve`.
+2. Open `Loom.xcodeproj` with Xcode that supports the macOS 26.2 deployment target.
+3. Build and run the **Loom** scheme.
+4. Open **Models**, install a model with **Add Model…** if needed, and set an installed model as active.
+5. Open or create a chat.
 
-```sh
-xcodebuild \
-  -project Loom.xcodeproj \
-  -scheme Loom \
-  -configuration Debug \
-  -destination "platform=macOS,arch=arm64" \
-  -parallel-testing-enabled NO \
-  CODE_SIGN_IDENTITY="-" \
-  DEVELOPMENT_TEAM="" \
-  GCC_TREAT_WARNINGS_AS_ERRORS=YES \
-  SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
-  clean test
-```
+### Local validation and CI
+
+For local checks on the project’s development Mac, use the pinned Xcode launcher and shared native Mac target helper described in the [project guide](AGENTS.project.md#ci-reliability-and-local-validation). GitHub Actions uses a separately pinned Xcode and runs the build, unit tests, and UI tests through [`scripts/ci.sh`](scripts/ci.sh). The [CI workflow](.github/workflows/ci.yml) defines the hosted baseline.
 
 ### Isolated UI tests
 
@@ -236,7 +225,7 @@ Side-by-side local model comparison coordinator:
 - Keeps compare output separate from normal chat transcripts
 
 #### **Root UI (SwiftUI + NavigationSplitView)**
-- Sidebar areas: Sessions, Models, Compare, Settings
+- Sidebar areas include Chats, Models, Compare, and Settings.
 - Status pill in toolbar with quick readiness visibility (shows `Checking…` until initial local status refresh completes)
 - Session detail optimized for steady, low-jank streaming updates
 
@@ -321,8 +310,11 @@ Chat metadata stores `collectionName`; the sidebar groups chats by collection, a
 ## 🔒 Data and Privacy
 
 Chats, scratchpads, and memory are stored in the documented local data layout.
-Model responses use the configured local Ollama runtime. UI-test fixtures use an
-explicit temporary store and deterministic response stubs.
+Loom sends model requests to Ollama on your Mac. The curated models run locally.
+If you select an [Ollama cloud model](https://docs.ollama.com/cloud), Ollama sends
+the request to its cloud service. Optional mic dictation uses Apple Speech
+Recognition, which may send audio over the network for transcription. UI-test
+fixtures use a temporary store and deterministic response stubs.
 
 ## Work tracking
 
@@ -338,7 +330,7 @@ explicit temporary store and deterministic response stubs.
 <a id="-roadmap"></a>
 <a id="roadmap"></a>
 
-Optional roadmap ideas and their reconciliation with delivered capabilities are tracked in [issue #9](https://github.com/donnoel/Loom/issues/9). They remain deferred discovery, not confirmed defects or an active release commitment.
+[Issue #9](https://github.com/donnoel/Loom/issues/9) records the review of earlier roadmap ideas. Check [open issues](https://github.com/donnoel/Loom/issues?q=is%3Aissue+is%3Aopen) for planned work.
 
 ---
 

@@ -2,7 +2,7 @@ title: Loom
 description: A calm, offline-first local AI workspace for macOS.
 tagline: Local models. Durable conversations. Calm Mac-native work.
 project_label: Don Noel / Projects
-status_label: Local-first V1
+status_label: Local-first
 github_url: https://github.com/donnoel/Loom
 url: https://donnoel.github.io
 baseurl: /Loom
